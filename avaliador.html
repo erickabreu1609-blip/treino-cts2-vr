@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Avaliador CTS-2 VR</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Tela do avaliador: vídeo do mantenedor, estado, registro de ações e envio de dicas */
+:root {
+  --bg: #11161b;
+  --bg2: #0b0f13;
+  --fg: #eef1f3;
+  --muted: #a9b4bd;
+  --accent: #f2a400;
+  --ok: #23c552;
+  --err: #ff7a66;
+  --info: #3ea0e4;
+  --line: rgba(255, 255, 255, 0.16);
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; min-height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); }
+header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px; border-bottom: 1px solid var(--line);
+}
+header h1 { margin: 0 auto 0 0; font-size: 15px; font-weight: 600; }
+header h1 span { color: var(--accent); }
+#conexao { font-size: 12px; color: var(--muted); }
+#conexao.on { color: var(--ok); }
+button, input, textarea {
+  font: 500 14px var(--font-ui); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 6px; background: transparent;
+}
+button { padding: 8px 12px; cursor: pointer; }
+button.primario { background: var(--accent); border-color: var(--accent); color: #1a1300; font-weight: 600; }
+input, textarea { background: var(--bg2); padding: 10px 12px; font-weight: 400; }
+input:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#entrar { max-width: 420px; margin: 48px auto; padding: 0 16px; display: grid; gap: 12px; }
+#entrar h2 { margin: 0; font-size: 18px; }
+#entrar p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+#entrar form { display: flex; gap: 8px; }
+#codigo { flex: 1; min-width: 0; font-size: 22px; letter-spacing: 0.18em; font-variant-numeric: tabular-nums; }
+#erro { color: var(--err) !important; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; padding: 16px; }
+@media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+.video { position: relative; background: #000; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; aspect-ratio: 16 / 9; }
+video { width: 100%; height: 100%; object-fit: contain; display: block; }
+#semVideo { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; padding: 16px; }
+.lado { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.cartao { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 8px; min-width: 0; }
+.cartao h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+#estado { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 14px; margin: 0; }
+#estado dt { color: var(--muted); }
+#estado dd { margin: 0; font-weight: 500; }
+#estado dd.alerta { color: var(--err); }
+.rapidas { display: flex; flex-wrap: wrap; gap: 6px; }
+.rapidas button { font-size: 12px; padding: 6px 9px; text-align: left; }
+#dicaForm { display: grid; gap: 8px; }
+#dicaTexto { resize: vertical; min-height: 60px; }
+#enviada { font-size: 12px; color: var(--ok); min-height: 1em; }
+.registroTopo { display: flex; align-items: center; gap: 8px; }
+.registroTopo h2 { margin-right: auto; }
+.registroTopo button { font-size: 12px; padding: 5px 9px; }
+#log { list-style: none; margin: 0; padding: 0; max-height: 46vh; overflow: auto; font-size: 13px; }
+#log li { padding: 6px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 58px 1fr; gap: 8px; }
+#log time { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+#log li.erro span { color: var(--err); }
+#log li.painel span { color: var(--fg); }
+#log li.toque span { color: var(--muted); }
+#log li.sistema span { color: #8fc9f2; }
+#log small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Avaliador · máquina de chave <span>CTS-2</span></h1>
+  <span id="conexao">Desconectado</span>
+  <button id="btnSair" type="button" hidden>Desconectar</button>
+</header>
+
+<section id="entrar">
+  <h2>Acompanhar um mantenedor</h2>
+  <p>No celular do mantenedor, toque em <b>Avaliador</b> na barra de cima do treinamento. Aparece um código de 6 dígitos: digite aqui.</p>
+  <form id="entrarForm">
+    <input id="codigo" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="000000" aria-label="Código do mantenedor" required>
+    <button class="primario" type="submit">Conectar</button>
+  </form>
+  <p id="erro" hidden></p>
+</section>
+
+<main id="painel" hidden>
+  <div>
+    <div class="video">
+      <video id="video" autoplay playsinline muted></video>
+      <div id="semVideo">Aguardando o vídeo do mantenedor…</div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin:8px 0 0">No modo óculos o vídeo chega com a tela dividida em duas, como o mantenedor vê. <button id="btnTela" type="button" style="font-size:12px;padding:4px 8px;margin-left:4px">Tela cheia</button></p>
+  </div>
+  <div class="lado">
+    <section class="cartao" aria-label="Situação">
+      <h2>Situação</h2>
+      <dl id="estado">
+        <dt>Mantenedor</dt><dd id="eNome">–</dd>
+        <dt>Módulo</dt><dd id="eModo">–</dd>
+        <dt>Máquina</dt><dd id="ePos">–</dd>
+        <dt>Comutador</dt><dd id="eCom">–</dd>
+        <dt>Visão</dt><dd id="eVr">–</dd>
+      </dl>
+    </section>
+    <section class="cartao" aria-label="Dicas">
+      <h2>Mandar dica</h2>
+      <div class="rapidas" id="rapidas"></div>
+      <form id="dicaForm">
+        <textarea id="dicaTexto" maxlength="240" placeholder="Escreva uma correção ou dica curta"></textarea>
+        <button class="primario" type="submit">Enviar dica</button>
+        <span id="enviada" role="status"></span>
+      </form>
+    </section>
+    <section class="cartao" aria-label="Registro de ações">
+      <div class="registroTopo"><h2>Registro de ações</h2><button id="btnCsv" type="button">Baixar (CSV)</button></div>
+      <ul id="log"></ul>
+    </section>
+  </div>
+</main>
+
+<script src="peerjs.min.js"></script>
+<script>
+(function () {
+  const MODOS = { menuPassos: "Lista de passos 2 a 17", fim: "Resultado na tela", menu: "Menu", tour: "Tour da máquina", passo1: "Passo 1 · DAM e conectores", demo: "Máquina funcionando", explorar: "Explorar por dentro" };
+  const RAPIDAS = [
+    "Volte o comutador para AUTOMÁTICO antes de comandar.",
+    "Saia da área de movimentação das agulhas.",
+    "Faça o Apontar e Falar (Yoshi Yoshi) antes de agir.",
+    "Olhe o conector com mais atenção antes de decidir.",
+    "Confira a posição da chave de comando local.",
+    "Muito bem, pode seguir para o próximo passo."
+  ];
+  const $ = id => document.getElementById(id);
+  let peer = null, conn = null, registro = [], pessoa = "";
+
+  const rapidas = $("rapidas");
+  RAPIDAS.forEach(t => { const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.addEventListener("click", () => enviarDica(t)); rapidas.appendChild(b); });
+
+  function hora(t) { return new Date(t).toLocaleTimeString("pt-BR"); }
+  function addLog(ev) {
+    registro.push(ev);
+    const li = document.createElement("li"); li.className = ev.tipo;
+    const tm = document.createElement("time"); tm.textContent = hora(ev.t);
+    const sp = document.createElement("span"); sp.textContent = ev.texto;
+    if (ev.detalhe) { const sm = document.createElement("small"); sm.textContent = ev.detalhe; sp.appendChild(sm); }
+    li.append(tm, sp); $("log").prepend(li);
+  }
+  function mostrarEstado(e) {
+    if (!e) return;
+    pessoa = e.nome ? e.nome + (e.mat ? " · Mat. " + e.mat : "") : "Sem identificação";
+    $("eNome").textContent = pessoa;
+    $("eModo").textContent = MODOS[e.modo] || e.modo || "–";
+    $("ePos").textContent = e.posicao ? e.posicao.toUpperCase() : "–";
+    $("eCom").textContent = e.comutador === "manual" ? "MANUAL" : "AUTOMÁTICO";
+    $("eCom").className = e.comutador === "manual" ? "alerta" : "";
+    $("eVr").textContent = e.oculos ? "Modo óculos" : "Tela do celular";
+  }
+  function status(t, on) { $("conexao").textContent = t; $("conexao").className = on ? "on" : ""; }
+  function erro(t) { $("erro").textContent = t; $("erro").hidden = !t; }
+
+  function conectar(codigo) {
+    erro("");
+    if (!window.Peer) { erro("Não deu para carregar o módulo de conexão. Confira a internet e recarregue a página."); return; }
+    status("Conectando…");
+    peer = new Peer(undefined, Object.assign({ debug: 0 }, window.__peerCfg || {}));
+    peer.on("open", () => {
+      conn = peer.connect("cts2vr-" + codigo, { reliable: true });
+      conn.on("open", () => {
+        status("Conectado ao código " + codigo, true);
+        $("entrar").hidden = true; $("painel").hidden = false; $("btnSair").hidden = false;
+      });
+      conn.on("data", d => {
+        if (!d) return;
+        if (d.log) { registro = []; $("log").innerHTML = ""; d.log.forEach(addLog); }
+        if (d.ev) addLog(d.ev);
+        if (d.estado) mostrarEstado(d.estado);
+      });
+      conn.on("close", () => { status("O mantenedor encerrou a transmissão"); addLog({ t: Date.now(), tipo: "sistema", texto: "Transmissão encerrada pelo mantenedor" }); });
+    });
+    peer.on("call", call => {
+      call.answer();
+      call.on("stream", s => { $("video").srcObject = s; $("semVideo").hidden = true; $("video").play().catch(() => {}); });
+      call.on("close", () => { $("semVideo").hidden = false; $("semVideo").textContent = "O vídeo foi encerrado."; });
+    });
+    peer.on("error", e => {
+      if (e.type === "peer-unavailable") { erro("Código não encontrado. Confira os 6 dígitos na tela do mantenedor."); status("Desconectado"); sair(true); return; }
+      erro("Não foi possível conectar (" + (e.type || "erro") + "). A rede pode estar bloqueando; tente pelo 4G.");
+      status("Desconectado"); sair(true);
+    });
+  }
+  function sair(manterTela) {
+    if (peer) try { peer.destroy(); } catch (e) {}
+    peer = null; conn = null;
+    if (!manterTela) { $("painel").hidden = true; $("entrar").hidden = false; $("btnSair").hidden = true; status("Desconectado"); }
+  }
+  function enviarDica(t) {
+    t = (t || "").trim(); if (!t) return;
+    if (!conn || !conn.open) { $("enviada").textContent = "Sem conexão com o mantenedor."; return; }
+    conn.send({ dica: t });
+    addLog({ t: Date.now(), tipo: "sistema", texto: "Você enviou: " + t });
+    $("enviada").textContent = "Dica enviada.";
+    setTimeout(() => { $("enviada").textContent = ""; }, 3000);
+  }
+
+  $("entrarForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const c = $("codigo").value.replace(/\D/g, "");
+    if (c.length !== 6) { erro("O código tem 6 dígitos."); return; }
+    conectar(c);
+  });
+  $("dicaForm").addEventListener("submit", e => { e.preventDefault(); enviarDica($("dicaTexto").value); $("dicaTexto").value = ""; });
+  $("btnSair").addEventListener("click", () => sair(false));
+  $("btnTela").addEventListener("click", () => { const v = $("video"); (v.requestFullscreen || v.webkitEnterFullscreen || function () {}).call(v); });
+  $("btnCsv").addEventListener("click", () => {
+    const q = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+    const linhas = [["Hora", "Mantenedor", "Tipo", "Ação", "Detalhe"].map(q).join(";")]
+      .concat(registro.map(ev => [hora(ev.t), pessoa, ev.tipo, ev.texto, ev.detalhe].map(q).join(";")));
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["﻿" + linhas.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+    a.download = "avaliacao-cts2-" + new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-") + ".csv";
+    a.click();
+  });
+  const pre = new URLSearchParams(location.search).get("codigo");
+  if (pre) { $("codigo").value = pre; }
+})();
+</script>
+</body>
+</html>
