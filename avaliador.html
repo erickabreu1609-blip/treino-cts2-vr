@@ -46,6 +46,7 @@ input:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--acc
 #entrar form { display: flex; gap: 8px; }
 #codigo { flex: 1; min-width: 0; font-size: 22px; letter-spacing: 0.18em; font-variant-numeric: tabular-nums; }
 #erro { color: var(--err) !important; }
+#etapa { color: var(--fg) !important; }
 main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; padding: 16px; }
 @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
 .video { position: relative; background: #000; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; aspect-ratio: 16 / 9; }
@@ -90,6 +91,7 @@ video { width: 100%; height: 100%; object-fit: contain; display: block; }
     <input id="codigo" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="000000" aria-label="Código do mantenedor" required>
     <button class="primario" type="submit">Conectar</button>
   </form>
+  <p id="etapa" hidden></p>
   <p id="erro" hidden></p>
 </section>
 
@@ -141,7 +143,15 @@ video { width: 100%; height: 100%; object-fit: contain; display: block; }
     "Muito bem, pode seguir para o próximo passo."
   ];
   const $ = id => document.getElementById(id);
-  let peer = null, conn = null, registro = [], pessoa = "";
+  let peer = null, conn = null, registro = [], pessoa = "", timers = [];
+  // STUN para achar o caminho e TURN de reserva para redes que bloqueiam a ligação direta (4G, Wi-Fi corporativa)
+  const ICE = { iceServers: [
+    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun.cloudflare.com:3478"] },
+    { urls: ["turn:eu-0.turn.peerjs.com:3478", "turn:us-0.turn.peerjs.com:3478"], username: "peerjs", credential: "peerjsp" },
+    { urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turns:openrelay.metered.ca:443?transport=tcp"], username: "openrelayproject", credential: "openrelayproject" }
+  ] };
+  const etapa = t => { $("etapa").textContent = t; $("etapa").hidden = !t; };
+  const depois = (ms, fn) => timers.push(setTimeout(fn, ms));
 
   const rapidas = $("rapidas");
   RAPIDAS.forEach(t => { const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.addEventListener("click", () => enviarDica(t)); rapidas.appendChild(b); });
@@ -172,11 +182,20 @@ video { width: 100%; height: 100%; object-fit: contain; display: block; }
     erro("");
     if (!window.Peer) { erro("Não deu para carregar o módulo de conexão. Confira a internet e recarregue a página."); return; }
     status("Conectando…");
-    peer = new Peer(undefined, Object.assign({ debug: 0 }, window.__peerCfg || {}));
+    etapa("1 de 3 · Conectando ao serviço de conexão…");
+    peer = new Peer(undefined, Object.assign({ debug: 0, config: ICE }, window.__peerCfg || {}));
+    const meu = peer;
+    depois(15000, () => { if (peer === meu && !meu.open) { erro("O serviço de conexão não respondeu. Confira a internet deste aparelho e tente de novo."); etapa(""); status("Desconectado"); sair(true); } });
     peer.on("open", () => {
+      etapa("2 de 3 · Procurando o mantenedor com o código " + codigo + "…");
       conn = peer.connect("cts2vr-" + codigo, { reliable: true });
+      const c = conn;
+      depois(4000, () => { if (c.peerConnection && !c.open) etapa("2 de 3 · Mantenedor encontrado. Ligando os aparelhos (" + c.peerConnection.iceConnectionState + ")…"); });
+      depois(20000, () => { if (conn === c && !c.open) { erro("O código existe, mas a rede não deixou os aparelhos se ligarem. Tente os dois na mesma Wi-Fi ou os dois no 4G."); etapa(""); status("Desconectado"); sair(true); } });
       conn.on("open", () => {
+        etapa("");
         status("Conectado ao código " + codigo, true);
+        depois(15000, () => { if (!$("video").srcObject) $("semVideo").textContent = "O registro e as dicas estão funcionando, mas o vídeo não chegou. A rede pode estar bloqueando vídeo; tente os dois aparelhos na mesma Wi-Fi."; });
         $("entrar").hidden = true; $("painel").hidden = false; $("btnSair").hidden = false;
       });
       conn.on("data", d => {
@@ -189,16 +208,19 @@ video { width: 100%; height: 100%; object-fit: contain; display: block; }
     });
     peer.on("call", call => {
       call.answer();
+      $("semVideo").textContent = "Recebendo o vídeo do mantenedor…";
       call.on("stream", s => { $("video").srcObject = s; $("semVideo").hidden = true; $("video").play().catch(() => {}); });
       call.on("close", () => { $("semVideo").hidden = false; $("semVideo").textContent = "O vídeo foi encerrado."; });
     });
     peer.on("error", e => {
+      etapa("");
       if (e.type === "peer-unavailable") { erro("Código não encontrado. Confira os 6 dígitos na tela do mantenedor."); status("Desconectado"); sair(true); return; }
       erro("Não foi possível conectar (" + (e.type || "erro") + "). A rede pode estar bloqueando; tente pelo 4G.");
       status("Desconectado"); sair(true);
     });
   }
   function sair(manterTela) {
+    timers.forEach(clearTimeout); timers = [];
     if (peer) try { peer.destroy(); } catch (e) {}
     peer = null; conn = null;
     if (!manterTela) { $("painel").hidden = true; $("entrar").hidden = false; $("btnSair").hidden = true; status("Desconectado"); }

@@ -125,7 +125,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v08/10 17h</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v08/10 18h</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -205,7 +205,7 @@ body.vr #stick { display: none; }
 
   // ---------- Renderizador e cena ----------
   const stage = document.getElementById("stage");
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });   // preserveDrawingBuffer: o iPhone só transmite a tela ao avaliador com ele
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.shadowMap.enabled = true;
@@ -1579,27 +1579,42 @@ body.vr #stick { display: none; }
     for (const c of aval.conns) if (c.open) try { c.send({ ev, estado: avalEstado() }); } catch (e) {}
   }
   function txTexto(html) { txMsg.innerHTML = html; }
+  // STUN para achar o caminho e TURN de reserva para redes que bloqueiam a ligação direta (4G, Wi-Fi corporativa)
+  const ICE_AVAL = { iceServers: [
+    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun.cloudflare.com:3478"] },
+    { urls: ["turn:eu-0.turn.peerjs.com:3478", "turn:us-0.turn.peerjs.com:3478"], username: "peerjs", credential: "peerjsp" },
+    { urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turns:openrelay.metered.ca:443?transport=tcp"], username: "openrelayproject", credential: "openrelayproject" }
+  ] };
   function iniciarTransmissao() {
     txEl.hidden = false;
     if (aval.peer) return;
     if (!window.Peer) { txTexto("Não deu para carregar o módulo de transmissão. Confira a internet e toque de novo em Avaliador."); return; }
     const codigo = String(100000 + Math.floor(Math.random() * 900000));
     txTexto("Preparando a transmissão…");
-    const peer = new Peer("cts2vr-" + codigo, Object.assign({ debug: 0 }, window.__peerCfg || {}));
+    const peer = new Peer("cts2vr-" + codigo, Object.assign({ debug: 0, config: ICE_AVAL }, window.__peerCfg || {}));
     aval.peer = peer;
+    const semServico = setTimeout(() => { if (aval.peer === peer && !aval.codigo) { txTexto("O serviço de conexão não respondeu. Confira a internet do celular e toque em Avaliador de novo."); pararTransmissao(true); } }, 15000);
     peer.on("open", () => {
+      clearTimeout(semServico);
       aval.codigo = codigo; btnTx.setAttribute("aria-pressed", "true"); btnTx.textContent = "Avaliador " + codigo;
       const url = location.href.replace(/[^/]*([?#].*)?$/, "") + "avaliador.html";
       txTexto(`Código para o avaliador:<br><b>${codigo}</b><p>No outro aparelho, abra <u>${url.replace(/^https?:\/\//, "")}</u> e digite o código. Depois disso você pode entrar no modo óculos.</p>`);
       avalEnviar("sistema", "Transmissão iniciada");
     });
     peer.on("connection", conn => {
+      txTexto(`Código <b>${codigo}</b><p>O avaliador encontrou você. Ligando os dois aparelhos…</p>`);
+      const travou = setTimeout(() => { if (!conn.open) txTexto(`Código <b>${codigo}</b><p>O avaliador achou o código, mas a rede não deixou os aparelhos se ligarem. Tente os dois na mesma Wi-Fi ou os dois no 4G.</p>`); }, 20000);
       conn.on("open", () => {
+        clearTimeout(travou);
         aval.conns.push(conn);
         conn.send({ ola: true, log: aval.log.slice(-80), estado: avalEstado() });
         let stream = null;
         try { stream = renderer.domElement.captureStream(20); } catch (e) {}
-        if (stream) peer.call(conn.peer, stream);
+        if (stream) {
+          const call = peer.call(conn.peer, stream);
+          const pc = call && call.peerConnection;
+          if (pc) pc.addEventListener("iceconnectionstatechange", () => conn.open && conn.send({ ev: { t: Date.now(), tipo: "sistema", texto: "Vídeo: " + pc.iceConnectionState } }));
+        }
         else conn.send({ ev: { t: Date.now(), tipo: "sistema", texto: "Este aparelho não consegue enviar vídeo; só o registro de ações." } });
         txTexto(`Avaliador conectado ao código <b>${codigo}</b><p>Ele vê a sua tela e as suas ações e pode mandar dicas.</p>`);
         som.bip(); hint("Avaliador conectado: ele está vendo a sua tela.");
