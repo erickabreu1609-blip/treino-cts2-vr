@@ -46,11 +46,23 @@ button[aria-pressed="true"] { background: var(--accent); color: #1a1300; border-
 #tx p { margin: 0; color: var(--muted); }
 #tx .txBotoes { display: flex; gap: 8px; }
 #btnTx[aria-pressed="true"] { background: transparent; border-color: #23c552; color: #7be3a0; }
+#alertaRisco {
+  position: fixed; inset: 0; z-index: 7; pointer-events: none; display: grid; place-items: start center;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 70px);
+  box-shadow: inset 0 0 0 10px rgba(229, 83, 61, 0.9), inset 0 0 120px rgba(229, 83, 61, 0.55);
+  animation: piscaRisco 0.45s steps(2, start) infinite;
+}
+#alertaRisco b { display: block; background: #e5533d; color: #fff; padding: 8px 14px; border-radius: 8px 8px 0 0; font-size: 15px; letter-spacing: 0.08em; text-align: center; }
+#alertaRisco span { display: block; background: rgba(17, 22, 27, 0.92); color: #fff; padding: 8px 14px; border-radius: 0 0 8px 8px; font-size: 14px; max-width: min(520px, calc(100vw - 32px)); text-align: center; }
+body.vr #alertaRisco { place-items: center; padding-top: 0; }
+@keyframes piscaRisco { to { box-shadow: inset 0 0 0 4px rgba(229, 83, 61, 0.4), inset 0 0 40px rgba(229, 83, 61, 0.2); } }
 #dicaAval {
   position: fixed; z-index: 6; left: 50%; bottom: 72px; transform: translateX(-50%);
   width: min(560px, calc(100% - 32px)); padding: 12px 14px; border-radius: 10px;
   background: #0f2a3d; border: 1px solid #3ea0e4; font-size: 15px;
 }
+#dicaAval.coord { background: #2b2108; border-color: #f2a400; }
+#dicaAval.coord small { color: #ffd27a; }
 #dicaAval small { display: block; color: #8fc9f2; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px; }
 #exitVr {
   position: fixed; z-index: 3; right: 12px;
@@ -119,18 +131,36 @@ body.vr #stick { display: none; }
 .relScroll { overflow-x: auto; }
 #btnPessoa { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cfgRow output { min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; font-size: 13px; }
+#bib {
+  position: fixed; inset: 0; z-index: 9; overflow: auto; padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px 24px;
+  background: var(--bg);
+}
+#bib .bibTopo { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+#bib h2 { margin: 0 auto 0 0; font-size: 19px; }
+#bib > p { margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+#bibLista { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+#bibLista button { text-align: left; display: grid; gap: 6px; padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: #0b0f13; color: var(--fg); font: inherit; cursor: pointer; }
+#bibLista button:not(:disabled):hover { border-color: var(--accent); }
+#bibLista button:disabled { opacity: 0.6; cursor: default; }
+#bibLista b { font-size: 16px; }
+#bibLista small { font-size: 12px; color: var(--muted); }
+#bibLista span { font-size: 13px; }
+#bibLista i { justify-self: start; font-style: normal; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: #23c552; color: #04150a; }
+#bibLista button:disabled i { background: #3a434c; color: var(--fg); }
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v08/10 18h</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v08/10 21h</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
   <button id="btnCentro" type="button">Centralizar</button>
   <button id="btnRel" type="button">Relatório</button>
+  <button id="btnBib" type="button">Treinamentos</button>
+  <button id="btnAjustes" type="button">Ajustes</button>
   <button id="btnTx" type="button" aria-pressed="false" title="Deixar um avaliador acompanhar em outro aparelho">Avaliador</button>
   <button id="btnMenu" type="button">Menu</button>
 </div>
@@ -153,6 +183,12 @@ body.vr #stick { display: none; }
   <div id="txMsg">Preparando a transmissão…</div>
   <div class="txBotoes"><button id="txParar" type="button">Parar transmissão</button><button id="txFechar" type="button">Fechar</button></div>
 </div>
+<section id="bib" hidden aria-label="Biblioteca de treinamentos">
+  <div class="bibTopo"><h2>Biblioteca de treinamentos</h2><button id="bibFechar" type="button">Fechar</button></div>
+  <p>Escolha o treinamento. Cada procedimento (PRO) em VR aparece aqui; os resultados vão para o mesmo relatório.</p>
+  <div id="bibLista"></div>
+</section>
+<div id="alertaRisco" hidden role="alert"><b>AÇÃO DE RISCO</b><span></span></div>
 <div id="dicaAval" hidden role="status"><small>Dica do avaliador</small><span></span></div>
 <button id="exitVr" type="button" hidden>Sair do modo óculos</button>
 <button id="vrGear" type="button" hidden>Ajustar óculos</button>
@@ -169,11 +205,15 @@ body.vr #stick { display: none; }
   </form>
 </div>
 <div id="vrCfg" hidden>
-  <h2>Ajuste do óculos</h2>
+  <h2>Ajustes</h2>
   <p>Coloque o celular no óculos e ajuste até as duas imagens virarem uma só, nítida. A linha branca deve ficar no meio do óculos.</p>
   <div class="cfgRow"><span>Distância entre as lentes</span><button id="sepMenos" type="button">−</button><output id="sepVal"></output><button id="sepMais" type="button">+</button></div>
   <div class="cfgRow"><span>Correção da lente</span><button id="distMenos" type="button">−</button><output id="distVal"></output><button id="distMais" type="button">+</button></div>
   <div class="cfgRow"><span>Tamanho da tela (diagonal)</span><button id="telaMenos" type="button">−</button><output id="telaVal"></output><button id="telaMais" type="button">+</button></div>
+  <div class="cfgRow"><span>Nitidez no óculos</span><button id="qualMenos" type="button">−</button><output id="qualVal"></output><button id="qualMais" type="button">+</button></div>
+  <div class="cfgRow"><span>Quem executa as ações</span><button id="btnExecutor" type="button">Avatar</button></div>
+  <div class="cfgRow"><span>Trem de minério a cada</span><button id="tremMenos" type="button">−</button><output id="tremVal"></output><button id="tremMais" type="button">+</button></div>
+  <div class="cfgRow"><span>Voz do coordenador</span><button id="btnVoz" type="button">Ligada</button></div>
   <button id="cfgOk" type="button">Pronto</button>
 </div>
 
@@ -271,7 +311,7 @@ body.vr #stick { display: none; }
     const c = document.createElement("canvas"); c.width = c.height = tam;
     desenha(c.getContext("2d"), tam);
     const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
-    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; t.repeat.set(rep[0], rep[1]);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); t.repeat.set(rep[0], rep[1]);
     return t;
   }
   let semente = 7;
@@ -361,7 +401,7 @@ body.vr #stick { display: none; }
   }
   const aco = mat(0x6e5a4c, { metalness: 0.45, roughness: 0.75 });          // alma e patim com ferrugem
   const polido = mat(0xc9ccd0, { metalness: 0.85, roughness: 0.28 });      // topo do boleto
-  for (const z of [-BITOLA_Z, BITOLA_Z]) scene.add(trilho(-40, 40, z, 1, aco));
+  for (const z of [-BITOLA_Z, BITOLA_Z]) for (let x0 = -200; x0 < 200; x0 += 40) scene.add(trilho(x0, x0 + 40, z, 1, aco));   // em trechos de 40 m (um trilho único de 400 m gera riscos na tela)
   const agulhas = new THREE.Group();
   const agF = trilho(-1, 6, 0.6579, 0.85, aco); agulhas.add(agF);
   const agA = trilho(-1, 6, -0.7264, 0.85, aco); agulhas.add(agA);
@@ -588,12 +628,400 @@ body.vr #stick { display: none; }
       }
     };
   })();
+
+  const FONT = '"IBM Plex Sans", system-ui, sans-serif';
+  // ---------- Avatares: mantenedor com uniforme e EPIs (executa as ações) e coordenador da atividade ----------
+  // Feitos com formas simples; a frente é +z (lookAt aponta +z para o alvo).
+  function alturaLastro(z) {   // topo do lastro na seção transversal da via
+    const a = Math.abs(z);
+    if (a <= 1.55) return 0.28;
+    if (a <= 1.85) return 0.28 - (a - 1.55) / 0.3 * 0.1;
+    if (a <= 2.6) return 0.18 * (2.6 - a) / 0.75;
+    return 0;
+  }
+  function plaquinha(texto, cor) {
+    const tx = canvasTex(256, 64);
+    tx.ctx.fillStyle = cor; tx.ctx.fillRect(0, 0, 256, 64);
+    tx.ctx.fillStyle = "#11161b"; tx.ctx.font = `700 30px ${FONT}`; tx.ctx.textAlign = "center"; tx.ctx.textBaseline = "middle"; tx.ctx.fillText(texto, 128, 34, 240);
+    tx.t.needsUpdate = true;
+    return new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.05), new THREE.MeshBasicMaterial({ map: tx.t }));
+  }
+  function criarAvatar(o) {
+    const g = new THREE.Group();
+    const pele = mat(0xb98a66, { roughness: 0.7 }), roupa = mat(o.roupa, { roughness: 0.85 }), calca = mat(o.calca, { roughness: 0.9 });
+    const refl = mat(0xe3e9ec, { roughness: 0.25, metalness: 0.3, emissive: 0x666666 }), bota = mat(0x1b1b1b, { roughness: 0.6 });
+    const luva = mat(o.luva, { roughness: 0.9 }), capacete = mat(o.capacete, { roughness: 0.3 });
+    const lente = new THREE.MeshStandardMaterial({ color: 0x223040, roughness: 0.05, metalness: 0.6, transparent: true, opacity: 0.8 });
+    const pernas = [];
+    [-0.1, 0.1].forEach(x => {
+      const quadril = new THREE.Group(); quadril.position.set(x, 0.92, 0); g.add(quadril);
+      const coxa = cyl(0.078, 0.44, calca, 12); coxa.position.y = -0.22; quadril.add(coxa);
+      const joelho = new THREE.Group(); joelho.position.y = -0.44; quadril.add(joelho);
+      const canela = cyl(0.066, 0.42, calca, 12); canela.position.y = -0.21; joelho.add(canela);
+      const faixa = cyl(0.069, 0.035, refl, 12); faixa.position.y = -0.28; joelho.add(faixa);
+      const pe = box(0.12, 0.09, 0.28, bota); pe.position.set(0, -0.445, 0.05); joelho.add(pe);
+      pernas.push([quadril, joelho]);
+    });
+    const tronco = box(0.42, 0.58, 0.25, roupa); tronco.position.y = 1.2; g.add(tronco);
+    [1.04, 1.3].forEach(y => { const f = box(0.425, 0.04, 0.255, refl); f.position.y = y; g.add(f); });
+    if (o.colete) {
+      const c = box(0.43, 0.42, 0.26, mat(o.colete, { roughness: 0.8, emissive: 0x222200 })); c.position.y = 1.24; g.add(c);
+      const f = box(0.435, 0.04, 0.265, refl); f.position.y = 1.16; g.add(f);
+    }
+    const cinto = box(0.43, 0.06, 0.26, mat(0x2a2a2a)); cinto.position.y = 0.93; g.add(cinto);
+    const pesc = cyl(0.05, 0.08, pele, 10); pesc.position.y = 1.53; g.add(pesc);
+    const cabeca = new THREE.Mesh(new THREE.SphereGeometry(0.105, 18, 14), pele); cabeca.position.y = 1.64; cabeca.scale.set(1, 1.1, 1.05); g.add(cabeca);
+    const casco = new THREE.Mesh(new THREE.SphereGeometry(0.128, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), capacete); casco.position.y = 1.67; g.add(casco);
+    const aba = cyl(0.145, 0.012, capacete, 24); aba.position.set(0, 1.672, 0.025); aba.scale.z = 1.12; g.add(aba);
+    const crista = box(0.03, 0.03, 0.22, capacete); crista.position.y = 1.79; g.add(crista);
+    const oculos = box(0.18, 0.04, 0.03, lente); oculos.position.set(0, 1.655, 0.1); g.add(oculos);
+    [-1, 1].forEach(sx => { const p = new THREE.Mesh(new THREE.SphereGeometry(0.032, 10, 8), mat(o.capacete)); p.position.set(sx * 0.105, 1.63, 0); p.scale.x = 0.6; g.add(p); });   // protetor auricular
+    const nome = plaquinha(o.nome, o.corNome); nome.position.set(0, 1.36, 0.127); g.add(nome);
+    const bracos = [];
+    [-1, 1].forEach(sx => {
+      const ombro = new THREE.Group(); ombro.position.set(sx * 0.255, 1.44, 0); g.add(ombro);
+      const sup = cyl(0.056, 0.3, roupa, 10); sup.position.y = -0.15; ombro.add(sup);
+      const fx = cyl(0.058, 0.035, refl, 10); fx.position.y = -0.22; ombro.add(fx);
+      const cot = new THREE.Group(); cot.position.y = -0.3; ombro.add(cot);
+      const ant = cyl(0.05, 0.27, roupa, 10); ant.position.y = -0.135; cot.add(ant);
+      const mao = new THREE.Mesh(new THREE.SphereGeometry(0.056, 12, 10), luva); mao.position.y = -0.3; mao.scale.set(0.9, 1.2, 0.7); cot.add(mao);
+      bracos.push({ ombro, cot, mao });
+    });
+    if (o.radio) {   // rádio na mão esquerda
+      const r = new THREE.Group(); r.add(box(0.05, 0.11, 0.03, mat(0x161616)));
+      const ant = cyl(0.006, 0.09, mat(0x161616), 6); ant.position.set(0.015, 0.1, 0); r.add(ant);
+      r.position.set(0, -0.33, 0.03); bracos[0].cot.add(r);
+    }
+    if (o.prancheta) { const p = box(0.22, 0.3, 0.012, mat(0x8a6a44)); const f = box(0.19, 0.25, 0.013, mat(0xf4f4f0)); f.position.z = 0.002; p.add(f); p.position.set(0, -0.3, 0.08); p.rotation.x = -0.4; bracos[1].cot.add(p); }
+    g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.userData.avatar = true; } });
+    g.userData = { pernas, bracos, fase: 0, estado: "parado", destino: null, alvo: null, girar: false, tAcao: 0, falando: 0 };
+    scene.add(g);
+    return g;
+  }
+  const qA = new THREE.Quaternion(), qB = new THREE.Quaternion(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), BAIXO = new THREE.Vector3(0, -1, 0);
+  function posAvatar(av, x, z) { av.position.set(x, alturaLastro(z), z); }
+  function virarPara(av, x, z, k) {
+    const alvo = Math.atan2(x - av.position.x, z - av.position.z);
+    let d = alvo - av.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
+    av.rotation.y += d * Math.min(1, k);
+  }
+  function apontarBraco(av, b, ponto, k) {   // estica o braço na direção do ponto (em coordenadas do avatar)
+    av.updateMatrixWorld(true);
+    b.ombro.getWorldPosition(vA);
+    vB.copy(ponto).sub(vA).applyQuaternion(qA.copy(av.quaternion).invert()).normalize();
+    qB.setFromUnitVectors(BAIXO, vB);
+    b.ombro.quaternion.slerp(qB, Math.min(1, k));
+    b.cot.rotation.x += (0 - b.cot.rotation.x) * Math.min(1, k);
+  }
+  function atualizarAvatar(av, dt) {
+    const u = av.userData;
+    u.fase += dt;
+    const [bE, bD] = u.bracos;
+    if (u.estado === "andando" && u.destino) {
+      const dx = u.destino.x - av.position.x, dz = u.destino.z - av.position.z, d = Math.hypot(dx, dz);
+      virarPara(av, u.destino.x, u.destino.z, dt * 8);
+      const passo = 1.25 * dt;
+      if (d <= passo) { posAvatar(av, u.destino.x, u.destino.z); u.estado = u.alvo ? "agindo" : "parado"; u.tAcao = 0; }
+      else posAvatar(av, av.position.x + dx / d * passo, av.position.z + dz / d * passo);
+      const sw = Math.sin(u.fase * 9) * 0.5;
+      u.pernas[0][0].rotation.x = sw; u.pernas[1][0].rotation.x = -sw;
+      u.pernas[0][1].rotation.x = Math.max(0, -sw) * 0.8; u.pernas[1][1].rotation.x = Math.max(0, sw) * 0.8;
+      bE.ombro.quaternion.setFromEuler(new THREE.Euler(-sw * 0.6, 0, 0)); bD.ombro.quaternion.setFromEuler(new THREE.Euler(sw * 0.6, 0, 0));
+      return;
+    }
+    for (const [q, j] of u.pernas) { q.rotation.x *= 0.8; j.rotation.x *= 0.8; }
+    if (u.estado === "agindo" && u.alvo) {
+      u.tAcao += dt;
+      virarPara(av, u.alvo.x, u.alvo.z, dt * 6);
+      if (u.tAcao < 1.3) {
+        apontarBraco(av, bD, u.alvo, dt * 7);
+        if (u.girar && u.tAcao > 0.5) bD.mao.rotation.y = Math.sin((u.tAcao - 0.5) * 10) * 0.9;
+      } else { u.estado = "parado"; u.alvo = null; bD.mao.rotation.y = 0; }
+      return;
+    }
+    // parado: respiração leve; o coordenador ergue o rádio quando fala
+    const respira = Math.sin(u.fase * 1.6) * 0.02;
+    bD.ombro.quaternion.slerp(qB.setFromEuler(new THREE.Euler(0.05 + respira, 0, 0.06)), Math.min(1, dt * 4));
+    bD.cot.rotation.x += (-(u.prancheta ? 1.2 : 0.15) - bD.cot.rotation.x) * Math.min(1, dt * 4);
+    if (u.falando > 0) {
+      u.falando -= dt;
+      bE.ombro.quaternion.slerp(qB.setFromEuler(new THREE.Euler(-0.35, 0, -0.35)), Math.min(1, dt * 6));
+      bE.cot.rotation.x += (-2.2 - bE.cot.rotation.x) * Math.min(1, dt * 6);
+    } else {
+      bE.ombro.quaternion.slerp(qB.setFromEuler(new THREE.Euler(-respira, 0, -0.06)), Math.min(1, dt * 4));
+      bE.cot.rotation.x += (-0.15 - bE.cot.rotation.x) * Math.min(1, dt * 4);
+    }
+  }
+  const mantenedor = criarAvatar({ nome: "MANTENEDOR", corNome: "#f2a400", roupa: 0xe8681f, calca: 0x23324a, luva: 0xd9c040, capacete: 0xf4f4f2 });
+  posAvatar(mantenedor, -0.7, 3.0); mantenedor.rotation.y = Math.PI * 0.8;
+  const coordenador = criarAvatar({ nome: "COORDENADOR", corNome: "#cfe8ff", roupa: 0xe8681f, calca: 0x23324a, luva: 0xd9c040, capacete: 0x2f6fd6, colete: 0xd8f000, radio: true, prancheta: true });
+  coordenador.userData.prancheta = true;
+  posAvatar(coordenador, 3.6, 3.5); coordenador.rotation.y = Math.PI * 1.15;
+  const CASA_MANT = new THREE.Vector3(-0.7, 0, 3.0);
+  function mantenedorAgir(ponto, girar) {
+    const u = mantenedor.userData;
+    const olho = new THREE.Vector3(); camera.getWorldPosition(olho);
+    const dir = new THREE.Vector3(ponto.x - olho.x, 0, ponto.z - olho.z);
+    if (dir.lengthSq() < 1e-4) dir.set(0, 0, -1);
+    dir.normalize();
+    // fica do outro lado da peça, de frente para o aluno, perto o bastante para alcançar
+    const fica = new THREE.Vector3(ponto.x + dir.x * 0.42, 0, ponto.z + dir.z * 0.42);
+    u.alvo = ponto.clone(); u.girar = girar; u.tAcao = 0;
+    if (Math.hypot(fica.x - mantenedor.position.x, fica.z - mantenedor.position.z) < 0.15) u.estado = "agindo";
+    else { u.destino = fica; u.estado = "andando"; som.passos(); }
+  }
+  function mantenedorVoltar() { const u = mantenedor.userData; u.alvo = null; u.destino = CASA_MANT.clone(); u.estado = "andando"; }
+  function atualizarAvatares(dt) {
+    atualizarAvatar(mantenedor, dt);
+    // coordenador fica de frente para o aluno
+    const olho = new THREE.Vector3(); camera.getWorldPosition(olho);
+    virarPara(coordenador, olho.x, olho.z, dt * 2);
+    atualizarAvatar(coordenador, dt);
+  }
+
+  // ---------- Rádio do coordenador: voz sintetizada em português, bip de rádio e legenda ----------
+  let vozPt = null;
+  function acharVoz() { if (!window.speechSynthesis) return; vozPt = speechSynthesis.getVoices().find(v => /^pt(-|_)BR/i.test(v.lang)) || speechSynthesis.getVoices().find(v => /^pt/i.test(v.lang)) || null; }
+  if (window.speechSynthesis) { acharVoz(); speechSynthesis.onvoiceschanged = acharVoz; }
+  function coordenadorFala(texto, urgente, quem) {
+    quem = quem || "Coordenador";
+    som.radio();
+    coordenador.userData.falando = Math.max(2.5, texto.length * 0.07);
+    mostrarDica(texto, quem + " · rádio", true);
+    avalEnviar("sistema", quem + ": " + texto);
+    if (!cfg.voz || !window.speechSynthesis) return;
+    try {
+      if (urgente) speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(texto); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = urgente ? 1.15 : 1.05; u.pitch = quem === "CCP" ? 1.15 : 0.9;
+      setTimeout(() => speechSynthesis.speak(u), 250);
+    } catch (e) {}
+  }
+
   const GIRAM_NA_MAO = new Set(["chave", "conA", "conB", "comutador", "manivela"]);
+  // Quem executa o toque: o avatar do mantenedor (padrão) ou a mão virtual (Ajustes)
+  let ultimoPonto = null;
+  function executarToque(p, id) {
+    const girar = GIRAM_NA_MAO.has(id);
+    if (cfg.executor === "mao") mao.tocar(p, girar); else mantenedorAgir(p, girar);
+  }
+
+  // ---------- Ferramentas 3D ----------
+  // Cada ferramenta tem um modelo provisório feito aqui. Quando o arquivo ferramentas/<id>.glb existir
+  // e estiver listado em ferramentas/ferramentas.json, o modelo do arquivo substitui o provisório.
+  // Formato: GLB em metros, +Y para cima, ponto de pega na origem, nó opcional "visor" onde aparece a leitura.
+  const FERRAMENTAS = {
+    regua:        { nome: "Régua" },
+    trena:        { nome: "Trena" },
+    multimetro:   { nome: "Multímetro" },
+    celula_carga: { nome: "Célula de carga" },
+    gabarito_2mm: { nome: "Gabarito 2 mm" },
+    gabarito_4mm: { nome: "Gabarito 4 mm" },
+    chave_boca:   { nome: "Chave de boca" },
+    radio:        { nome: "Rádio" }
+  };
+  function provisoria(id) {
+    const g = new THREE.Group();
+    const amarelo = mat(0xf2c200, { roughness: 0.5 }), preto = mat(0x1d1f22, { roughness: 0.6 }), aco2 = mat(0xb9bec4, { metalness: 0.8, roughness: 0.3 });
+    if (id === "regua") { const r = box(0.5, 0.003, 0.03, aco2); r.position.x = 0.25; g.add(r); for (let i = 0; i <= 10; i++) { const m = box(0.002, 0.004, i % 5 ? 0.008 : 0.015, preto); m.position.set(i * 0.05, 0.001, -0.008); g.add(m); } }
+    else if (id === "trena") { g.add(box(0.075, 0.075, 0.035, amarelo)); const f = box(0.45, 0.002, 0.019, amarelo); f.position.set(0.26, -0.03, 0); g.add(f); }
+    else if (id === "multimetro") { g.add(box(0.085, 0.16, 0.035, amarelo)); const t = box(0.065, 0.045, 0.002, mat(0x9fb59a, { emissive: 0x223322 })); t.position.set(0, 0.04, 0.018); g.add(t);
+      [[0xd03030, 0.025], [0x202020, -0.025]].forEach(([c, x]) => { const p = cyl(0.004, 0.18, mat(c), 8); p.position.set(x, -0.16, 0.02); g.add(p); }); }
+    else if (id === "celula_carga") { const c = cyl(0.045, 0.05, aco2, 24); c.rotation.z = Math.PI / 2; g.add(c); const fio = cyl(0.004, 0.25, preto, 6); fio.position.set(0, -0.13, 0); g.add(fio); }
+    else if (id === "gabarito_2mm" || id === "gabarito_4mm") { const e = id === "gabarito_2mm" ? 0.002 : 0.004; const p = box(0.012 + e, 0.06, 0.12, mat(id === "gabarito_2mm" ? 0xd03a2a : 0x2a6fd0, { metalness: 0.5, roughness: 0.4 })); g.add(p); const c = box(0.03, 0.03, 0.03, preto); c.position.set(0, 0.045, 0); g.add(c); }
+    else if (id === "chave_boca") { const b = box(0.22, 0.012, 0.03, aco2); b.position.x = 0.11; g.add(b); const a = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.008, 8, 16), aco2); a.rotation.x = Math.PI / 2; a.position.x = 0.23; g.add(a); }
+    else { g.add(box(0.055, 0.12, 0.03, preto)); const a = cyl(0.005, 0.1, preto, 6); a.position.set(0.015, 0.11, 0); g.add(a); }
+    return g;
+  }
+  const ferr = { ativo: null, visor: null, arquivos: {} };
+  (function () {
+    const tx = canvasTex(640, 200);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.19), new THREE.MeshBasicMaterial({ map: tx.t, transparent: true, depthTest: false }));
+    m.renderOrder = 998; m.visible = false; scene.add(m); ferr.visor = { m, tx };
+  })();
+  for (const id in FERRAMENTAS) { const f = FERRAMENTAS[id]; f.obj = provisoria(id); f.obj.visible = false; scene.add(f.obj); }
+  // lista de modelos prontos (opcional); se não existir, ficam os provisórios
+  fetch("ferramentas/ferramentas.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : null).then(j => {
+    if (!j || !j.modelos) return;
+    const loader = new THREE.GLTFLoader();
+    for (const id in j.modelos) {
+      if (!FERRAMENTAS[id]) continue;
+      loader.load("ferramentas/" + j.modelos[id], g => {
+        const f = FERRAMENTAS[id], novo = g.scene;
+        novo.traverse(o => { if (o.isMesh) o.castShadow = true; });
+        novo.visible = f.obj.visible; novo.position.copy(f.obj.position); novo.quaternion.copy(f.obj.quaternion);
+        scene.remove(f.obj); scene.add(novo); f.obj = novo; f.glb = true;
+        f.visorNo = novo.getObjectByName("visor") || null;
+      }, undefined, () => {});
+    }
+  }).catch(() => {});
+  function centroPeca(id) {
+    const b = new THREE.Box3(); (partGroups[id] || []).forEach(m => b.expandByObject(m));
+    return b.isEmpty() ? centroMaquina.clone() : b.getCenter(new THREE.Vector3());
+  }
+  function mostrarFerramenta(id, ponto, leitura) {
+    guardarFerramentas();
+    const f = FERRAMENTAS[id]; if (!f) return;
+    const olho = new THREE.Vector3(); camera.getWorldPosition(olho);
+    const p = ponto.clone(), para = olho.clone().sub(p); para.y = 0; para.normalize();
+    p.addScaledVector(para, 0.09); p.y += 0.05;
+    f.obj.position.copy(p); f.obj.rotation.set(0, Math.atan2(para.x, para.z) - Math.PI / 2, 0); f.obj.visible = true;
+    ferr.ativo = id;
+    const { ctx, c, t } = ferr.visor.tx;
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.fillStyle = "rgba(10,14,18,0.92)"; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(0, 0, c.width, c.height, 22) : ctx.rect(0, 0, c.width, c.height); ctx.fill();
+    ctx.strokeStyle = "#f2a400"; ctx.lineWidth = 5; ctx.stroke();
+    ctx.fillStyle = "#ffd27a"; ctx.font = `600 38px ${FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(f.nome.toUpperCase(), 320, leitura ? 52 : 100, 600);
+    if (leitura) { ctx.fillStyle = "#eef1f3"; ctx.font = `700 72px ${FONT}`; ctx.fillText(leitura, 320, 136, 600); }
+    t.needsUpdate = true;
+    ferr.visor.m.visible = true;
+    ferr.visor.leitura = leitura || "";
+    avalEnviar("sistema", "Ferramenta: " + f.nome + (leitura ? " · " + leitura : ""));
+  }
+  function guardarFerramentas() {
+    for (const id in FERRAMENTAS) FERRAMENTAS[id].obj.visible = false;
+    ferr.ativo = null; if (ferr.visor) ferr.visor.m.visible = false;
+  }
+  function atualizarFerramentas() {
+    if (!ferr.ativo) return;
+    const f = FERRAMENTAS[ferr.ativo], v = ferr.visor.m;
+    if (f.visorNo) f.visorNo.getWorldPosition(v.position); else v.position.copy(f.obj.position);
+    v.position.y += 0.2;
+    const olho = new THREE.Vector3(); camera.getWorldPosition(olho);
+    v.lookAt(olho);
+  }
+
+  // ---------- Circulação de trens de minério e licença do CCP ----------
+  // Sem licença, passa um trem de minério na via a cada intervalo (Ajustes, padrão 10 min).
+  // Com licença, os trens ficam retidos; depois do mesmo intervalo o CCP pede a linha pelo rádio.
+  const licenca = { ativa: false, desde: 0, pedido: false, retomar: false, eventos: [] };
+  const trem = { ativo: false, x: 0, dir: 1, comp: 0, buzinou: false, alertou: false, atingiu: false, tRoda: 0, prox: 0 };
+  const intervaloTrem = () => (cfg.trem || 10) * 60000;
+  const tremGrupo = new THREE.Group(); tremGrupo.visible = false; scene.add(tremGrupo);
+  (function montarTrem() {
+    const Y = Y_PATIM + 6.5 * 0.0254;   // topo do boleto
+    const amarelo = mat(0xe0a400, { roughness: 0.55, metalness: 0.2 }), cinza = mat(0x3a3d40, { roughness: 0.7 }), preto = mat(0x18191b, { roughness: 0.8 });
+    const vagaoM = mat(0x6b3a22, { roughness: 0.85, metalness: 0.2 }), minerio = mat(0x4a2418, { roughness: 1 }), vidro = mat(0x1a2a36, { roughness: 0.1, metalness: 0.6 });
+    const farol = new THREE.MeshBasicMaterial({ color: 0xfff2c0 });
+    const truque = (x, g) => { const t = box(2.6, 0.75, 2.2, preto); t.position.set(x, Y + 0.45, 0); g.add(t);
+      [-0.9, 0.9].forEach(dx => [-0.8, 0.8].forEach(z => { const r = cyl(0.46, 0.14, cinza, 14); r.rotation.x = Math.PI / 2; r.position.set(x + dx, Y + 0.46, z); g.add(r); })); };
+    let x = 0;
+    // locomotiva (frente em x = 0, corpo para -x)
+    const loco = new THREE.Group();
+    const corpo = box(21, 3.0, 3.05, amarelo); corpo.position.set(-10.5, Y + 2.55, 0); loco.add(corpo);
+    const faixa = box(21.05, 0.35, 3.08, cinza); faixa.position.set(-10.5, Y + 1.5, 0); loco.add(faixa);
+    const cab = box(3.2, 0.9, 2.9, amarelo); cab.position.set(-1.8, Y + 4.5, 0); loco.add(cab);
+    const vid = box(0.05, 0.75, 2.6, vidro); vid.position.set(-0.17, Y + 3.5, 0); loco.add(vid);
+    [-1, 1].forEach(z => { const f = new THREE.Mesh(new THREE.CircleGeometry(0.16, 16), farol); f.position.set(0.01, Y + 2.0, z * 0.9); f.rotation.y = Math.PI / 2; loco.add(f); });
+    const chassi = box(21, 0.32, 3.0, cinza); chassi.position.set(-10.5, Y + 0.96, 0); loco.add(chassi);
+    const tanque = box(8, 0.75, 2.4, preto); tanque.position.set(-10.5, Y + 0.48, 0); loco.add(tanque);
+    truque(-3.5, loco); truque(-17.5, loco);
+    tremGrupo.add(loco); x = -21.6;
+    for (let i = 0; i < 12; i++) {
+      const v = new THREE.Group();
+      const c = box(10.2, 2.4, 3.1, vagaoM); c.position.set(-5.1, Y + 2.2, 0); v.add(c);
+      const m = box(9.6, 0.4, 2.8, minerio); m.position.set(-5.1, Y + 3.5, 0); m.scale.y = 1; v.add(m);
+      for (let k = 1; k < 5; k++) { const n = box(0.12, 2.42, 3.14, mat(0x55301c)); n.position.set(-k * 2.04, Y + 2.2, 0); v.add(n); }
+      const fr = box(10.2, 0.28, 2.9, preto); fr.position.set(-5.1, Y + 0.92, 0); v.add(fr);
+      truque(-1.6, v); truque(-8.6, v);
+      v.position.x = x; tremGrupo.add(v); x -= 10.8;
+    }
+    trem.comp = -x;
+  })();
+  function chamarTrem() {
+    if (trem.ativo) return;
+    trem.ativo = true; trem.dir = Math.random() < 0.5 ? 1 : -1;
+    trem.x = -trem.dir * 230; trem.buzinou = trem.alertou = trem.atingiu = false;
+    tremGrupo.rotation.y = trem.dir > 0 ? 0 : Math.PI; tremGrupo.position.set(trem.x, 0, 0); tremGrupo.visible = true;
+    avalEnviar("sistema", "Trem de minério em circulação na via");
+  }
+  function olhoNaVia() { const o = new THREE.Vector3(); camera.getWorldPosition(o); return { o, naVia: Math.abs(o.z) < 2.1 }; }
+  function atualizarTrem(dt) {
+    const agora = performance.now();
+    if (!trem.prox) trem.prox = agora + intervaloTrem();
+    if (licenca.ativa) {
+      if (!licenca.pedido && !busy && agora - licenca.desde > intervaloTrem()) pedidoCcp();
+    } else if (!trem.ativo && agora >= trem.prox) chamarTrem();
+    if (!trem.ativo) return;
+    trem.x += trem.dir * 16 * dt;
+    tremGrupo.position.x = trem.x;
+    const { o, naVia } = olhoNaVia();
+    const frente = trem.x, tras = trem.x - trem.dir * trem.comp;
+    const dist = (o.x - frente) * trem.dir;   // > 0: a frente ainda não chegou
+    if (!trem.buzinou && dist < 160) { trem.buzinou = true; som.buzina(2.2); setTimeout(() => som.buzina(1.2), 2600); }
+    if (!trem.alertou && dist < 140 && dist > 0) {
+      trem.alertou = true;
+      if (naVia) alertaRisco("Trem de minério se aproximando! Saia da via agora.");
+      const mz = mantenedor.position.z; if (Math.abs(mz) < 2.1) mantenedorVoltar();
+    }
+    const sobre = dist <= 0 && (o.x - tras) * trem.dir >= 0;
+    if (sobre) {
+      trem.tRoda -= dt;
+      if (trem.tRoda <= 0) { trem.tRoda = 10.8 / 16; som.roda(0.7); }
+      if (naVia && !trem.atingiu) atingido();
+    } else if (Math.abs(dist) < 60) { trem.tRoda -= dt; if (trem.tRoda <= 0) { trem.tRoda = 10.8 / 16; som.roda(0.7 * (1 - Math.abs(dist) / 60)); } }
+    if ((o.x - tras) * trem.dir < -240) {
+      trem.ativo = false; tremGrupo.visible = false; trem.prox = agora + intervaloTrem();
+      if (licenca.retomar) {
+        licenca.retomar = false; licenca.ativa = true; licenca.desde = performance.now(); licenca.pedido = false;
+        coordenadorFala("Trem passou. Licença renovada: a equipe pode voltar à via.", false, "CCP");
+      }
+    }
+  }
+  function atingido() {
+    trem.atingiu = true;
+    alertaRisco("Você foi atingido pelo trem: estava na via durante a circulação.");
+    som.erro();
+    licenca.eventos.push("ATINGIDO PELO TREM (estava na via durante a circulação)");
+    if (mode === "pro" && pro) pro.criticos++;
+    if (mode === "desafio" && dz) dz.riscos++;
+    registrarResultado({ modulo: "Segurança · circulação de trem", segundos: 0, avaliacoes: 1, avaliacoesCertas: 0, errosPeca: 0, bloqueios: 1, detalhes: "Atingido pelo trem de minério: estava na via sem licença do CCP ou após devolver a linha" });
+    teleportar({ x: rig.position.x, z: 3.6 });
+  }
+  function pedirLicenca(depois) {
+    if (licenca.ativa) { coordenadorFala("A licença já está concedida.", false, "CCP"); return depois && depois(); }
+    if (trem.ativo) { coordenadorFala("Aguarde: tem trem circulando nesta via. Peça de novo depois que ele passar.", false, "CCP"); return; }
+    coordenadorFala("CCP, aqui é a equipe da via. Solicito licença para manutenção na máquina de chave.");
+    setTimeout(() => {
+      licenca.ativa = true; licenca.desde = performance.now(); licenca.pedido = false;
+      licenca.eventos.push("Licença concedida pelo CCP");
+      coordenadorFala("Licença concedida. Via interditada para circulação. Hora registrada.", false, "CCP");
+      if (depois) depois();
+    }, 3200);
+  }
+  function devolverLinha(motivo) {
+    if (!licenca.ativa) return;
+    licenca.ativa = false; licenca.pedido = false; trem.prox = performance.now() + intervaloTrem();
+    licenca.eventos.push(motivo || "Linha devolvida ao CCP");
+  }
+  let ccpSalvo = null;
+  function pedidoCcp() {
+    licenca.pedido = true;
+    ccpSalvo = { painel: ultimoPainel, botoes: ultimaLista, pulse: pulseIds };
+    pulseIds = [];
+    coordenadorFala("Equipe, aqui é o CCP. Precisamos circular um trem de minério nesta via. Vocês devolvem a linha para circulação parcial?", true, "CCP");
+    drawPanel("Rádio · CCP", "O CCP pede a linha para passar um trem",
+      "Devolver a linha exige recolher ferramentas, deixar a máquina travada e com indicação, e sair da via. Se a máquina não estiver em condição segura, mantenha a interdição e informe o CCP.", "#3ea0e4");
+    setButtons([["linha:devolver", "Devolver a\nlinha"], ["linha:manter", "Manter a\ninterdição"]]);
+  }
+  function respostaCcp(devolver) {
+    const min = Math.round((performance.now() - licenca.desde) / 60000);
+    if (devolver) {
+      devolverLinha(`Devolveu a linha ao CCP para circulação parcial (após ${min} min de licença)`);
+      licenca.retomar = true; trem.prox = performance.now() + 15000;
+      coordenadorFala("Linha devolvida. Trem autorizado em circulação parcial. Equipe, saiam da via!", true, "CCP");
+    } else {
+      licenca.eventos.push(`Manteve a interdição quando o CCP pediu a linha (após ${min} min de licença)`);
+      licenca.desde = performance.now(); licenca.pedido = false;
+      coordenadorFala("CCP ciente. Trem retido aguardando a liberação da via. Agilizem a atividade.", false, "CCP");
+    }
+    if (ccpSalvo) { drawPanel.apply(null, ccpSalvo.painel); setButtons(ccpSalvo.botoes); pulseIds = ccpSalvo.pulse; ccpSalvo = null; }
+  }
 
   // ---------- Painel de texto e botões no mundo 3D ----------
   function canvasTex(w, h) {
     const c = document.createElement("canvas"); c.width = w; c.height = h;
-    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4;
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = renderer.capabilities.getMaxAnisotropy();
     return { c, ctx: c.getContext("2d"), t };
   }
   function wrap(ctx, text, x, y, maxW, lh) {
@@ -608,8 +1036,7 @@ body.vr #stick { display: none; }
     }
     return y;
   }
-  const FONT = '"IBM Plex Sans", system-ui, sans-serif';
-  const panelTx = canvasTex(1400, 800);
+  const RES_PAINEL = 1.6, panelTx = canvasTex(1400 * RES_PAINEL, 800 * RES_PAINEL);
   const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.8), new THREE.MeshBasicMaterial({ map: panelTx.t, transparent: true }));
   const panelPos = new THREE.Vector3(0.6, 1.5, 2.0);
   panel.position.copy(panelPos);
@@ -617,25 +1044,34 @@ body.vr #stick { display: none; }
   scene.add(panel);
   // Quadro de instruções fixo, paralelo à via, do lado oposto à caixa de junção (além do lastro), virado para a máquina
   // Quadro grande, fixo do outro lado da via e paralelo ao lastro: legível de perto da máquina sem tapar a visão
-  const PAINEL_ESC = 2.3, PAINEL_Y = 2.3, PAINEL_Z = -2.9;
+  const PAINEL_ESC = 2.875, PAINEL_Y = 2.85, PAINEL_Z = -2.9;
   function fixarPainel() {
     panel.position.set(0.6, PAINEL_Y, PAINEL_Z); panel.scale.setScalar(PAINEL_ESC); panel.lookAt(0.6, PAINEL_Y, 0);
     const poste = mat(0x4a4f55, { metalness: 0.4, roughness: 0.6 }), alto = PAINEL_Y + 0.4 * PAINEL_ESC;
     [-1, 1].forEach(sx => { const p = cyl(0.045, alto, poste, 10); p.position.set(0.6 + sx * (0.7 * PAINEL_ESC + 0.06), alto / 2, PAINEL_Z - 0.06); p.castShadow = true; scene.add(p); });
     const fundo = box(1.4 * PAINEL_ESC + 0.2, 0.8 * PAINEL_ESC + 0.1, 0.03, poste); fundo.position.set(0.6, PAINEL_Y, PAINEL_Z - 0.03); scene.add(fundo);
   }
+  let ultimoPainel = null;
   function drawPanel(etiqueta, titulo, corpo, cor) {
+    ultimoPainel = [etiqueta, titulo, corpo, cor];
     avalEnviar(cor === "#e5533d" ? "erro" : "painel", etiqueta + " · " + titulo, corpo);
-    const { ctx, c, t } = panelTx;
-    ctx.clearRect(0, 0, c.width, c.height);
-    ctx.fillStyle = "rgba(17,22,27,0.92)";
-    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(0, 0, c.width, c.height, 28) : ctx.rect(0, 0, c.width, c.height); ctx.fill();
-    ctx.fillStyle = cor || "#f2a400"; ctx.fillRect(0, 0, 12, c.height);
-    ctx.fillStyle = cor || "#f2a400"; ctx.font = `600 40px ${FONT}`; ctx.fillText(etiqueta.toUpperCase(), 64, 84);
-    ctx.fillStyle = "#eef1f3"; ctx.font = `600 66px ${FONT}`;
-    let y = wrap(ctx, titulo, 64, 168, 1290, 76);
-    ctx.fillStyle = "#c8d1d8"; ctx.font = `400 48px ${FONT}`;
-    wrap(ctx, corpo, 64, y + 26, 1290, 62);
+    const { ctx, c, t } = panelTx, W = 1400, H = 800;
+    // fonte grande; se o texto não couber, reduz aos poucos até caber
+    for (let red = 0; red <= 6; red++) {
+      const fT = 80 - red * 5, fC = 58 - red * 3;
+      ctx.setTransform(RES_PAINEL, 0, 0, RES_PAINEL, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = "rgba(17,22,27,0.94)";
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(0, 0, W, H, 28) : ctx.rect(0, 0, W, H); ctx.fill();
+      ctx.fillStyle = cor || "#f2a400"; ctx.fillRect(0, 0, 14, H);
+      ctx.fillStyle = cor || "#f2a400"; ctx.font = `600 46px ${FONT}`; ctx.fillText(etiqueta.toUpperCase(), 60, 82);
+      ctx.fillStyle = "#ffffff"; ctx.font = `600 ${fT}px ${FONT}`;
+      const y = wrap(ctx, titulo, 60, 82 + fT + 14, 1300, fT + 10);
+      ctx.fillStyle = "#dde3e8"; ctx.font = `400 ${fC}px ${FONT}`;
+      const fim = wrap(ctx, corpo, 60, y + 22, 1300, fC + 12);
+      if (fim <= H - 10) break;
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     t.needsUpdate = true;
   }
 
@@ -648,11 +1084,12 @@ body.vr #stick { display: none; }
     const n = list.length, porLinha = 4, w = n > 3 ? 0.4 : 0.46, gap = 0.04;
     const right = new THREE.Vector3(); panel.getWorldDirection(right); right.cross(new THREE.Vector3(0, 1, 0)).normalize().negate();
     list.forEach(([id, label], i) => {
-      const tx = canvasTex(640, 180);
+      const tx = canvasTex(1024, 288);
+      tx.ctx.setTransform(1.6, 0, 0, 1.6, 0, 0);
       tx.ctx.fillStyle = "#f2a400"; tx.ctx.fillRect(0, 0, 640, 180);
-      tx.ctx.fillStyle = "#1a1300"; tx.ctx.font = `600 54px ${FONT}`; tx.ctx.textAlign = "center"; tx.ctx.textBaseline = "middle";
-      const linhas = label.split("\n");
-      linhas.forEach((l, k) => tx.ctx.fillText(l, 320, 90 + (k - (linhas.length - 1) / 2) * 62));
+      const linhas = label.split("\n"), fB = linhas.length > 2 ? 52 : 62;
+      tx.ctx.fillStyle = "#1a1300"; tx.ctx.font = `700 ${fB}px ${FONT}`; tx.ctx.textAlign = "center"; tx.ctx.textBaseline = "middle";
+      linhas.forEach((l, k) => tx.ctx.fillText(l, 320, 90 + (k - (linhas.length - 1) / 2) * (fB + 6), 620));
       tx.t.needsUpdate = true;
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.13), new THREE.MeshBasicMaterial({ map: tx.t }));
       const lin = Math.floor(i / porLinha), col = i % porLinha, nl = Math.min(porLinha, n - lin * porLinha);
@@ -722,6 +1159,36 @@ body.vr #stick { display: none; }
       // destrava / trava mecânica: batida metálica pesada
       trava() { const t = agora(); if (t == null) return; estalo(t, 0.25, 450, 1.5, 1); tom(t, 0.3, 120, "sine", 0.3, 60); estalo(t + 0.03, 0.12, 2600, 8, 0.35); },
       // motor: liga, gira com engrenagens e desliga
+      // sirene de alerta: dois tons alternados, como giroflex de segurança
+      sirene(dur) {
+        const t = agora(); if (t == null) return; dur = dur || 2.4;
+        const o = ctx.createOscillator(), g = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+        o.type = "square"; o.frequency.value = 820; lfo.type = "square"; lfo.frequency.value = 2.2; lg.gain.value = 260;
+        lfo.connect(lg); lg.connect(o.frequency);
+        const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 2600;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.11, t + 0.05);
+        g.gain.setValueAtTime(0.11, t + dur - 0.2); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(f); f.connect(g); g.connect(saida);
+        o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+      },
+      // rádio: bip de abertura e chiado curto
+      radio() {
+        const t = agora(); if (t == null) return;
+        tom(t, 0.09, 1450, "sine", 0.08); tom(t + 0.1, 0.09, 1900, "sine", 0.08);
+        estalo(t + 0.02, 0.22, 2400, 0.4, 0.25);
+      },
+      // buzina de locomotiva: dois tons graves
+      buzina(dur) {
+        const t = agora(); if (t == null) return; dur = dur || 1.6;
+        [[311, 0.06], [370, 0.05], [466, 0.035]].forEach(([fq, v]) => {
+          const o = ctx.createOscillator(), g = ctx.createGain(); o.type = "sawtooth"; o.frequency.value = fq;
+          g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.08);
+          g.gain.setValueAtTime(v, t + dur - 0.15); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+          o.connect(g); g.connect(saida); o.start(t); o.stop(t + dur + 0.05);
+        });
+      },
+      // rodas passando na junta do trilho
+      roda(vol) { const t = agora(); if (t == null) return; estalo(t, 0.09, 380, 1.2, vol); estalo(t + 0.11, 0.09, 420, 1.2, vol * 0.9); tom(t, 0.2, 55, "sine", vol * 0.4); },
       motor(dur) {
         const t = agora(); if (t == null) return;
         const o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter();
@@ -864,10 +1331,10 @@ body.vr #stick { display: none; }
   }
   function showMenu() {
     fecharDemo();
-    mode = "menu"; pulseIds = []; resetMaquina(); restaurarModelo(true);
+    mode = "menu"; pulseIds = []; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar();
     drawPanel("Treinamento PRO-001122 · Anexo 5", "Manutenção preventiva da máquina de chave CTS-2",
-      "Participante: " + quem() + ".\nEscolha um módulo tocando no botão. No óculos, mire com o ponto central e toque na tela.");
-    setButtons([["tour", "Tour da\nmáquina"], ["passo1", "Passo 1\nDAM e\nconectores"], ["passos0", "Passos\n2 a 17"], ["demo", "Máquina\nfuncionando"], ["explorar", "Explorar\npor dentro"]]);
+      "Participante: " + quem() + ".\nEscolha um módulo tocando no botão. Antes de entrar na via, peça licença ao CCP. Sem licença passa trem de minério a cada " + (cfg.trem || 10) + " min.");
+    setButtons([["tour", "Tour da\nmáquina"], ["passo1", "Passo 1\nDAM e\nconectores"], ["passos0", "Passos\n2 a 17"], ["demo", "Máquina\nfuncionando"], ["explorar", "Explorar\npor dentro"], ["desafios", "Desafios\nde defeitos"], [licenca.ativa ? "devolver" : "licenca", licenca.ativa ? "Devolver a\nlinha ao CCP" : "Pedir licença\nao CCP"]]);
   }
 
   // ---------- Máquina em funcionamento: comando normal / reverso ----------
@@ -879,6 +1346,7 @@ body.vr #stick { display: none; }
   }
   function startDemo() {
     mode = "demo"; pulseIds = []; resetMaquina();
+    coordenadorFala("Máquina liberada para testes. Antes de comandar, confira o comutador e fique fora da área de movimentação.");
     demoStats = { comandos: 0, bloqueios: 0, errosComutador: 0, trocasComutador: 0, manivelas: 0, inicio: performance.now(), comutadorInicial: Math.random() < 0.5 ? "manual" : "auto" };
     comutador = demoStats.comutadorInicial; aplicarComutador();
     drawPanel("Máquina em funcionamento", "Comande a máquina de chave", "Escolha Normal ou Reverso e observe as agulhas, barras e clips. Antes de comandar, confira a máquina e fique fora da área de movimentação (Procedimento de Segurança 03). Posição atual: " + posicao.toUpperCase() + ".");
@@ -891,7 +1359,8 @@ body.vr #stick { display: none; }
       return;
     }
     if (naAreaDeMovimento()) {
-      som.erro(); if (demoStats) demoStats.bloqueios++;
+      alertaRisco("Comando com você dentro da área de movimentação das agulhas.");
+      if (demoStats) demoStats.bloqueios++;
       drawPanel("Comando bloqueado", "Você está na área de movimentação", "Procedimento de Segurança 03: mantenha-se fora da área das agulhas, barras e tirantes durante os testes. Afaste-se da via e comande de novo.", "#e5533d");
       return;
     }
@@ -968,6 +1437,7 @@ body.vr #stick { display: none; }
 
   function startPasso1() {
     mode = "passo1"; step = 0; erros = 0; errosPeca = 0; achados = []; inicioModulo = performance.now(); resetMaquina();
+    coordenadorFala("Equipe, vamos ao passo 1: DAM e conectores. Sigam a peça que pisca.");
     const opcoes = ["ok", "folgado", "quebrado"];
     falhas = { conA: opcoes[Math.floor(Math.random() * 3)], conB: opcoes[Math.floor(Math.random() * 3)] };
     if (falhas.conA === "ok" && falhas.conB === "ok") falhas.conB = "folgado";
@@ -1054,6 +1524,17 @@ body.vr #stick { display: none; }
   }
 
 
+  // ---------- Alerta de ação de risco: sirene, tela piscando em vermelho e aviso no registro do avaliador ----------
+  let alertaTimer = 0;
+  function alertaRisco(motivo) {
+    som.sirene(2.6);
+    const el = document.getElementById("alertaRisco");
+    el.querySelector("span").textContent = motivo; el.hidden = false;
+    clearTimeout(alertaTimer); alertaTimer = setTimeout(() => { el.hidden = true; }, 3200);
+    avalEnviar("erro", "AÇÃO DE RISCO: " + motivo);
+    if (typeof coordenadorFala === "function") coordenadorFala("Pare! " + motivo, true);
+  }
+
   // ---------- Passos 2 a 17 do Anexo 5: roteiro com desvios sorteados ----------
   // Cada passo tem etapas: tocar na peça (com animação opcional), Apontar e Falar (Yoshi Yoshi) ou decidir a ação diante do que foi visto/medido.
   const sorte = (a, b, d) => +(a + Math.random() * (b - a)).toFixed(d || 0);
@@ -1076,7 +1557,7 @@ body.vr #stick { display: none; }
   }
   function moverPro(alvo, manual, done) {
     if (!manual && naAreaDeMovimento()) {
-      pro.bloqueios++; som.erro();
+      pro.bloqueios++; alertaRisco("Comando com você dentro da área de movimentação das agulhas.");
       drawPanel(etiquetaPro(), "Comando bloqueado: você está na área de movimentação", "Procedimento de Segurança 03. Saia de perto das agulhas e barras e toque de novo.", "#e5533d");
       return done(false);
     }
@@ -1120,9 +1601,9 @@ body.vr #stick { display: none; }
     2: { titulo: "Condições gerais do layout do AMV", curto: "Layout\ndo AMV", seg: "01 a 04",
       sortear: () => ({ altura: medir([1, 5], [[6, 9]]), abertura: medir([116, 124], [[106, 113], [127, 133]]), dormente: estado(["obstruido"]) }),
       etapas: [
-        { alvo: "agulhas", titulo: "Meça a altura da lança", corpo: "Toque nas agulhas para medir com a régua a altura da lança em relação ao patim do trilho.", anim: instrumento },
+        { alvo: "agulhas", ferramenta: "regua", leitura: f => num(f.altura.v) + " mm", titulo: "Meça a altura da lança", corpo: "Toque nas agulhas para medir com a régua a altura da lança em relação ao patim do trilho.", anim: instrumento },
         { decisao: f => ({ titulo: "Altura da lança", visto: `A régua marca ${num(f.altura.v)} mm. O PRO aceita no máximo 5 mm.`, opcoes: FAIXA, certo: f.altura.ok ? "ok" : "fora" }) },
-        { alvo: "agulhas", titulo: "Meça a abertura na 1ª barra", corpo: "Com a agulha aberta, meça com a trena a abertura na altura da primeira barra de acionamento.", anim: instrumento },
+        { alvo: "agulhas", ferramenta: "trena", leitura: f => num(f.abertura.v) + " mm", titulo: "Meça a abertura na 1ª barra", corpo: "Com a agulha aberta, meça com a trena a abertura na altura da primeira barra de acionamento.", anim: instrumento },
         { decisao: f => ({ titulo: "Abertura na 1ª barra", visto: `A trena marca ${num(f.abertura.v)} mm. A faixa do PRO é de 115 a 125 mm.`, opcoes: FAIXA, certo: f.abertura.ok ? "ok" : "fora" }) },
         { alvo: "dormente", titulo: "Verifique o dormente oco", corpo: "Toque no dormente oco e veja se ele está livre por dentro." },
         { decisao: f => ({ titulo: "Dormente oco", visto: f.dormente === "ok" ? "O dormente oco está limpo e livre por dentro." : "Há brita acumulada obstruindo o dormente oco.", opcoes: OPC(["obstruido", "Limpar e\nregistrar"]), certo: f.dormente }) }
@@ -1138,7 +1619,7 @@ body.vr #stick { display: none; }
     4: { titulo: "Fixação da MCH e juntas isolantes", curto: "Fixação e\nisolantes", seg: "01 e 02",
       sortear: () => ({ fix: estado(["folgado", "isolante"]) }),
       etapas: [
-        { alvo: "clips", titulo: "Inspecione clips, sapatas e isolantes", corpo: "Toque nos clips para conferir a fixação, o tirante e as juntas isolantes.", anim: instrumento },
+        { alvo: "clips", ferramenta: "chave_boca", titulo: "Inspecione clips, sapatas e isolantes", corpo: "Toque nos clips para conferir a fixação, o tirante e as juntas isolantes.", anim: instrumento },
         { decisao: f => ({ titulo: "Fixação e isolantes", visto: { ok: "Tudo firme, isolantes no lugar e identificados.", folgado: "Um parafuso do clip está folgado.", isolante: "Uma junta isolante está fora de posição." }[f.fix],
           opcoes: OPC(["folgado", "Reapertar com\nLoctite 243"], ["isolante", "Reposicionar\nisolante"]), certo: f.fix }) }
       ] },
@@ -1148,7 +1629,7 @@ body.vr #stick { display: none; }
         YOSHI,
         { alvo: "dormente", titulo: "Compare os eixos", corpo: "Toque no dormente oco para comparar o eixo dele com o eixo dos clips.", anim: instrumento },
         { decisao: f => ({ titulo: "Alinhamento", visto: f.alinh === "ok" ? "O eixo do dormente oco coincide com o eixo dos clips." : "O eixo dos clips está cerca de 25 mm deslocado do eixo do dormente oco.", opcoes: OPC(["desalinhada", "Alinhar\na MCH"]), certo: f.alinh }) },
-        { alvo: "agulhas", titulo: "Meça a agulha fechada", corpo: "Meça a cota da agulha fechada.", anim: instrumento },
+        { alvo: "agulhas", ferramenta: "trena", leitura: f => num(f.fechada.v) + " mm", titulo: "Meça a agulha fechada", corpo: "Meça a cota da agulha fechada.", anim: instrumento },
         { decisao: f => ({ titulo: "Agulha fechada", visto: `A medida deu ${num(f.fechada.v)} mm. O PRO pede 45 mm ± 15 mm.`, opcoes: FAIXA, certo: f.fechada.ok ? "ok" : "fora" }) }
       ] },
     6: { titulo: "Cordoalha de aterramento", curto: "Cordoalha", seg: "01 e 02",
@@ -1188,10 +1669,10 @@ body.vr #stick { display: none; }
       sortear: () => ({ g2: Math.random() < 0.75, g4: Math.random() < 0.7 }),
       etapas: [
         YOSHI,
-        { alvo: "agulhas", titulo: "Gabarito de 2 mm", corpo: "Toque na agulha para inserir o gabarito de 2 mm entre a agulha e o trilho de encosto. A máquina é comandada em seguida.", anim: (f, done) => testeGabarito(f.g2, done) },
+        { alvo: "agulhas", ferramenta: "gabarito_2mm", titulo: "Gabarito de 2 mm", corpo: "Toque na agulha para inserir o gabarito de 2 mm entre a agulha e o trilho de encosto. A máquina é comandada em seguida.", anim: (f, done) => testeGabarito(f.g2, done) },
         { decisao: f => ({ titulo: "Gabarito de 2 mm", visto: f.g2 ? "Com 2 mm a máquina travou e manteve a indicação." : "Com 2 mm a máquina NÃO travou e ficou sem indicação.", opcoes: [["ok", "Correto,\nseguir"], ["ajustar", "Ajustar\nespaçadores"]], certo: f.g2 ? "ok" : "ajustar" }) },
-        { alvo: "agulhas", titulo: "Gabarito de 4 mm", corpo: "Troque pelo gabarito de 4 mm e comande de novo.", anim: (f, done) => testeGabarito(!f.g4, done) },
-        { decisao: f => ({ titulo: "Gabarito de 4 mm", visto: f.g4 ? "Com 4 mm a máquina não travou e ficou sem indicação." : "Com 4 mm a máquina TRAVOU e deu indicação.", opcoes: [["ok", "Correto,\nseguir"], ["ajustar", "Ajustar\nespaçadores"]], certo: f.g4 ? "ok" : "ajustar", critico: !f.g4 }) }
+        { alvo: "agulhas", ferramenta: "gabarito_4mm", titulo: "Gabarito de 4 mm", corpo: "Troque pelo gabarito de 4 mm e comande de novo.", anim: (f, done) => testeGabarito(!f.g4, done) },
+        { decisao: f => ({ titulo: "Gabarito de 4 mm", visto: f.g4 ? "Com 4 mm a máquina não travou e ficou sem indicação." : "Com 4 mm a máquina TRAVOU e deu indicação.", opcoes: [["ok", "Correto,\nseguir"], ["ajustar", "Ajustar\nespaçadores"]], certo: f.g4 ? "ok" : "ajustar", critico: !f.g4, risco: "Aceitou indicação com gabarito de 4 mm: a agulha pode ficar aberta sob o trem." }) }
       ] },
     11: { titulo: "Unidade do motor", curto: "Unidade do\nmotor", seg: "01 e 02",
       sortear: () => ({ u: estado(["umidade", "goretex"]) }),
@@ -1206,7 +1687,7 @@ body.vr #stick { display: none; }
       sortear: () => ({ u: estado(["retentor", "chicote"]) }),
       etapas: [
         YOSHI,
-        { alvo: "trava", titulo: "Inspecione a unidade de travamento", corpo: "Toque na unidade de travamento para conferir interior, retentor, bornes e chicote.", anim: instrumento },
+        { alvo: "trava", ferramenta: "chave_boca", titulo: "Inspecione a unidade de travamento", corpo: "Toque na unidade de travamento para conferir interior, retentor, bornes e chicote.", anim: instrumento },
         { decisao: f => ({ titulo: "Unidade de travamento", visto: { ok: "Interior seco, retentor bom e bornes firmes.", retentor: "O retentor está vazando óleo.", chicote: "A fiação do chicote está ressecada e com a isolação trincada." }[f.u],
           opcoes: OPC(["retentor", "Substituir\nretentor"], ["chicote", "Refazer\nchicote"]), certo: f.u }) }
       ] },
@@ -1214,22 +1695,22 @@ body.vr #stick { display: none; }
       sortear: () => ({ v: medir([11.2, 12.8], [[8.6, 10.5], [13.4, 14.6]], 1) }),
       etapas: [
         YOSHI,
-        { alvo: "caixa", titulo: "Meça entre os bornes 32 e 52", corpo: "Toque na caixa de junção para abrir e medir com o multímetro.", anim: abrirCaixa },
+        { alvo: "caixa", ferramenta: "multimetro", leitura: f => num(f.v.v, 1) + " Vdc", titulo: "Meça entre os bornes 32 e 52", corpo: "Toque na caixa de junção para abrir e medir com o multímetro.", anim: abrirCaixa },
         { decisao: f => ({ titulo: "Tensão de indicação", visto: `O multímetro marca ${num(f.v.v, 1)} Vdc. A faixa é de 11 a 13 Vdc.`, opcoes: FAIXA, certo: f.v.ok ? "ok" : "fora" }) }
       ] },
     14: { titulo: "Tensão de alimentação do motor", curto: "Tensão do\nmotor", seg: "01 a 04",
       sortear: () => ({ a: medir([106, 124], [[88, 102], [128, 138]]), b: medir([106, 124], [[88, 102], [128, 138]]) }),
       etapas: [
         YOSHI,
-        { alvo: "caixa", titulo: "Bornes 6 e 8, puxando", corpo: "Toque na caixa de junção para medir durante o comando que puxa as agulhas.", anim: (f, done) => abrirCaixa(f, () => { som.motor(1.6); tween(1.6, () => {}, done); }) },
+        { alvo: "caixa", ferramenta: "multimetro", leitura: f => num(f.a.v) + " Vdc", titulo: "Bornes 6 e 8, puxando", corpo: "Toque na caixa de junção para medir durante o comando que puxa as agulhas.", anim: (f, done) => abrirCaixa(f, () => { som.motor(1.6); tween(1.6, () => {}, done); }) },
         { decisao: f => ({ titulo: "Motor puxando (6–8)", visto: `${num(f.a.v)} Vdc durante o movimento. A faixa é de 105 a 125 Vdc.`, opcoes: [["ok", "Dentro da\nfaixa"], ["fora", "Ajustar banco\nde resistores"]], certo: f.a.ok ? "ok" : "fora" }) },
-        { alvo: "caixa", titulo: "Bornes 6 e 9, empurrando", corpo: "Agora meça durante o comando que empurra.", anim: (f, done) => { som.clique(); som.motor(1.6); tween(1.6, () => {}, () => { som.bip(); done(); }); } },
+        { alvo: "caixa", ferramenta: "multimetro", leitura: f => num(f.b.v) + " Vdc", titulo: "Bornes 6 e 9, empurrando", corpo: "Agora meça durante o comando que empurra.", anim: (f, done) => { som.clique(); som.motor(1.6); tween(1.6, () => {}, () => { som.bip(); done(); }); } },
         { decisao: f => ({ titulo: "Motor empurrando (6–9)", visto: `${num(f.b.v)} Vdc durante o movimento. A faixa é de 105 a 125 Vdc.`, opcoes: [["ok", "Dentro da\nfaixa"], ["fora", "Ajustar banco\nde resistores"]], certo: f.b.ok ? "ok" : "fora" }) }
       ] },
     15: { titulo: "Força de movimentação", curto: "Força de\nmovimentação", seg: "01 e 03",
       sortear: () => ({ k: medir([560, 710], [[430, 530], [740, 820]]) }),
       etapas: [
-        { alvo: "agulhas", titulo: "Instale a célula de carga", corpo: "Toque na agulha para colocar a célula de carga entre a agulha e o trilho e comandar.", anim: (f, done) => testeGabarito(true, done) },
+        { alvo: "agulhas", ferramenta: "celula_carga", leitura: f => num(f.k.v) + " kgf", titulo: "Instale a célula de carga", corpo: "Toque na agulha para colocar a célula de carga entre a agulha e o trilho e comandar.", anim: (f, done) => testeGabarito(true, done) },
         { decisao: f => ({ titulo: "Força de movimentação", visto: `A célula de carga marca ${num(f.k.v)} kgf. A faixa é de 550 a 720 kgf (1200 a 1600 lbs).`, opcoes: [["ok", "Dentro da\nfaixa"], ["fora", "Ajustar porca\nda embreagem"]], certo: f.k.ok ? "ok" : "fora" }) }
       ] },
     16: { titulo: "Remover DAM e testar correspondência", curto: "Remover DAM\ne testar", seg: "01 e 03",
@@ -1242,13 +1723,13 @@ body.vr #stick { display: none; }
         { alvo: "chave", titulo: "Comande para REVERSO", corpo: "Fique fora da via. Toque na chave de comando local e acompanhe o movimento.", anim: (f, done) => moverPro("reverso", false, done) },
         { alvo: "chave", titulo: "Comande de volta para NORMAL", corpo: "Toque de novo na chave de comando.", anim: (f, done) => moverPro("normal", false, done) },
         { decisao: f => ({ titulo: "Correspondência e 5S", visto: { ok: "A posição no campo bate com a indicação do intertravamento e a via está limpa.", discordancia: "No campo a máquina está em NORMAL, mas o intertravamento mostra REVERSO.", ferramenta: "A correspondência está certa, mas ficou uma chave de boca sobre o dormente." }[f.c],
-          opcoes: [["ok", "Liberar\nao CCO"], ["discordancia", "Não liberar:\nnota e CCO"], ["ferramenta", "Recolher a\nferramenta (5S)"]], certo: f.c, critico: f.c === "discordancia" }) }
+          opcoes: [["ok", "Liberar\nao CCO"], ["discordancia", "Não liberar:\nnota e CCO"], ["ferramenta", "Recolher a\nferramenta (5S)"]], certo: f.c, critico: f.c === "discordancia", risco: "Liberou ao CCO com discordância entre campo e intertravamento." }) }
       ] },
     17: { titulo: "Registrar anormalidades", curto: "Registro\nno RG", seg: "—",
       sortear: () => ({ a: umDe(["coifa rasgada na unidade de travamento", "terminal da cordoalha oxidado", "membrana Goretex rasgada"]) }),
       etapas: [
         { decisao: f => ({ titulo: "Registro no RG online", visto: `Na preventiva você encontrou: ${f.a}, sem material para corrigir hoje.`, opcoes: [["rg", "Só registrar\nno RG"], ["ycm", "RG e nota\nYCM"], ["nada", "Não\nregistrar"]], certo: "ycm" }) },
-        { decisao: f => ({ titulo: "Fechamento", visto: "O RG está preenchido. Falta devolver a máquina.", opcoes: [["cco", "Comunicar o\nCCO e liberar"], ["sair", "Ir embora\nsem avisar"]], certo: "cco", critico: true }) }
+        { decisao: f => ({ titulo: "Fechamento", visto: "O RG está preenchido. Falta devolver a máquina.", opcoes: [["cco", "Comunicar o\nCCO e liberar"], ["sair", "Ir embora\nsem avisar"]], certo: "cco", critico: true, risco: "Saiu sem devolver a máquina ao CCO." }) }
       ] }
   };
 
@@ -1266,10 +1747,25 @@ body.vr #stick { display: none; }
     const def = PASSOS[n];
     menuPassos(n >= 10 ? 1 : 0);
     mode = "pro";
-    pro = { n, def, i: -1, f: def.sortear ? def.sortear() : {}, achados: [], errosPeca: 0, bloqueios: 0, criticos: 0, t0: performance.now(), d: null };
+    pro = { n, def, i: -1, f: def.sortear ? def.sortear() : {}, achados: [], errosPeca: 0, bloqueios: 0, criticos: 0, t0: performance.now(), d: null, ev0: licenca.eventos.length };
     if (def.prep) def.prep();
-    drawPanel(`Passo ${n} · Antes de começar`, def.titulo, (def.seg !== "—" ? `Procedimentos de Segurança ${def.seg} valem para este passo. ` : "") + "Siga a peça que pisca e decida a ação em cada desvio.", "#f2a400");
-    setButtons([["pok", "Começar"], [voltarLista(n), "Voltar"]]);
+    telaInicioPro();
+    coordenadorFala(`Equipe, vamos ao passo ${n}: ${def.titulo}.` + (licenca.ativa ? "" : " Peçam licença ao CCP antes de entrar na via."));
+  }
+  function telaInicioPro() {
+    const n = pro.n, def = pro.def;
+    drawPanel(`Passo ${n} · Antes de começar`, def.titulo, (def.seg !== "—" ? `Procedimentos de Segurança ${def.seg} valem para este passo. ` : "") +
+      (licenca.ativa ? "Licença do CCP concedida. " : "Sem licença do CCP: peça antes de começar. ") + "Siga a peça que pisca e decida a ação em cada desvio.", "#f2a400");
+    setButtons((licenca.ativa ? [] : [["licenca", "Pedir licença\nao CCP"]]).concat([["pok", "Começar"], [voltarLista(n), "Voltar"]]));
+  }
+  function comecarPro() {
+    if (!licenca.ativa) {
+      pro.bloqueios++;
+      alertaRisco("Tentou começar a atividade na via sem licença do CCP.");
+      drawPanel(`Passo ${pro.n} · Bloqueado`, "Sem licença do CCP", "Antes de entrar na via, peça licença ao CCP pelo rádio. Sem licença, trens de minério circulam normalmente.", "#e5533d");
+      return setButtons([["licenca", "Pedir licença\nao CCP"], [voltarLista(pro.n), "Voltar"]]);
+    }
+    avancarPro();
   }
   function etiquetaPro() {
     const alvos = pro.def.etapas.filter(e => e.alvo).length, feitos = pro.def.etapas.slice(0, pro.i + 1).filter(e => e.alvo).length;
@@ -1279,7 +1775,9 @@ body.vr #stick { display: none; }
     const e = pro.def.etapas[pro.i];
     if (!e) return fimPro();
     pulseIds = []; pro.d = null;
+    if (!e.decisao) guardarFerramentas();
     if (e.yoshi) {
+      coordenadorFala("Antes de intervir, façam o Apontar e Falar.");
       drawPanel(`Passo ${pro.n} · Apontar e Falar`, "Faça o Yoshi Yoshi", "Aponte para a máquina e fale em voz alta: \"Máquina bloqueada, área livre, posso intervir\". Só depois toque nela.", "#f2a400");
       return setButtons([["y:sim", "Apontei\ne falei"], ["y:nao", "Pular"]]);
     }
@@ -1302,6 +1800,7 @@ body.vr #stick { display: none; }
       return;
     }
     pulseIds = []; som.selecionar();
+    if (e.ferramenta) mostrarFerramenta(e.ferramenta, ultimoPonto || centroPeca(e.alvo), e.leitura ? e.leitura(pro.f) : "");
     if (!e.anim) return avancarPro();
     busy = true;
     e.anim(pro.f, ok => { busy = false; if (ok === false) { pulseIds = [e.alvo]; return; } avancarPro(); });
@@ -1309,19 +1808,20 @@ body.vr #stick { display: none; }
   function decidirPro(escolha) {
     const d = pro.d, lab = id => ((d.opcoes.find(o => o[0] === id) || [id, id])[1]).replace(/\n/g, " ");
     const certo = escolha === d.certo, critico = !certo && !!d.critico;
-    if (critico) pro.criticos++;
+    if (critico) { pro.criticos++; alertaRisco(d.risco || "Decisão crítica: " + d.titulo + "."); }
     pro.achados.push({ titulo: d.titulo, escolha: lab(escolha), correto: lab(d.certo), certo, critico });
     if (!certo) som.erro();
     avancarPro();
   }
-  function yoshiPro(fez) { if (!fez) { pro.bloqueios++; som.erro(); } avancarPro(); }
+  function yoshiPro(fez) { if (!fez) { pro.bloqueios++; alertaRisco("Intervenção sem o Apontar e Falar (Yoshi Yoshi)."); } avancarPro(); }
   function fimPro() {
-    mode = "fim"; pulseIds = []; pro.d = null;
+    mode = "fim"; pulseIds = []; pro.d = null; guardarFerramentas(); mantenedorVoltar();
     const seg = Math.round((performance.now() - pro.t0) / 1000), tot = pro.achados.length, certas = pro.achados.filter(a => a.certo).length;
     const ok = certas === tot && !pro.errosPeca && !pro.bloqueios;
     const extra = [];
     if (pro.bloqueios) extra.push(`Segurança: Apontar e Falar pulado ou comando na área de movimentação (${pro.bloqueios}x)`);
     if (pro.criticos) extra.push("ERRO CRÍTICO: reprovado no passo");
+    extra.push(...licenca.eventos.slice(pro.ev0).map(t => "CCP: " + t));
     registrarResultado({ modulo: `Passo ${pro.n} · ${pro.def.titulo}`, segundos: seg, avaliacoesCertas: certas, avaliacoes: tot, errosPeca: pro.errosPeca, bloqueios: pro.bloqueios,
       detalhes: pro.achados.map(a => `${a.titulo}: ${a.escolha}` + (a.certo ? " (certo)" : ` (correto: ${a.correto})${a.critico ? " [crítico]" : ""}`)).concat(extra).join("; ") });
     const linhas = pro.achados.map(a => `${a.certo ? "✓" : "✗"} ${a.titulo}: ${a.escolha}` + (a.certo ? "" : `, o correto era ${a.correto}`));
@@ -1329,8 +1829,172 @@ body.vr #stick { display: none; }
     const resumo = `${certas} de ${tot} avaliações certas · ${pro.errosPeca} toque${pro.errosPeca === 1 ? "" : "s"} na peça errada · ${tempoTxt(seg)}`;
     drawPanel(`Passo ${pro.n} concluído`, pro.criticos ? "Erro crítico: reprovado" : ok ? "Sem erros" : resumo,
       quem() + "\n" + (ok || pro.criticos ? resumo + "\n" : "") + linhas.join("\n"), ok ? "#23c552" : "#e5533d");
+    coordenadorFala(pro.criticos ? `Passo ${pro.n} reprovado por erro crítico. Vamos revisar antes de seguir.` : ok ? `Passo ${pro.n} concluído sem desvios. Bom trabalho.` : `Passo ${pro.n} concluído. Revisem os pontos marcados no quadro.`);
     setButtons([["p:" + pro.n, "Refazer"]].concat(PASSOS[pro.n + 1] ? [["p:" + (pro.n + 1), "Próximo\npasso"]] : []).concat([[voltarLista(pro.n), "Lista de\npassos"], ["menu", "Menu"]]));
   }
+
+  // ---------- Desafios de resolução de defeitos ----------
+  // Um defeito é sorteado. O CCP relata o sintoma; o mantenedor inspeciona peças, mede e diagnostica a causa.
+  const NORMAL = {
+    alim: ["116 Vdc", "Bornes 6 e 8 durante o comando: 116 Vdc. A faixa é de 105 a 125 Vdc."],
+    ind: ["12,1 Vdc", "Bornes 32 e 52: 12,1 Vdc. A faixa é de 11 a 13 Vdc."],
+    forca: ["640 kgf", "Célula de carga: 640 kgf. A faixa é de 550 a 720 kgf."],
+    cmd: "A máquina destravou, movimentou, travou e a indicação chegou ao CCP. Movimento normal."
+  };
+  const DEFEITOS = {
+    obstrucao: { nome: "Obstrução entre agulha e trilho", curto: "Obstrução\nna agulha",
+      sintoma: "CCP informa: comandamos a chave para reverso, o motor girou, mas ela ficou sem indicação.",
+      cmd: "O motor gira, a embreagem patina e a agulha para a poucos milímetros do trilho de encosto. Sem travamento e sem indicação.",
+      med: { ind: ["0,0 Vdc", "Bornes 32 e 52: 0,0 Vdc. Sem indicação: a máquina não travou."], forca: ["—", "Não dá para instalar a célula: há algo entre a agulha e o trilho."] },
+      pistas: { agulhas: "Há brita presa entre a agulha e o trilho de encosto, impedindo o fechamento.", clips: "Os clips estão firmes; a agulha para antes de encostar." },
+      correcao: "Retirar a brita, limpar a região da agulha, comandar de novo e conferir a indicação. Registrar no RG." },
+    alimentacao: { nome: "Falta de alimentação do motor", curto: "Sem alimentação\ndo motor",
+      sintoma: "CCP informa: a chave não sai do lugar quando comandamos; continua indicando a posição anterior.",
+      cmd: "Nenhum ruído de motor. As agulhas não se movem e a indicação da posição anterior continua.",
+      med: { alim: ["0 Vdc", "Bornes 6 e 8 durante o comando: 0 Vdc. A tensão não chega ao motor."] },
+      pistas: { caixa: "A fiação na caixa de junção está íntegra, mas os bornes 6 e 8 não recebem tensão: o problema está a montante (disjuntor ou fusível do circuito do motor)." , motor: "O motor não mostra sinal de queima nem cheiro." },
+      correcao: "Verificar o circuito a montante, achar a causa, rearmar o disjuntor ou trocar o fusível e testar com o CCP." },
+    manual: { nome: "Comutador esquecido em MANUAL", curto: "Comutador\nem MANUAL",
+      sintoma: "CCP informa: logo depois de uma manutenção a chave ficou sem indicação e não obedece aos comandos.",
+      cmd: "Nada acontece: o circuito do motor está cortado.",
+      med: { alim: ["0 Vdc", "Bornes 6 e 8 durante o comando: 0 Vdc."], ind: ["0,0 Vdc", "Bornes 32 e 52: 0,0 Vdc. Sem indicação."] },
+      pistas: { comutador: "O comutador da caixa da manivela está em MANUAL.", manivela: "A manivela foi usada e guardada, mas o comutador ficou em manual." },
+      prep: () => { comutador = "manual"; aplicarComutador(); },
+      correcao: "Voltar o comutador para AUTOMÁTICO, comandar e confirmar a indicação com o CCP. Esquecer em manual é falha do mantenedor." },
+    conector: { nome: "Conector militar folgado", curto: "Conector\nfolgado",
+      sintoma: "CCP informa: a indicação da chave cai e volta sozinha, sem nenhum comando, principalmente quando passa trem.",
+      med: { ind: ["0 ↔ 12 V", "Bornes 32 e 52: a leitura oscila entre 0 e 12 Vdc quando o cabo é mexido."] },
+      pistas: { conA: "O conector militar está folgado: a rosca não está travada e o pino de contato tem folga.", conB: "Este conector está firme e travado." },
+      correcao: "Reconectar e travar o conector militar, conferir os pinos e acompanhar a indicação com o CCP." },
+    embreagem: { nome: "Embreagem desregulada", curto: "Embreagem\ndesregulada",
+      sintoma: "CCP informa: às vezes a chave não completa o movimento e fica sem indicação; no comando seguinte funciona.",
+      cmd: "O motor gira e a agulha anda, mas para no fim do curso com a embreagem patinando. Num segundo comando ela fecha.",
+      med: { forca: ["410 kgf", "Célula de carga: 410 kgf. A faixa é de 550 a 720 kgf (passo 15)."] },
+      pistas: { agulhas: "Agulha e trilho limpos, sem obstrução.", motor: "O motor gira normal; a embreagem patina com pouca resistência." },
+      correcao: "Ajustar a porca da embreagem até a força ficar entre 550 e 720 kgf e repetir a medição." },
+    clip: { nome: "Clip da barra quebrado", curto: "Clip\nquebrado", critico: true,
+      sintoma: "CCP informa: indicação normal, mas um maquinista relatou que a agulha parece não ter encostado.",
+      cmd: "O motor movimenta e trava, a indicação chega, mas uma das agulhas não acompanha o movimento da barra.",
+      pistas: { clips: "O clip da barra de acionamento está trincado e solto: a agulha não acompanha a barra.", barra: "A barra se move normalmente; a agulha é que fica para trás.", agulhas: "Uma agulha ficou aberta enquanto a outra encostou." },
+      correcao: "Não liberar a chave. Interditar, substituir o clip, fazer o teste de quebra de clip e o teste de gabarito antes de liberar ao CCP." },
+    indicacao: { nome: "Tensão de indicação baixa", curto: "Indicação\nbaixa",
+      sintoma: "CCP informa: depois de movimentar, a chave perde a indicação, embora as agulhas fiquem encostadas.",
+      cmd: "A máquina movimenta e trava normal, mas a indicação chega fraca e cai depois de alguns segundos.",
+      med: { ind: ["8,7 Vdc", "Bornes 32 e 52: 8,7 Vdc. A faixa é de 11 a 13 Vdc (passo 13)."] },
+      pistas: { caixa: "Os bornes estão firmes e limpos; a tensão de indicação está baixa." },
+      correcao: "Verificar a fonte e o circuito de indicação, ajustar até 11 a 13 Vdc e confirmar a indicação com o CCP." }
+  };
+  let dz = null, britaObj = null;
+  function mostrarBrita(sim) {
+    if (sim && !britaObj) {
+      britaObj = new THREE.Group();
+      const m = mat(0x8c8a86, { roughness: 1 });
+      for (let i = 0; i < 9; i++) { const p = new THREE.Mesh(new THREE.DodecahedronGeometry(0.02 + Math.random() * 0.015), m); p.position.set((Math.random() - 0.5) * 0.3, Math.random() * 0.03, (Math.random() - 0.5) * 0.04); p.rotation.set(Math.random() * 3, Math.random() * 3, 0); britaObj.add(p); }
+      scene.add(britaObj);
+    }
+    if (britaObj) { britaObj.visible = sim; if (sim) { const c = centroPeca("agulhas"); britaObj.position.set(c.x, Y_PATIM + 0.17, 0.7); } }
+  }
+  function limparDesafio() { mostrarBrita(false); if (mode !== "desafio") dz = null; }
+  function menuDesafios(lista) {
+    mode = "menuDesafios"; pulseIds = []; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas();
+    if (lista) {
+      drawPanel("Desafios de defeitos", "Instrutor: escolha o defeito", "O participante não vê qual foi escolhido; o sintoma é relatado pelo CCP no rádio.");
+      return setButtons(Object.keys(DEFEITOS).map(k => ["dz:" + k, DEFEITOS[k].curto]).concat([["desafios", "Voltar"]]));
+    }
+    drawPanel("Desafios de defeitos", "Resolva o defeito na máquina de chave",
+      "Um defeito é sorteado. Ouça o sintoma do CCP, inspecione as peças, faça as medições e diga a causa. A nota considera o diagnóstico, o número de verificações, o tempo e a segurança.");
+    setButtons([["dz:sorte", "Novo desafio\nsorteado"], ["dzlista", "Instrutor:\nescolher defeito"], ["menu", "Menu"]]);
+  }
+  function startDesafio(k) {
+    if (k === "sorte") k = umDe(Object.keys(DEFEITOS));
+    menuDesafios();
+    mode = "desafio";
+    const d = DEFEITOS[k];
+    dz = { k, d, verif: 0, riscos: 0, t0: performance.now(), feitos: [], ev0: licenca.eventos.length };
+    if (d.prep) d.prep();
+    if (k === "obstrucao") mostrarBrita(true);
+    coordenadorFala(d.sintoma, false, "CCP");
+    telaDesafio(d.sintoma);
+  }
+  function telaDesafio(texto, cor, titulo) {
+    drawPanel(`Desafio · ${dz.verif} verificaç${dz.verif === 1 ? "ão" : "ões"}`, titulo || "Sintoma relatado pelo CCP", texto, cor);
+    setButtons([["dt:alim", "Medir\nalimentação\n(6 e 8)"], ["dt:ind", "Medir\nindicação\n(32 e 52)"], ["dt:forca", "Medir força\n(célula)"], ["dt:cmd", "Comandar\nteste"],
+      ["dt:sintoma", "Repetir\nsintoma"], ["dt:diag", "Diagnosticar"], ["menu", "Desistir"]]);
+  }
+  function verificar(nome) { dz.verif++; dz.feitos.push(nome); }
+  function testeDesafio(t) {
+    const d = dz.d;
+    if (t === "sintoma") return telaDesafio(d.sintoma);
+    if (t === "diag") {
+      drawPanel(`Desafio · ${dz.verif} verificaç${dz.verif === 1 ? "ão" : "ões"}`, "Qual é a causa do defeito?", "Escolha a causa. Só diagnostique quando tiver evidência suficiente.");
+      return setButtons(Object.keys(DEFEITOS).map(x => ["dd:" + x, DEFEITOS[x].curto]).concat([["dt:sintoma", "Voltar à\ninvestigação"]]));
+    }
+    if (!licenca.ativa && t !== "cmd") {
+      dz.riscos++; alertaRisco("Medição na via sem licença do CCP.");
+      return telaDesafio("Antes de abrir a caixa ou instalar instrumentos na via, peça licença ao CCP (botão no menu principal ou abaixo).", "#e5533d", "Sem licença do CCP");
+    }
+    if (t === "cmd") {
+      if (naAreaDeMovimento()) { dz.riscos++; alertaRisco("Comando com você dentro da área de movimentação das agulhas."); return telaDesafio("Procedimento de Segurança 03: saia da área das agulhas, barras e tirantes antes de comandar.", "#e5533d", "Comando bloqueado"); }
+      verificar("comando");
+      busy = true; som.rele();
+      const motorGira = !["alimentacao", "manual"].includes(dz.k);
+      if (motorGira) setTimeout(() => som.motor(2.2), 250);
+      tween(motorGira ? 2.6 : 1.2, () => {}, () => { busy = false; if (motorGira && !["obstrucao"].includes(dz.k)) som.trava(); telaDesafio(d.cmd || NORMAL.cmd, null, "Resultado do comando"); });
+      return;
+    }
+    verificar(t);
+    const [leit, txt] = (d.med && d.med[t]) || NORMAL[t];
+    if (t === "forca") mostrarFerramenta("celula_carga", centroPeca("agulhas"), leit);
+    else { abrirCaixaDesafio(); mostrarFerramenta("multimetro", centroPeca("caixa"), leit); }
+    som.clique(); setTimeout(() => som.bip(), 700);
+    telaDesafio(txt, null, t === "forca" ? "Força de movimentação" : t === "alim" ? "Alimentação do motor" : "Tensão de indicação");
+  }
+  function abrirCaixaDesafio() { tampaCx.rotation.z = -1.45; }
+  function tocarDesafio(id) {
+    if (!licenca.ativa) { dz.riscos++; alertaRisco("Intervenção na máquina sem licença do CCP."); return telaDesafio("Peça licença ao CCP antes de mexer na máquina.", "#e5533d", "Sem licença do CCP"); }
+    verificar(PARTS[id].nome);
+    som.selecionar();
+    if (id === "comutador") {
+      const t = alternarComutador();
+      return telaDesafio(t + (dz.d.pistas.comutador ? " " + dz.d.pistas.comutador.replace("está em MANUAL", "estava em MANUAL") : ""), null, "Comutador");
+    }
+    telaDesafio(dz.d.pistas[id] || `Nada anormal em ${PARTS[id].nome.toLowerCase()}.`, null, PARTS[id].nome);
+  }
+  function diagnosticar(k) {
+    const d = dz.d, certo = k === dz.k, seg = Math.round((performance.now() - dz.t0) / 1000);
+    const nota = certo ? Math.max(10, 100 - Math.max(0, dz.verif - 3) * 5 - Math.floor(seg / 60) * 2 - dz.riscos * 20) : 0;
+    const critico = !certo && d.critico;
+    if (critico) alertaRisco("Diagnóstico errado com agulha solta: a chave seria liberada com risco de descarrilamento.");
+    if (!certo) som.erro(); else som.bip();
+    const evs = licenca.eventos.slice(dz.ev0).map(t => "CCP: " + t);
+    registrarResultado({ modulo: "Desafio · " + d.nome, segundos: seg, avaliacoes: 1, avaliacoesCertas: certo ? 1 : 0, errosPeca: 0, bloqueios: dz.riscos,
+      detalhes: [`Causa escolhida: ${DEFEITOS[k].nome}` + (certo ? " (certo)" : ` (correto: ${d.nome})${critico ? " [crítico]" : ""}`), `nota ${nota}`, `${dz.verif} verificações: ${dz.feitos.join(", ") || "nenhuma"}`].concat(dz.riscos ? [`${dz.riscos} ação(ões) de risco`] : []).concat(evs).join("; ") });
+    mode = "fim"; guardarFerramentas(); mostrarBrita(false); mantenedorVoltar();
+    drawPanel(`Desafio concluído · nota ${nota}`, certo ? "Diagnóstico correto: " + d.nome : "Diagnóstico errado. Era: " + d.nome,
+      quem() + `\n${dz.verif} verificações · ${tempoTxt(seg)}` + (dz.riscos ? ` · ${dz.riscos} ação(ões) de risco` : "") + "\nCorreção: " + d.correcao, certo ? "#23c552" : "#e5533d");
+    coordenadorFala(certo ? "Diagnóstico correto. Executem a correção e confirmem com o CCP." : "Diagnóstico errado. Vamos revisar as evidências.");
+    setButtons([["dz:sorte", "Novo\ndesafio"], ["desafios", "Desafios"], ["menu", "Menu"]]);
+  }
+
+  // ---------- Biblioteca de treinamentos ----------
+  const TREINAMENTOS = [
+    { id: "cts2", titulo: "Manutenção preventiva da máquina de chave CTS-2", pro: "PRO-001122 · Anexo 5", txt: "Tour, passo 1, passos 2 a 17, máquina funcionando e explorar por dentro.", abrir: () => showMenu() },
+    { id: "desafios", titulo: "Desafios de defeitos em máquinas de chave", pro: "Baseado no PRO-001122", txt: "Um defeito é sorteado: ouça o sintoma, inspecione, meça e diagnostique a causa.", abrir: () => menuDesafios() },
+    { id: "radio", titulo: "Comunicação via rádio", pro: "Procedimento de comunicação", txt: "Padrão de comunicação com o CCP e a equipe. Será usado também nos outros treinamentos.", abrir: null }
+  ];
+  const bibEl = document.getElementById("bib");
+  function abrirBib() {
+    const l = document.getElementById("bibLista"); l.innerHTML = "";
+    for (const t of TREINAMENTOS) {
+      const b = document.createElement("button"); b.type = "button"; b.disabled = !t.abrir;
+      b.innerHTML = `<small>${esc(t.pro)}</small><b>${esc(t.titulo)}</b><span>${esc(t.txt)}</span><i>${t.abrir ? "Disponível" : "Em preparação"}</i>`;
+      if (t.abrir) b.onclick = () => { bibEl.hidden = true; t.abrir(); };
+      l.appendChild(b);
+    }
+    bibEl.hidden = false;
+  }
+  document.getElementById("btnBib").addEventListener("click", abrirBib);
+  document.getElementById("bibFechar").addEventListener("click", () => { bibEl.hidden = true; });
 
   // ---------- Explorar por dentro (drill-down do Gêmeo digital) ----------
   // Selecionar cada peça, tirar parafusos e tampas, ocultar, isolar, raio-X das carcaças e vista explodida.
@@ -1464,10 +2128,18 @@ body.vr #stick { display: none; }
       som.selecionar();
       const b = id.slice(4);
       if (b === "menu") return showMenu();
+      if (b.startsWith("linha:")) return respostaCcp(b === "linha:devolver");
+      if (b === "licenca") return pedirLicenca(() => { if (mode === "pro" && pro && pro.i < 0) telaInicioPro(); else if (mode === "menu") showMenu(); else if (mode === "desafio" && dz) telaDesafio("Licença concedida. Pode investigar a máquina."); });
+      if (b === "devolver") { devolverLinha("Devolveu a linha ao CCP ao terminar"); coordenadorFala("CCP, a equipe terminou e devolve a linha. Via livre para circulação."); return showMenu(); }
       if (mode === "pro" && pro && pro.d) return decidirPro(b);
+      if (b === "desafios") return menuDesafios();
+      if (b === "dzlista") return menuDesafios(true);
+      if (b.startsWith("dz:")) return startDesafio(b.slice(3));
+      if (b.startsWith("dt:")) return testeDesafio(b.slice(3));
+      if (b.startsWith("dd:")) return diagnosticar(b.slice(3));
       if (b === "passos0" || b === "passos1") return menuPassos(+b.slice(6));
       if (b.startsWith("p:")) return startPro(+b.slice(2));
-      if (b === "pok") return avancarPro();
+      if (b === "pok") return comecarPro();
       if (b.startsWith("y:")) return yoshiPro(b === "y:sim");
       if (b === "tour") return startTour();
       if (b === "passo1") return startPasso1();
@@ -1487,6 +2159,7 @@ body.vr #stick { display: none; }
     }
     if (mode === "demo" && id === "comutador") { const t = alternarComutador(); drawPanel("Máquina em funcionamento", "Comutador em " + (comutador === "manual" ? "MANUAL" : "AUTOMÁTICO"), t); return; }
     if (id === "chao" || !PARTS[id]) return;
+    if (mode === "desafio" && dz) return tocarDesafio(id);
     if (mode === "tour") { som.selecionar(); drawPanel("Tour da máquina", PARTS[id].nome, PARTS[id].txt); return; }
     if (mode === "pro" && pro) return tocarPro(id);
     if (mode === "passo1") {
@@ -1646,16 +2319,19 @@ body.vr #stick { display: none; }
   const dica3d = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.105), new THREE.MeshBasicMaterial({ map: dicaTx.t, transparent: true, depthTest: false }));
   dica3d.position.set(0, -0.11, -0.55); dica3d.renderOrder = 999; dica3d.visible = false; camera.add(dica3d);
   let dicaTimer = 0;
-  function mostrarDica(texto) {
+  function mostrarDica(texto, rotulo, coord) {
     const { ctx, c, t } = dicaTx;
+    const fundo = coord ? "rgba(43,33,8,0.94)" : "rgba(15,42,61,0.94)", borda = coord ? "#f2a400" : "#3ea0e4", tit = coord ? "#ffd27a" : "#8fc9f2";
     ctx.clearRect(0, 0, c.width, c.height);
-    ctx.fillStyle = "rgba(15,42,61,0.94)"; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(0, 0, c.width, c.height, 26) : ctx.rect(0, 0, c.width, c.height); ctx.fill();
-    ctx.strokeStyle = "#3ea0e4"; ctx.lineWidth = 6; ctx.stroke();
-    ctx.fillStyle = "#8fc9f2"; ctx.font = `600 34px ${FONT}`; ctx.fillText("DICA DO AVALIADOR", 40, 62);
+    ctx.fillStyle = fundo; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(0, 0, c.width, c.height, 26) : ctx.rect(0, 0, c.width, c.height); ctx.fill();
+    ctx.strokeStyle = borda; ctx.lineWidth = 6; ctx.stroke();
+    ctx.fillStyle = tit; ctx.font = `600 34px ${FONT}`; ctx.fillText((rotulo || "Dica do avaliador").toUpperCase(), 40, 62);
     ctx.fillStyle = "#eef1f3"; ctx.font = `500 46px ${FONT}`; wrap(ctx, texto, 40, 124, 944, 56);
     t.needsUpdate = true; dica3d.visible = vr;
+    dicaEl.querySelector("small").textContent = rotulo || "Dica do avaliador";
+    dicaEl.classList.toggle("coord", !!coord);
     dicaEl.querySelector("span").textContent = texto; dicaEl.hidden = vr;
-    som.bip(); avalEnviar("sistema", "Dica recebida na tela do mantenedor");
+    if (!coord) { som.bip(); avalEnviar("sistema", "Dica recebida na tela do mantenedor"); }
     clearTimeout(dicaTimer); dicaTimer = setTimeout(() => { dica3d.visible = false; dicaEl.hidden = true; }, 9000);
   }
   dicaEl.addEventListener("click", () => { dicaEl.hidden = true; dica3d.visible = false; });
@@ -1699,7 +2375,7 @@ body.vr #stick { display: none; }
     lastTap = now;
     const a = alvoDoToque(e);
     objToque = a.obj;
-    if (a.id && a.p3 && a.id !== "chao" && !a.id.startsWith("btn:")) mao.tocar(a.p3, GIRAM_NA_MAO.has(a.id));
+    if (a.id && a.p3 && a.id !== "chao" && !a.id.startsWith("btn:")) { ultimoPonto = a.p3.clone(); executarToque(a.p3, a.id); }
     if (a.id === "chao" && a.ponto) {
       if (!vr) { andarAte(a.ponto); return; }
       if (marcado && now - marcadoEm < 5000 && marcado.distanceTo(a.ponto) < 0.8) { marcado = null; andarAte(a.ponto); return; }
@@ -1778,13 +2454,17 @@ body.vr #stick { display: none; }
   }
   const vrGear = document.getElementById("vrGear"), vrDivider = document.getElementById("vrDivider"), vrCfg = document.getElementById("vrCfg");
   // Calibração do óculos (estilo Cardboard): distância entre lentes, correção de lente e tamanho da tela
-  const cfg = { sep: 62, dist: 0.35, tela: 6.5 };
+  const cfg = { sep: 62, dist: 0.35, tela: 6.5, qual: 1.45, executor: "avatar", voz: true, trem: 10 };
   try { Object.assign(cfg, JSON.parse(localStorage.getItem("cts2-vr-cfg") || "{}")); } catch (e) {}
   function saveCfg() { try { localStorage.setItem("cts2-vr-cfg", JSON.stringify(cfg)); } catch (e) {} showCfg(); }
   function showCfg() {
     document.getElementById("sepVal").textContent = cfg.sep + " mm";
     document.getElementById("distVal").textContent = Math.round(cfg.dist * 100) + "%";
     document.getElementById("telaVal").textContent = cfg.tela.toFixed(1) + "\"";
+    document.getElementById("qualVal").textContent = Math.round(cfg.qual * 100) + "%";
+    document.getElementById("btnExecutor").textContent = cfg.executor === "mao" ? "Mão virtual" : "Avatar";
+    document.getElementById("btnVoz").textContent = cfg.voz ? "Ligada" : "Desligada";
+    document.getElementById("tremVal").textContent = cfg.trem + " min";
   }
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   document.getElementById("sepMenos").onclick = () => { cfg.sep = clamp(cfg.sep - 1, 50, 80); saveCfg(); };
@@ -1793,6 +2473,13 @@ body.vr #stick { display: none; }
   document.getElementById("distMais").onclick = () => { cfg.dist = clamp(Math.round((cfg.dist + 0.05) * 100) / 100, 0, 0.8); saveCfg(); };
   document.getElementById("telaMenos").onclick = () => { cfg.tela = clamp(Math.round((cfg.tela - 0.1) * 10) / 10, 4.5, 7.5); saveCfg(); };
   document.getElementById("telaMais").onclick = () => { cfg.tela = clamp(Math.round((cfg.tela + 0.1) * 10) / 10, 4.5, 7.5); saveCfg(); };
+  document.getElementById("qualMenos").onclick = () => { cfg.qual = clamp(Math.round((cfg.qual - 0.15) * 100) / 100, 0.7, 1.75); saveCfg(); };
+  document.getElementById("qualMais").onclick = () => { cfg.qual = clamp(Math.round((cfg.qual + 0.15) * 100) / 100, 0.7, 1.75); saveCfg(); };
+  document.getElementById("btnExecutor").onclick = () => { cfg.executor = cfg.executor === "mao" ? "avatar" : "mao"; saveCfg(); };
+  document.getElementById("btnVoz").onclick = () => { cfg.voz = !cfg.voz; if (!cfg.voz && window.speechSynthesis) speechSynthesis.cancel(); saveCfg(); };
+  document.getElementById("tremMenos").onclick = () => { cfg.trem = clamp(cfg.trem - 1, 2, 30); trem.prox = 0; saveCfg(); };
+  document.getElementById("tremMais").onclick = () => { cfg.trem = clamp(cfg.trem + 1, 2, 30); trem.prox = 0; saveCfg(); };
+  document.getElementById("btnAjustes").onclick = () => { vrCfg.hidden = !vrCfg.hidden; };
   vrGear.onclick = () => { vrCfg.hidden = !vrCfg.hidden; };
   document.getElementById("cfgOk").onclick = () => { vrCfg.hidden = true; };
   showCfg();
@@ -1811,7 +2498,9 @@ body.vr #stick { display: none; }
   window.addEventListener("resize", resize);
 
   // ---------- Passe de lente (distorção em barril por olho) ----------
-  const eyeRT = new THREE.WebGLRenderTarget(1, 1);
+  // Olho renderizado com antisserrilhado (multisample no WebGL2) e na densidade real da tela, com folga para a lupa da lente
+  const eyeRT = renderer.capabilities.isWebGL2 ? new THREE.WebGLMultisampleRenderTarget(1, 1) : new THREE.WebGLRenderTarget(1, 1);
+  if (eyeRT.samples !== undefined) eyeRT.samples = 4;
   eyeRT.texture.encoding = THREE.sRGBEncoding;
   const lensMat = new THREE.ShaderMaterial({
     uniforms: { tex: { value: eyeRT.texture }, k1: { value: 0.35 }, k2: { value: 0.2 }, ext: { value: new THREE.Vector2(1, 1) }, zoom: { value: 0.8 } },
@@ -1840,8 +2529,9 @@ body.vr #stick { display: none; }
     const rw = Math.max(50, Math.min(sepPx, 2 * Math.min(cxL, w - cxR)));
     const rh = Math.min(h, rw * 1.1);
     const y0 = (h - rh) / 2;
-    const dpr = renderer.getPixelRatio();
-    const tw = Math.round(rw * dpr * 1.2), th = Math.round(rh * dpr * 1.2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 3), maxT = Math.min(renderer.capabilities.maxTextureSize, 2560);
+    const esc = Math.min(cfg.qual, maxT / (rw * dpr), maxT / (rh * dpr));
+    const tw = Math.round(rw * dpr * esc), th = Math.round(rh * dpr * esc);
     if (eyeRT.width !== tw || eyeRT.height !== th) eyeRT.setSize(tw, th);
     const m = Math.max(rw, rh);
     lensMat.uniforms.ext.value.set(rw / m, rh / m);
@@ -1940,6 +2630,7 @@ body.vr #stick { display: none; }
       if (performance.now() < ex.piscarAte) for (const p of ex.piscar) { p.material.emissive.setHex(0xf2a400); p.material.emissiveIntensity = 0.4 + 0.4 * Math.sin(t * 12); }
     }
     atualizarModelo(dt);
+    atualizarAvatares(dt); atualizarFerramentas(); atualizarTrem(dt);
     for (const b of buttons) b.scale.setScalar((b.userData.id === hovered ? 1.06 : 1) * PAINEL_ESC);
 
     // caminhada até o ponto tocado
@@ -1956,6 +2647,8 @@ body.vr #stick { display: none; }
     if (destino) { alvoChao.visible = true; alvoChao.position.set(destino.x, 0.17, destino.z); }
 
     const w = stage.clientWidth, h = stage.clientHeight;
+    const prDesejado = Math.min(window.devicePixelRatio || 1, vr ? 3 : 2);
+    if (renderer.getPixelRatio() !== prDesejado) { renderer.setPixelRatio(prDesejado); resize(); }
     if (vr) {
       renderVr(w, h);
     } else {
@@ -1968,6 +2661,7 @@ body.vr #stick { display: none; }
   resize();
   mostrarPessoa();
   showMenu();
+  if (!/test\.html$/.test(location.pathname)) abrirBib();
   if (!pessoa.nome || !pessoa.mat) pedirIdentificacao();
   document.fonts && document.fonts.ready.then(() => { if (mode === "menu") showMenu(); });
   requestAnimationFrame(loop);
