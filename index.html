@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v08/10 22h</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v08/10 22h30</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -1913,13 +1913,13 @@ body.vr #stick { display: none; }
     dz = { k, d, verif: 0, riscos: 0, t0: performance.now(), feitos: [], ev0: licenca.eventos.length };
     if (d.prep) d.prep();
     if (k === "obstrucao") mostrarBrita(true);
-    coordenadorFala(d.sintoma, false, "CCP");
-    telaDesafio(d.sintoma);
+    coordenadorFala(d.sintoma + (licenca.ativa ? "" : " Peçam licença antes de entrar na via."), false, "CCP");
+    telaDesafio(d.sintoma + (licenca.ativa ? "" : "\nAntes de medir ou mexer na máquina, peça licença ao CCP (primeiro botão)."));
   }
   function telaDesafio(texto, cor, titulo) {
     drawPanel(`Desafio · ${dz.verif} verificaç${dz.verif === 1 ? "ão" : "ões"}`, titulo || "Sintoma relatado pelo CCP", texto, cor);
-    setButtons([["dt:alim", "Medir\nalimentação\n(6 e 8)"], ["dt:ind", "Medir\nindicação\n(32 e 52)"], ["dt:forca", "Medir força\n(célula)"], ["dt:cmd", "Comandar\nteste"],
-      ["dt:sintoma", "Repetir\nsintoma"], ["dt:diag", "Diagnosticar"], ["menu", "Desistir"]]);
+    setButtons((licenca.ativa ? [] : [["licenca", "Pedir licença\nao CCP"]]).concat([["dt:alim", "Medir\nalimentação\n(6 e 8)"], ["dt:ind", "Medir\nindicação\n(32 e 52)"], ["dt:forca", "Medir força\n(célula)"], ["dt:cmd", "Comandar\nteste"],
+      ["dt:sintoma", "Repetir\nsintoma"], ["dt:diag", "Diagnosticar"], ["menu", "Desistir"]]));
   }
   function verificar(nome) { dz.verif++; dz.feitos.push(nome); }
   function testeDesafio(t) {
@@ -1931,7 +1931,7 @@ body.vr #stick { display: none; }
     }
     if (!licenca.ativa && t !== "cmd") {
       dz.riscos++; alertaRisco("Medição na via sem licença do CCP.");
-      return telaDesafio("Antes de abrir a caixa ou instalar instrumentos na via, peça licença ao CCP (botão no menu principal ou abaixo).", "#e5533d", "Sem licença do CCP");
+      return telaDesafio("Antes de abrir a caixa ou instalar instrumentos na via, peça licença ao CCP no botão Pedir licença ao CCP, logo abaixo.", "#e5533d", "Sem licença do CCP");
     }
     if (t === "cmd") {
       if (naAreaDeMovimento()) { dz.riscos++; alertaRisco("Comando com você dentro da área de movimentação das agulhas."); return telaDesafio("Procedimento de Segurança 03: saia da área das agulhas, barras e tirantes antes de comandar.", "#e5533d", "Comando bloqueado"); }
