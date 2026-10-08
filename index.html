@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v08/10 21h</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v08/10 22h</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -1334,7 +1334,7 @@ body.vr #stick { display: none; }
     mode = "menu"; pulseIds = []; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar();
     drawPanel("Treinamento PRO-001122 · Anexo 5", "Manutenção preventiva da máquina de chave CTS-2",
       "Participante: " + quem() + ".\nEscolha um módulo tocando no botão. Antes de entrar na via, peça licença ao CCP. Sem licença passa trem de minério a cada " + (cfg.trem || 10) + " min.");
-    setButtons([["tour", "Tour da\nmáquina"], ["passo1", "Passo 1\nDAM e\nconectores"], ["passos0", "Passos\n2 a 17"], ["demo", "Máquina\nfuncionando"], ["explorar", "Explorar\npor dentro"], ["desafios", "Desafios\nde defeitos"], [licenca.ativa ? "devolver" : "licenca", licenca.ativa ? "Devolver a\nlinha ao CCP" : "Pedir licença\nao CCP"]]);
+    setButtons([["tour", "Tour da\nmáquina"], ["passos0", "Passos\n1 a 17"], ["demo", "Máquina\nfuncionando"], ["explorar", "Explorar\npor dentro"], ["desafios", "Desafios\nde defeitos"], [licenca.ativa ? "devolver" : "licenca", licenca.ativa ? "Devolver a\nlinha ao CCP" : "Pedir licença\nao CCP"]]);
   }
 
   // ---------- Máquina em funcionamento: comando normal / reverso ----------
@@ -1520,7 +1520,7 @@ body.vr #stick { display: none; }
     const resumo = `${achados.length - erros} de ${achados.length} avaliações certas · ${errosPeca} toque${errosPeca === 1 ? "" : "s"} na peça errada · ${tempoTxt(seg)}`;
     drawPanel("Passo 1 concluído · " + quando, ok ? "Sem erros" : resumo,
       quem() + "\n" + (ok ? resumo + "\n" : "") + linhas.join("\n") + "\nLembre de registrar tudo no RG online (passo 17).", ok ? "#23c552" : "#e5533d");
-    setButtons([["passo1", "Refazer"], ["menu", "Menu"]]);
+    setButtons([["passo1", "Refazer"], ["p:2", "Próximo\npasso"], ["passos0", "Lista de\npassos"], ["menu", "Menu"]]);
   }
 
 
@@ -1738,10 +1738,10 @@ body.vr #stick { display: none; }
   function menuPassos(pag) {
     mode = "menuPassos"; pulseIds = []; resetMaquina(); restaurarModelo(true); moverMecanismo(0);
     agulhas.position.z = clips.position.z = barras.position.z = 0; posicao = "normal";
-    const ns = pag ? [10, 11, 12, 13, 14, 15, 16, 17] : [2, 3, 4, 5, 6, 7, 8, 9];
-    drawPanel("Treinamento PRO-001122 · Anexo 5", "Passos " + (pag ? "10 a 17" : "2 a 9"),
-      "Escolha o passo. Os desvios são sorteados a cada vez: inspecione, decida a ação e o resultado vai para o relatório. O passo 1 fica no menu principal.");
-    setButtons(ns.map(n => ["p:" + n, "Passo " + n + "\n" + PASSOS[n].curto]).concat([[pag ? "passos0" : "passos1", pag ? "Passos\n2 a 9" : "Passos\n10 a 17"], ["menu", "Menu"]]));
+    const ns = pag ? [10, 11, 12, 13, 14, 15, 16, 17] : [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    drawPanel("Treinamento PRO-001122 · Anexo 5", "Passos " + (pag ? "10 a 17" : "1 a 9"),
+      "Escolha o passo. Os desvios são sorteados a cada vez: inspecione, decida a ação e o resultado vai para o relatório.");
+    setButtons(ns.map(n => n === 1 ? ["passo1", "Passo 1\nDAM e\nconectores"] : ["p:" + n, "Passo " + n + "\n" + PASSOS[n].curto]).concat([[pag ? "passos0" : "passos1", pag ? "Passos\n1 a 9" : "Passos\n10 a 17"], ["menu", "Menu"]]));
   }
   function startPro(n) {
     const def = PASSOS[n];
