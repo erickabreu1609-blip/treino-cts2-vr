@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v08/10 22h30</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v09/10 00h</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -783,17 +783,35 @@ body.vr #stick { display: none; }
   let vozPt = null;
   function acharVoz() { if (!window.speechSynthesis) return; vozPt = speechSynthesis.getVoices().find(v => /^pt(-|_)BR/i.test(v.lang)) || speechSynthesis.getVoices().find(v => /^pt/i.test(v.lang)) || null; }
   if (window.speechSynthesis) { acharVoz(); speechSynthesis.onvoiceschanged = acharVoz; }
+  // Toda fala de rádio começa com o bip do botão do rádio e termina com "câmbio".
+  // As falas entram numa fila para que o bip venha sempre logo antes de cada uma.
+  const filaRadio = []; let radioOcupado = false, radioTimer = 0;
+  function comCambio(t) {
+    t = t.trim();
+    if (/câmbio[.!]?$/i.test(t)) return t;
+    return (/[.!?]$/.test(t) ? t : t + ".") + " Câmbio.";
+  }
   function coordenadorFala(texto, urgente, quem) {
-    quem = quem || "Coordenador";
+    const item = { texto: comCambio(texto), urgente, quem: quem || "Coordenador" };
+    if (urgente) { filaRadio.length = 0; radioOcupado = false; clearTimeout(radioTimer); try { window.speechSynthesis && speechSynthesis.cancel(); } catch (e) {} }
+    filaRadio.push(item);
+    proximaFala();
+  }
+  function proximaFala() {
+    if (radioOcupado || !filaRadio.length) return;
+    const { texto, urgente, quem } = filaRadio.shift();
+    radioOcupado = true;
     som.radio();
     coordenador.userData.falando = Math.max(2.5, texto.length * 0.07);
     mostrarDica(texto, quem + " · rádio", true);
     avalEnviar("sistema", quem + ": " + texto);
+    const fim = () => { if (!radioOcupado) return; radioOcupado = false; clearTimeout(radioTimer); setTimeout(proximaFala, 350); };
+    radioTimer = setTimeout(fim, 1500 + texto.length * 85);   // garante a fila mesmo se a voz não avisar o fim
     if (!cfg.voz || !window.speechSynthesis) return;
     try {
-      if (urgente) speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(texto); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = urgente ? 1.15 : 1.05; u.pitch = quem === "CCP" ? 1.15 : 0.9;
-      setTimeout(() => speechSynthesis.speak(u), 250);
+      u.onend = u.onerror = fim;
+      setTimeout(() => speechSynthesis.speak(u), 480);
     } catch (e) {}
   }
 
@@ -981,7 +999,7 @@ body.vr #stick { display: none; }
   function pedirLicenca(depois) {
     if (licenca.ativa) { coordenadorFala("A licença já está concedida.", false, "CCP"); return depois && depois(); }
     if (trem.ativo) { coordenadorFala("Aguarde: tem trem circulando nesta via. Peça de novo depois que ele passar.", false, "CCP"); return; }
-    coordenadorFala("CCP, aqui é a equipe da via. Solicito licença para manutenção na máquina de chave.");
+    coordenadorFala("CCP, aqui é a equipe da via. Solicito licença para manutenção na máquina de chave.", false, "Mantenedor");
     setTimeout(() => {
       licenca.ativa = true; licenca.desde = performance.now(); licenca.pedido = false;
       licenca.eventos.push("Licença concedida pelo CCP");
@@ -1172,10 +1190,12 @@ body.vr #stick { display: none; }
         o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
       },
       // rádio: bip de abertura e chiado curto
+      // botão do rádio (PTT) apertado: estalo do botão, bip de liberação e chiado curto
       radio() {
         const t = agora(); if (t == null) return;
-        tom(t, 0.09, 1450, "sine", 0.08); tom(t + 0.1, 0.09, 1900, "sine", 0.08);
-        estalo(t + 0.02, 0.22, 2400, 0.4, 0.25);
+        estalo(t, 0.03, 3000, 3, 0.7);
+        tom(t + 0.05, 0.11, 1750, "square", 0.045); tom(t + 0.17, 0.08, 2150, "square", 0.04);
+        estalo(t + 0.27, 0.12, 2400, 0.4, 0.18);
       },
       // buzina de locomotiva: dois tons graves
       buzina(dur) {
@@ -2130,7 +2150,7 @@ body.vr #stick { display: none; }
       if (b === "menu") return showMenu();
       if (b.startsWith("linha:")) return respostaCcp(b === "linha:devolver");
       if (b === "licenca") return pedirLicenca(() => { if (mode === "pro" && pro && pro.i < 0) telaInicioPro(); else if (mode === "menu") showMenu(); else if (mode === "desafio" && dz) telaDesafio("Licença concedida. Pode investigar a máquina."); });
-      if (b === "devolver") { devolverLinha("Devolveu a linha ao CCP ao terminar"); coordenadorFala("CCP, a equipe terminou e devolve a linha. Via livre para circulação."); return showMenu(); }
+      if (b === "devolver") { devolverLinha("Devolveu a linha ao CCP ao terminar"); coordenadorFala("CCP, a equipe terminou e devolve a linha. Via livre para circulação.", false, "Mantenedor"); return showMenu(); }
       if (mode === "pro" && pro && pro.d) return decidirPro(b);
       if (b === "desafios") return menuDesafios();
       if (b === "dzlista") return menuDesafios(true);
