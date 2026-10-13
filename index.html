@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v13/10 PROs</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v13/10 cenário</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -362,11 +362,11 @@ body.vr #stick { display: none; }
     const m = new THREE.Mesh(geo, material); m.receiveShadow = true; scene.add(m); return m;
   }
   const britaMat = mat(0xffffff, { map: texBrita([30, 3]), roughness: 1, metalness: 0 });
-  trapezio(-40, 40, 2.6, 1.85, 0, 0.18, britaMat);
+  const viaAntiga = [];   // via feita no código: fica só se o modelo da ferrovia não carregar
+  viaAntiga.push(trapezio(-40, 40, 2.6, 1.85, 0, 0.18, britaMat));
   // entre dormentes a brita sobe quase até o topo; deixa livre o vão do dormente oco da máquina
   const britaMat2 = mat(0xffffff, { map: texBrita([18, 2]), roughness: 1, metalness: 0 });
-  trapezio(-40, -0.24, 1.85, 1.55, 0.17, 0.28, britaMat2);
-  trapezio(0.24, 40, 1.85, 1.55, 0.17, 0.28, britaMat2);
+  viaAntiga.push(trapezio(-40, -0.24, 1.85, 1.55, 0.17, 0.28, britaMat2), trapezio(0.24, 40, 1.85, 1.55, 0.17, 0.28, britaMat2));
 
   // Dormentes de madeira, placas de apoio e grampos (instanciados para pesar pouco)
   const PASSO = 0.55, DX = [];
@@ -386,7 +386,7 @@ body.vr #stick { display: none; }
       [-0.085, 0.085].forEach((dz, k) => { m4.makeTranslation(x, 0.345, z + dz); grampos.setMatrixAt(i * 4 + j * 2 + k, m4); });
     });
   });
-  for (const im of [sleepers, placas, grampos]) { im.castShadow = im.receiveShadow = true; scene.add(im); }
+  for (const im of [sleepers, placas, grampos]) { im.castShadow = im.receiveShadow = true; scene.add(im); viaAntiga.push(im); }
   const dorm = box(0.32, 0.18, 4.3, mat(0x59616a, { metalness: 0.5 }));
   dorm.position.set(0, 0.24, 0.75); scene.add(part("dormente", dorm));
 
@@ -405,7 +405,7 @@ body.vr #stick { display: none; }
   }
   const aco = mat(0x6e5a4c, { metalness: 0.45, roughness: 0.75 });          // alma e patim com ferrugem
   const polido = mat(0xc9ccd0, { metalness: 0.85, roughness: 0.28 });      // topo do boleto
-  for (const z of [-BITOLA_Z, BITOLA_Z]) for (let x0 = -200; x0 < 200; x0 += 40) scene.add(trilho(x0, x0 + 40, z, 1, aco));   // em trechos de 40 m (um trilho único de 400 m gera riscos na tela)
+  for (const z of [-BITOLA_Z, BITOLA_Z]) for (let x0 = -200; x0 < 200; x0 += 40) { const t = trilho(x0, x0 + 40, z, 1, aco); scene.add(t); viaAntiga.push(t); }   // em trechos de 40 m (um trilho único de 400 m gera riscos na tela)
   const agulhas = new THREE.Group();
   const agF = trilho(-1, 6, 0.6579, 0.85, aco); agulhas.add(agF);
   const agA = trilho(-1, 6, -0.7264, 0.85, aco); agulhas.add(agA);
@@ -421,6 +421,48 @@ body.vr #stick { display: none; }
     const b = cyl(0.025, 1.85, ferro); b.rotation.x = Math.PI / 2; b.position.set(x, 0.36, 0.2); barras.add(b);
   }
   scene.add(part("barra", barras));
+
+  // ---------- Ferrovia com AMV (modelo do SketchUp enviado pelo Erick) ----------
+  // O modelo veio em bitola métrica; a conversão (ferrovia_amv.glb) alarga o traçado para 1600 mm sem engordar os trilhos,
+  // põe a ponta da agulha em x = -1 (a CTS2 fica no dormente oco em x = 0) e o desvio para o lado -z, longe da máquina.
+  // As agulhas do modelo substituem as da via antiga e flexionam no talão: no eixo da máquina (x = 0) andam o lance todo.
+  const AG_TALAO = 3.59;
+  const VIA_A = [-7.45, 76.49], VIA_B = [-4.68, 79.26], Z_B = -6.741, PLACA_PASSO = 6.78;
+  let ferroviaOk = false;
+  new THREE.GLTFLoader().load("ferrovia_amv.glb", g => {
+    const root = g.scene, placa = [], novasAgulhas = [];
+    root.traverse(o => { if (o.isMesh) (/^placa_via/.test(o.name) ? placa : /^agulha_/.test(o.name) ? novasAgulhas : []).push(o); });
+    root.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = /Metal|material/.test(o.material.name || ""); } });
+    // agulhas: troca as da via antiga pelas do modelo, mantendo o grupo "agulhas" que os treinos movimentam
+    const antigas = [];
+    [agF, agA].forEach(a => { a.traverse(o => { if (o.isMesh) antigas.push(o); }); a.visible = false; tirarPeca(a); });
+    partGroups.agulhas = (partGroups.agulhas || []).filter(m => !antigas.includes(m));
+    novasAgulhas.forEach(o => { o.parent.remove(o); o.castShadow = true; agulhas.add(part("agulhas", o)); });
+    agulhas.updateMatrix = function () {   // desloca z conforme a distância ao talão (flexão da agulha)
+      const d = this.position.z, k = d / AG_TALAO;
+      this.matrix.set(1, 0, 0, 0, 0, 1, 0, 0, -k, 0, 1, d, 0, 0, 0, 1);
+      this.matrixWorldNeedsUpdate = true;
+    };
+    // placa de via comum repetida além do modelo, nas duas linhas (instanciada para pesar pouco)
+    const pos = [];
+    for (const [ini, fim, z] of [[VIA_A[0], VIA_A[1], 0], [VIA_B[0], VIA_B[1], Z_B]]) {
+      for (let x = ini - 0.1 - PLACA_PASSO / 2; x > -150; x -= PLACA_PASSO) pos.push([x, z]);
+      for (let x = fim + 0.1 + PLACA_PASSO / 2; x < 150; x += PLACA_PASSO) pos.push([x, z]);
+    }
+    placa.forEach(o => {
+      o.parent.remove(o);
+      const im = new THREE.InstancedMesh(o.geometry, o.material, pos.length);
+      pos.forEach(([x, z], i) => im.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0, z)));
+      im.receiveShadow = true; scene.add(im);
+    });
+    // trilhos além do modelo (mesmo perfil da via antiga), em trechos de até 40 m
+    const trecho = (a, b, zc) => { for (let x0 = a; x0 < b; x0 += 40) for (const dz of [-BITOLA_Z, BITOLA_Z]) scene.add(trilho(x0, Math.min(b, x0 + 40), zc + dz, 1, aco)); };
+    trecho(-230, VIA_A[0], 0); trecho(VIA_A[1], 230, 0); trecho(-230, VIA_B[0], Z_B); trecho(VIA_B[1], 230, Z_B);
+    viaAntiga.forEach(o => { o.visible = false; });
+    ground.position.y = -0.05;   // o piso do modelo fica por cima do terreno
+    scene.add(root);
+    ferroviaOk = true;
+  }, undefined, () => {});
 
   // Máquina de chave
   const azul = mat(0x3c6a8c, { metalness: 0.3, roughness: 0.6 });
@@ -638,6 +680,7 @@ body.vr #stick { display: none; }
   // Feitos com formas simples; a frente é +z (lookAt aponta +z para o alvo).
   function alturaLastro(z) {   // topo do lastro na seção transversal da via
     const a = Math.abs(z);
+    if (ferroviaOk) return a <= 1.6 ? 0.2 : -0.02;   // via em placa de concreto do modelo
     if (a <= 1.55) return 0.28;
     if (a <= 1.85) return 0.28 - (a - 1.55) / 0.3 * 0.1;
     if (a <= 2.6) return 0.18 * (2.6 - a) / 0.75;
@@ -698,7 +741,7 @@ body.vr #stick { display: none; }
     }
     if (o.prancheta) { const p = box(0.22, 0.3, 0.012, mat(0x8a6a44)); const f = box(0.19, 0.25, 0.013, mat(0xf4f4f0)); f.position.z = 0.002; p.add(f); p.position.set(0, -0.3, 0.08); p.rotation.x = -0.4; bracos[1].cot.add(p); }
     g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.userData.avatar = true; } });
-    g.userData = { pernas, bracos, fase: 0, estado: "parado", destino: null, alvo: null, girar: false, tAcao: 0, falando: 0 };
+    g.userData = { pernas, bracos, fase: 0, estado: "parado", destino: null, alvo: null, girar: false, tAcao: 0, falando: 0, nome, boneco: g.children.slice(), corpo: null };
     scene.add(g);
     return g;
   }
@@ -720,6 +763,12 @@ body.vr #stick { display: none; }
   function atualizarAvatar(av, dt) {
     const u = av.userData;
     u.fase += dt;
+    if (u.corpo) {   // funcionário do modelo: balança ao andar e se inclina para a peça ao agir
+      const anda = u.estado === "andando";
+      u.corpo.position.y = anda ? Math.abs(Math.sin(u.fase * 9)) * 0.03 : 0;
+      u.corpo.rotation.z = anda ? Math.sin(u.fase * 9) * 0.035 : 0;
+      u.corpo.rotation.x += ((u.estado === "agindo" ? 0.14 : 0) - u.corpo.rotation.x) * Math.min(1, dt * 6);
+    }
     const [bE, bD] = u.bracos;
     if (u.estado === "andando" && u.destino) {
       const dx = u.destino.x - av.position.x, dz = u.destino.z - av.position.z, d = Math.hypot(dx, dz);
@@ -762,6 +811,27 @@ body.vr #stick { display: none; }
   coordenador.userData.prancheta = true;
   posAvatar(coordenador, 3.6, 3.5); coordenador.rotation.y = Math.PI * 1.15;
   const CASA_MANT = new THREE.Vector3(-0.7, 0, 3.0);
+  // Funcionários fardados (modelo do SketchUp do Erick) no lugar dos bonecos feitos com formas simples.
+  // "funcionario" veste o mantenedor e o coordenador (capacete azul); "funcionario_maleta" é o auxiliar da equipe com a caixa de ferramentas.
+  new THREE.GLTFLoader().load("funcionarios.glb", g => {
+    const modelo = nome => { const o = new THREE.Group(); g.scene.children.filter(c => c.name.startsWith(nome + "__")).forEach(c => o.add(c.clone())); return o; };
+    function vestir(av, capacete) {
+      const u = av.userData, corpo = modelo("funcionario");
+      corpo.traverse(m => {
+        if (!m.isMesh) return;
+        m.material = m.material.clone(); m.castShadow = true; m.userData.avatar = true;
+        if (capacete && /auto_11/.test(m.name)) m.material.color.setHex(capacete);
+      });
+      u.boneco.forEach(c => { if (c !== u.nome) c.visible = false; });
+      u.nome.position.set(0, 1.2, 0.36); u.nome.rotation.x = -0.35;   // crachá no peito, que fica inclinado para a frente
+      av.add(corpo); u.corpo = corpo;
+    }
+    vestir(mantenedor); vestir(coordenador, 0x2f6fd6);
+    const aux = modelo("funcionario_maleta");
+    aux.traverse(m => { if (m.isMesh) { m.castShadow = true; m.userData.avatar = true; } });
+    aux.position.set(5.2, alturaLastro(2.6), 2.6); aux.rotation.y = Math.atan2(0 - 5.2, 1.5 - 2.6);
+    scene.add(aux);
+  }, undefined, () => {});
   function mantenedorAgir(ponto, girar) {
     const u = mantenedor.userData;
     const olho = new THREE.Vector3(); camera.getWorldPosition(olho);
@@ -3156,7 +3226,7 @@ body.vr #stick { display: none; }
       if (!vr) { andarAte(a.ponto); return; }
       if (marcado && now - marcadoEm < 5000 && marcado.distanceTo(a.ponto) < 0.8) { marcado = null; andarAte(a.ponto); return; }
       marcado = a.ponto.clone(); marcadoEm = now;
-      alvoChao.position.set(marcado.x, 0.17, marcado.z);
+      alvoChao.position.set(marcado.x, alturaLastro(marcado.z) + 0.03, marcado.z);
       hint("Toque de novo no marcador para andar até lá.");
     } else if (a.id) { marcado = null; select(a.id); }
   });
@@ -3165,7 +3235,7 @@ body.vr #stick { display: none; }
   let destino = null;
   function andarAte(p) {
     destino = new THREE.Vector3(THREE.MathUtils.clamp(p.x, -14, 14), 0, THREE.MathUtils.clamp(p.z, -8, 9));
-    alvoChao.position.set(destino.x, 0.17, destino.z); alvoChao.visible = true;
+    alvoChao.position.set(destino.x, alturaLastro(destino.z) + 0.03, destino.z); alvoChao.visible = true;
     som.passos();
   }
   let yawExtra = 0;
@@ -3391,7 +3461,7 @@ body.vr #stick { display: none; }
     // o marcador só aparece depois de um toque no chão, nunca só por olhar
     if (marcado && performance.now() - marcadoEm > 5000) marcado = null;
     alvoChao.visible = !!marcado && vr;
-    if (marcado) alvoChao.position.set(marcado.x, 0.17, marcado.z);
+    if (marcado) alvoChao.position.set(marcado.x, alturaLastro(marcado.z) + 0.03, marcado.z);
 
     // brilho das peças
     const t = clock.elapsedTime;
@@ -3420,7 +3490,7 @@ body.vr #stick { display: none; }
         rig.updateMatrixWorld(true);
       }
     }
-    if (destino) { alvoChao.visible = true; alvoChao.position.set(destino.x, 0.17, destino.z); }
+    if (destino) { alvoChao.visible = true; alvoChao.position.set(destino.x, alturaLastro(destino.z) + 0.03, destino.z); }
 
     const w = stage.clientWidth, h = stage.clientHeight;
     const prDesejado = Math.min(window.devicePixelRatio || 1, vr ? 3 : 2);
