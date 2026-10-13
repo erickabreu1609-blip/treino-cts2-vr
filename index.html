@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v13/10 bonecos</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v13/10 locomotiva</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -1022,6 +1022,21 @@ body.vr #stick { display: none; }
     const tanque = box(8, 0.75, 2.4, preto); tanque.position.set(-10.5, Y + 0.48, 0); loco.add(tanque);
     truque(-3.5, loco); truque(-17.5, loco);
     tremGrupo.add(loco); x = -21.6;
+    // Locomotiva da Vale (C36, modelo do SketchUp do Erick) no lugar da feita com caixas, que fica só se o arquivo falhar.
+    // locomotiva_vale.glb já vem com a frente em x = 0, as rodas em y = 0 e centradas em z = 0, na bitola de 1600 mm.
+    new THREE.GLTFLoader().load("locomotiva_vale.glb", g => {
+      g.scene.traverse(m => {
+        if (!m.isMesh) return;
+        Object.assign(m.material, { side: THREE.DoubleSide, flatShading: true, metalness: 0.1, roughness: 0.85 });
+        if (!m.material.map) m.renderOrder = 1;   // detalhes de cor (logotipo, faixas) por cima da pintura, como no SketchUp
+        m.material.needsUpdate = true;
+      });
+      loco.children.forEach(c => { c.visible = false; });
+      g.scene.position.y = Y; loco.add(g.scene);
+      const d = 21.6 - 19.8;   // a C36 tem 19,2 m: os vagões encostam nela
+      tremGrupo.children.forEach(c => { if (c !== loco) c.position.x += d; });
+      trem.comp -= d;
+    }, undefined, () => {});
     for (let i = 0; i < 12; i++) {
       const v = new THREE.Group();
       const c = box(10.2, 2.4, 3.1, vagaoM); c.position.set(-5.1, Y + 2.2, 0); v.add(c);
