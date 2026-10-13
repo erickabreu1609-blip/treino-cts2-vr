@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v13/10 LDL</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v13/10 PROs</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -243,6 +243,7 @@ body.vr #stick { display: none; }
     placaPT:   { nome: "Placa Pessoas Trabalhando", txt: "Fora do gabarito de circulação (2,12 m do eixo), instalada antes de chamar o centro de controle (PGS-003781)." },
     placaDentro: { nome: "Placa dentro do gabarito", txt: "Posição errada: entre os trilhos, dentro do gabarito de circulação." },
     jumper:    { nome: "Jumper fixo (shunt)", txt: "Gera a ocupação forçada do circuito de via. Instalar e retirar só com autorização do centro de controle (PGS-003781 Anexo 06)." },
+    cepo:      { nome: "Cepo (calço de segurança)", txt: "Calço de madeira com alça, entre a agulha aberta e o trilho de encosto. Bloqueia as partes móveis antes de medir ou manter (PRO-022721 11.1)." },
     dam:       { nome: "DAM", txt: "Dispositivo de Acionamento da MCH. Com o DAM, todo comando elétrico segue a etapa 3 da IT-DAM e dispensa o Yoshi Yoshi." }
   };
 
@@ -1356,7 +1357,7 @@ body.vr #stick { display: none; }
   function showMenu() {
     fecharDemo();
     mode = "menu"; pulseIds = []; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar();
-    try { estadoLdlObjetos("off", false, "off"); } catch (e) {}   // placas e jumper do treino de LDL
+    try { estadoLdlObjetos("off", false, "off"); mostrarCepo(false); } catch (e) {}   // placas, jumper e cepo dos treinos de LDL e de AMV
     drawPanel("Treinamento PRO-001122 · Anexo 5", "Manutenção preventiva da máquina de chave CTS-2",
       "Participante: " + quem() + ".\nEscolha um módulo tocando no botão. Antes de entrar na via, peça licença ao CCP. Sem licença passa trem de minério a cada " + (cfg.trem || 10) + " min.");
     setButtons([["tour", "Tour da\nmáquina"], ["passos0", "Passos\n1 a 17"], ["demo", "Máquina\nfuncionando"], ["explorar", "Explorar\npor dentro"], ["desafios", "Desafios\nde defeitos"], [licenca.ativa ? "devolver" : "licenca", licenca.ativa ? "Devolver a\nlinha ao CCP" : "Pedir licença\nao CCP"]]);
@@ -2038,6 +2039,35 @@ body.vr #stick { display: none; }
   })();
   jumper.position.set(-3, 0, 0); jumper.visible = false;
   scene.add(part("jumper", jumper));
+  // Calço de segurança (cepo / "mão amiga"): madeira com alça, entre a agulha aberta e o trilho de encosto (PRO-022721 11.1)
+  const cepo = new THREE.Group();
+  (function montarCepo() {
+    const madeira = mat(0x9a6b3c, { roughness: 0.9 }), alca = mat(0xe0a400, { roughness: 0.5 });
+    const bloco = box(0.34, 0.12, 0.06, madeira); cepo.add(bloco);
+    const a = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 8, 20, Math.PI), alca); a.position.y = 0.06; cepo.add(a);
+  })();
+  cepo.visible = false;
+  scene.add(part("cepo", cepo));
+  function mostrarCepo(on) {
+    cepo.visible = !!on;
+    if (!on) return;
+    // lado aberto: em normal a agulha +z fica afastada do encosto; em reverso, a agulha -z
+    const z = posicao === "normal" ? 0.726 : -0.726;
+    cepo.position.set(1.6, Y_PATIM + 0.1, z);
+  }
+  // Movimenta as agulhas fora do roteiro do PRO-001122 (pela manivela ou por comando do centro de controle)
+  function moverAmv(alvo, manual, done) {
+    done = done || (() => {});
+    if (posicao === alvo) return done();
+    const de = posicao === "normal" ? 0 : LANCE, para = alvo === "normal" ? 0 : LANCE, dur = manual ? 3.6 : 2.4;
+    lampMat.color.set(0x333333); lampMat.emissive.set(0x000000);
+    if (manual) for (let i = 0; i < 4; i++) setTimeout(() => som.rosca(true), i * 900);
+    else { som.rele(); setTimeout(() => som.motor(2.4), 250); }
+    tween(dur, k => {
+      const z = de + (para - de) * (manual ? k : ease(k));
+      moverMecanismo(z / LANCE, manual); agulhas.position.z = z; clips.position.z = z; barras.position.z = z;
+    }, () => { posicao = alvo; som.trava(); done(); });
+  }
   function estadoLdlObjetos(pt, dentro, jp) {
     placaPT.visible = pt !== "off"; translucido(placaPT, pt === "on" ? 1 : 0.4);
     placaDentro.visible = !!dentro; translucido(placaDentro, 0.4);
@@ -2176,7 +2206,7 @@ body.vr #stick { display: none; }
   let ldl = null;
   function menuLdl() {
     fecharDemo();
-    mode = "menuLdl"; pulseIds = []; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar(); estadoLdlObjetos("off", false, "off");
+    mode = "menuLdl"; pulseIds = []; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar(); estadoLdlObjetos("off", false, "off"); mostrarCepo(false);
     drawPanel("PGS-003781 · LDL EFC", "Liberação e Devolução de Linha",
       "Participante: " + quem() + ".\nLDL no pátio: você é o coordenador mestre de uma LDL com o CCP para a preventiva da CTS-2, da chamada ao encerramento.\nPrecisa de LDL?: perguntas rápidas do Anexo 04.");
     setButtons([["ldl:mt", "LDL no\npátio"], ["ldl:quiz", "Precisa\nde LDL?"], ["menu", "Menu\nCTS-2"]]);
@@ -2213,7 +2243,7 @@ body.vr #stick { display: none; }
     avancarLdl();
   }
   function avancarLdl() { ldl.i++; mostrarLdl(); }
-  function etiquetaLdl() { return (ldl.tipo === "quiz" ? "Precisa de LDL? · " : (ldl.aberta ? `LDL ${ldl.f.num} aberta · ` : "LDL no pátio · ")) + `etapa ${ldl.i + 1} de ${ldl.etapas.length}`; }
+  function etiquetaLdl() { if (ldl.cfg) return ldl.cfg.etiqueta + (ldl.aberta ? ` · LDL ${ldl.f.num} aberta` : "") + ` · etapa ${ldl.i + 1} de ${ldl.etapas.length}`; return (ldl.tipo === "quiz" ? "Precisa de LDL? · " : (ldl.aberta ? `LDL ${ldl.f.num} aberta · ` : "LDL no pátio · ")) + `etapa ${ldl.i + 1} de ${ldl.etapas.length}`; }
   function mostrarLdl() {
     const e = ldl.etapas[ldl.i];
     if (!e) return fimLdl();
@@ -2224,9 +2254,9 @@ body.vr #stick { display: none; }
       if (d.antes && !d.jaFalou) { d.antes(); d.jaFalou = true; }
       if (!d.ordem) d.ordem = d.fixas ? d.opcoes : embaralhar(d.opcoes);
       ldl.d = d;
-      const L = "ABC";
+      const L = "ABCD";
       drawPanel(etiquetaLdl(), d.titulo, d.visto + "\n" + d.ordem.map((o, k) => `${L[k]}) ${o[1]}`).join("\n"));
-      return setButtons(d.ordem.map((o, k) => ["ldl:o:" + o[0], d.fixas ? o[1].replace("Não precisa", "Não\nprecisa").replace("Precisa de", "Precisa\nde") : L[k]]).concat([["ldl:sair", "Sair"]]));
+      return setButtons(d.ordem.map((o, k) => ["ldl:o:" + o[0], d.botoes ? d.botoes[o[0]] : d.fixas ? o[1].replace("Não precisa", "Não\nprecisa").replace("Precisa de", "Precisa\nde") : L[k]]).concat([["ldl:sair", "Sair"]]));
     }
     drawPanel(etiquetaLdl(), e.titulo, e.corpo);
     setButtons([["ldl:sair", "Sair"]]);
@@ -2235,6 +2265,7 @@ body.vr #stick { display: none; }
   function tocarLdl(id) {
     const e = ldl.etapas[ldl.i];
     if (!e || !e.alvo) return;
+    if (id === "cepo" && e.alvo === "agulhas") id = "agulhas";   // o cepo fica sobre as agulhas
     if (e.errado && e.errado[id]) { ldl.criticos.push(e.errado[id]); alertaRisco(e.errado[id]); return; }
     if (id !== e.alvo) {
       ldl.errosPeca++; som.erro();
@@ -2268,20 +2299,23 @@ body.vr #stick { display: none; }
   }
   function fimLdl() {
     mode = "fim"; pulseIds = []; mantenedorVoltar();
-    const quiz = ldl.tipo === "quiz";
+    const quiz = ldl.tipo === "quiz", cfg = ldl.cfg;
     if (ldl.aberta) { devolverLinha(`LDL ${ldl.f.num} interrompida (treino encerrado)`); ldl.aberta = false; }
+    if (cfg) { estadoLdlObjetos("off", false, "off"); mostrarCepo(false); }
     const seg = Math.round((performance.now() - ldl.t0) / 1000), tot = ldl.achados.length, certas = ldl.achados.filter(a => a.certo).length;
     const crit = [...new Set(ldl.criticos)], ok = certas === tot && !ldl.errosPeca && !crit.length;
     const extra = crit.map(c => "ERRO CRÍTICO: " + c).concat(licenca.eventos.slice(ldl.ev0).map(t => "CCP: " + t));
-    const modulo = quiz ? "LDL · Precisa de LDL? (PGS-003781 Anexo 04)" : "LDL · LDL no pátio com o CCP (PGS-003781)";
+    const modulo = cfg ? cfg.modulo : quiz ? "LDL · Precisa de LDL? (PGS-003781 Anexo 04)" : "LDL · LDL no pátio com o CCP (PGS-003781)";
     registrarResultado({ modulo, segundos: seg, avaliacoesCertas: certas, avaliacoes: tot, errosPeca: ldl.errosPeca, bloqueios: crit.length,
       detalhes: ldl.achados.map(a => `${a.titulo}: ${a.certo ? "certo" : "errado"}` + (a.critico ? " [crítico]" : "")).concat(extra).join("; ") });
     const linhas = ldl.achados.map(a => `${a.certo ? "✓" : "✗"} ${a.titulo}`).concat(crit.map(c => "✗ Crítico: " + c));
     const resumo = `${certas} de ${tot} decisões certas · ${tempoTxt(seg)}`;
-    drawPanel(quiz ? "Precisa de LDL? · resultado" : "LDL no pátio · resultado", crit.length ? "Erro crítico: reprovado" : ok ? "Sem erros" : resumo,
+    drawPanel(cfg ? cfg.etiqueta + " · resultado" : quiz ? "Precisa de LDL? · resultado" : "LDL no pátio · resultado", crit.length ? "Erro crítico: reprovado" : ok ? "Sem erros" : resumo,
       quem() + "\n" + (ok || crit.length ? resumo + "\n" : "") + linhas.join("\n"), ok ? "#23c552" : "#e5533d");
-    if (!quiz) coordenadorFala(crit.length ? "LDL reprovada por erro crítico. Vamos revisar antes de seguir." : ok ? "LDL encerrada sem desvios. Bom trabalho, equipe." : "LDL encerrada. Revisem os pontos marcados no quadro.");
-    setButtons([[quiz ? "ldl:quiz" : "ldl:mt", "Refazer"], ["ldl:menu", "Treino\nde LDL"], ["menu", "Menu\nCTS-2"]]);
+    if (cfg) { if (cfg.falaFim) coordenadorFala(crit.length ? "Treino reprovado por erro crítico. Vamos revisar antes de seguir." : ok ? cfg.falaFim : "Treino encerrado. Revisem os pontos marcados no quadro."); }
+    else if (!quiz) coordenadorFala(crit.length ? "LDL reprovada por erro crítico. Vamos revisar antes de seguir." : ok ? "LDL encerrada sem desvios. Bom trabalho, equipe." : "LDL encerrada. Revisem os pontos marcados no quadro.");
+    if (cfg) setButtons([["rt:go:" + cfg.id, "Refazer"], ["rt:menu:" + cfg.grupo, "Voltar ao\ntreino"], ["menu", "Menu\nCTS-2"]]);
+    else setButtons([[quiz ? "ldl:quiz" : "ldl:mt", "Refazer"], ["ldl:menu", "Treino\nde LDL"], ["menu", "Menu\nCTS-2"]]);
     ldl = null;
   }
   function acaoLdl(b) {
@@ -2295,12 +2329,426 @@ body.vr #stick { display: none; }
     if (b.startsWith("ldl:o:")) return decidirLdl(b.slice(6));
   }
 
+
+  // ---------- Treinamentos dos PROs aplicáveis ao VR (zip de 13/10/2026) ----------
+  // Usam o mesmo motor do treino de LDL (etapas de decisão ou de toque na peça). Mapeamento: vr-cts2/pros-vr/mapeamento-pros-vr.md
+  const ccpFala = t => coordenadorFala(t, false, "CCP");
+  function abrirLdlRoteiro(oQue) {
+    if (trem.ativo) { trem.ativo = false; tremGrupo.visible = false; }
+    licenca.ativa = true; licenca.desde = performance.now(); licenca.pedido = false;
+    licenca.eventos.push(`LDL ${ldl.f.num} aberta pelo CCP (${oQue})`);
+    ldl.aberta = true; estadoLdlObjetos("on", false, "on");
+    ccpFala(`${ldl.f.prefixo}, LDL ${ldl.f.num} aberta às ${horaTxt(new Date())} na linha 02 e AMV 03 do pátio, para ${oQue}. Linha jumpeada. Rota de fuga pela linha 03.`);
+  }
+  function devolverLdlRoteiro(resumo) {
+    if (!ldl.aberta) return;
+    coordenadorFala(`CCP, ${ldl.f.prefixo}. ${resumo} Equipe fora da via, material recolhido, jumper retirado. Devolvo a LDL ${ldl.f.num}.`, false, "Técnico");
+    ccpFala(`${ldl.f.prefixo}, LDL ${ldl.f.num} encerrada às ${horaTxt(new Date())}. Fiquem fora da via.`);
+    devolverLinha(`LDL ${ldl.f.num} devolvida e encerrada`); ldl.aberta = false; estadoLdlObjetos("off", false, "off");
+  }
+  const tocar = (alvo, titulo, corpo, extra) => Object.assign({ alvo, titulo, corpo }, extra);
+  // medição sorteada: ok = [min, max] dentro da faixa; foras = faixas fora
+  function leitura(ok, foras, d) { const m = medir(ok, foras, d); return { v: m.v, ok: m.ok, txt: num(m.v, d) }; }
+
+  // ---- PRO-022721: Inspeção e manutenção preventiva em AMV (EFC) ----
+  const ANOMALIAS_AMV = [
+    ["Parafuso curto comprimindo a mola do rolete do jacaré: mola comprimida, sem função.", "P0 com restrição programada", ["P1", "P0 com interdição"]],
+    ["Bandeja do jacaré descentralizada no vão.", "P0 com restrição programada", ["P2", "P0 com interdição"]],
+    ["RCF e amassamento na transição da pata de lebre para a ponta principal do jacaré.", "P0 com restrição programada", ["P2", "P1"]],
+    ["Toque severo do friso na ponta da agulha, com risco de fratura.", "P0 com restrição programada", ["P1", "P2"]],
+    ["Punhos das barras de detecção e atuação descentralizados em relação aos parafusos.", "P1F", ["P0 com interdição", "P2"]],
+    ["Escoras ajustáveis soltas na região da agulha.", "P0 com restrição programada", ["P2", "P1"]],
+    ["Trinca transversal na ponta do jacaré de ponta fixa (JPF), sem impedir a circulação restrita.", "P0 com restrição", ["P1F", "P0 com interdição"]],
+    ["Fratura na ponta principal do jacaré de ponta móvel (JPM).", "P0 com interdição", ["P0 com restrição programada", "P1F"]],
+    ["Vedação da agulha do JPM aberta 4 mm.", "P0 com interdição", ["P0 com restrição programada", "P1"]],
+    ["Vedação da agulha do JPM aberta 3 mm.", "P0 com restrição programada", ["P0 com interdição", "P2"]]
+  ];
+  const classificarAmv = ([visto, certa, erradas]) => ({ decisao: escolha("Classifique a anomalia", visto + "\nQual a prioridade pelo PGS-006334?", certa, erradas,
+    { nome: "Prioridade: " + visto, explica: "PGS-006334, tabela de itens do AMV na inspeção sensitiva: " + visto.replace(/\.$/, "") + " → " + certa + "." }) });
+
+  function etapasAmv(f) {
+    const folga = leitura([12, 13], [[8, 10], [15, 17]]), desq = leitura([32, 58], [[64, 75], [14, 26]]);
+    return [
+      { decisao: escolha("Inspeção prévia", "A OM de inspeção prévia saiu 4 dias antes da OM do preventivo do AMV. O que levantar no campo?",
+          "Superestrutura (fixação, dormentes, juntas, geometria, lastro) e infra (recalque, drenagem, vegetação, rede elétrica, acesso, área de vivência).",
+          ["Só a máquina de chave: o resto fica para a inspeção sensitiva.", "Só conferir se o material está no caminhão."],
+          { explica: "PRO-022721 9.1 e 9.2: a inspeção prévia avalia recursos e condições do AMV e da via. Registro no ValeForms/PowerApp; o Anexo 09 impresso só se o sistema estiver fora." }) },
+      { decisao: escolha("Área de vivência", "A zona segura ficou entre o acesso rodoviário e a via férrea. O que fazer?",
+          "Sinalizar o acesso com placas de 20 km/h e de trânsito de pedestres a 100 m.",
+          ["Nada: a área de vivência já é a zona segura.", "Colocar só uma fita zebrada na beira da via."],
+          { explica: "PRO-022721 9.3: placa de redução para 20 km/h e de pedestres a 100 m, padrão DNIT." }) },
+      { decisao: escolha("Pedir a LDL", "Você vai chamar o CCP para abrir a LDL, mas o rádio portátil não pega neste ponto.",
+          "Procurar um ponto com bom sinal ou usar o rádio veicular, e só entrar na via com a LDL aberta.",
+          ["Entrar na via e tentar de novo lá de dentro.", "Pedir a um colega para avisar o CCP pelo celular."],
+          { explica: "PRO-022721 9.4: procurar boa recepção e tentar o rádio veicular. 5.7 item 12: celular proibido durante a atividade.",
+            critico: { e0: "Entrou na via sem LDL aberta." }, apos: () => abrirLdlRoteiro("preventiva do AMV") }) },
+      tocar("agulhas", "Bloqueie as partes móveis", "Antes de medir ou manter, aplique o cepo de madeira com alça entre a agulha aberta e o trilho de encosto. Toque nas agulhas.",
+        { feito: () => { mostrarCepo(true); som.encaixe(); } }),
+      { decisao: escolha("Zona de risco", "Um auxiliar entra na agulhagem (dormentes 01 a 28) para buscar uma chave enquanto o cepo do jacaré JPM ainda não foi aplicado.",
+          "Interromper a atividade imediatamente.", ["Continuar: a LDL está aberta.", "Pedir para ele sair quando a medição terminar."],
+          { explica: "PRO-022721 7.2.2 e 12.13: zona de risco da agulhagem do dormente 01 ao 28 e do JPM do 85 ao 98. Alguém dentro sem o bloqueio das partes móveis: parar na hora.",
+            critico: { e0: "Manteve a atividade com pessoa na zona de risco sem bloqueio.", e1: "Manteve a atividade com pessoa na zona de risco sem bloqueio." } }) },
+      { decisao: escolha("Trabalho junto com a EE", "Hoje a eletroeletrônica trabalha junto com a equipe de AMV. Como ficam os compartimentos das manivelas das MCH?",
+          "Abertos, para evitar movimentação involuntária das partes móveis.", ["Fechados e com cadeado.", "Tanto faz: quem comanda a máquina é a EE."],
+          { explica: "PRO-022721 8.6: nas manutenções com a EE é obrigatório manter abertos os compartimentos das manivelas das MCH." }) },
+      tocar("barra", "Meça a folga das barras", "Meça a folga entre as porcas e os punhos das barras de conjugação. Toque nas barras.",
+        { feito: () => mostrarFerramenta("regua", centroPeca("barra"), folga.txt + " mm") }),
+      { decisao: escolha("Folga porca/punho", `Leitura: ${folga.txt} mm entre a porca e o punho da barra.`,
+          folga.ok ? "Dentro do padrão (12 a 13 mm)." : "Fora do padrão (12 a 13 mm): registrar e corrigir.",
+          [folga.ok ? "Fora do padrão: registrar e corrigir." : "Dentro do padrão."],
+          { explica: "PRO-022721 10.11: em condição normal a folga é de 12 a 13 mm. Sem essa folga as peças podem encostar e fechar curto.", apos: guardarFerramentas }) },
+      classificarAmv(umDe(ANOMALIAS_AMV)),
+      tocar("dormente", "Desquadramento do dormente oco", "Meça o quadramento do dormente oco em relação à ponta da agulha e à face da placa de apoio da MCH. Toque no dormente oco.",
+        { feito: () => mostrarFerramenta("trena", centroPeca("dormente"), desq.txt + " mm") }),
+      { decisao: escolha("Dormente oco", `Leitura: ${desq.txt} mm. Referência para os AMV elétricos do TFPM: 45 ± 15 mm.`,
+          desq.ok ? "Dentro da referência." : "Fora da referência: registrar a anomalia.", [desq.ok ? "Fora da referência: registrar a anomalia." : "Dentro da referência."],
+          { explica: "PRO-022721 10.12: valor de referência 45 mm ± 15 mm (30 a 60 mm).", apos: guardarFerramentas }) },
+      { decisao: escolha("Trinca na ponta da agulha", "Na ponta da agulha há uma trinca exposta. A altura medida em relação ao boleto está dentro do limite de segurança (13 a 22 mm).",
+          "Aplicar restrição de velocidade e acompanhar até esmerilhar a trinca.", ["Interditar até trocar a meia chave.", "Nada: dentro do limite não precisa fazer nada."],
+          { explica: "PRO-022721 10.3: dentro do limite, restrição de velocidade e acompanhamento até o esmerilhamento. Fora do limite, interdição até substituir ou recuperar." }) },
+      { decisao: escolha("Bandeirola", "A bandeirola do AMV está com a película verde virada para a posição reversa.",
+          "Corrigir: verde indica reta e amarela indica reversa.", ["Está certa: verde indica reversa.", "Não é item da preventiva."],
+          { explica: "PRO-022721 11.6: verde para reta, amarelo para reversa; preferencialmente oval, 30 × 50 cm, refletiva." }) },
+      tocar("cepo", "Libere as partes móveis", "O ajuste terminou e a equipe vai mover as agulhas. Retire o cepo pela alça. Toque no cepo.", { feito: () => { mostrarCepo(false); som.encaixe(); } }),
+      { decisao: escolha("Antes de mover as agulhas", "A agulha vai para a reversa. O que você faz antes do comando?",
+          "Fora da zona crítica, de frente para o AMV: apontar, falar \"comando para Reversa\" e confirmar \"OK\" sem ninguém no raio de ação.",
+          ["Mover direto: o cepo já saiu.", "Dar o comando de dentro da agulhagem para ver a vedação de perto."],
+          { explica: "PRO-022721 12.12 a 12.15: técnica Yoshi Yoshi (apontar e falar) antes de mover agulhas e JPM, com todos fora do raio de prensamento.",
+            critico: { e1: "Ficou dentro da zona crítica durante a movimentação." }, apos: () => moverAmv("reverso", true) }) },
+      { decisao: escolha("Socaria sem a EE", "A socaria manual na região das agulhas terminou e a eletroeletrônica não estava no local.",
+          "Avisar o centro de controle, deixar velocidade progressiva de 50 km/h e pedir o teste de movimentação do AMV.",
+          ["Liberar normal: socaria não mexe na máquina.", "Esperar a EE voltar outro dia para avisar o centro de controle."],
+          { explica: "PRO-022721 13.2, nota: socaria sem a EE é comunicada ao centro de controle, o local fica em velocidade progressiva de 50 km/h e depois se pede o teste de movimentação." }) },
+      { decisao: escolha("Pendência na região crítica", "Falta um grampo na região do jacaré. O material está no caminhão e ainda há tempo na MI.",
+          "Corrigir agora: não pode haver encerramento técnico com pendência corrigível em região crítica.",
+          ["Encerrar a OM e abrir uma nota para depois.", "Encerrar: um grampo não é item de segurança."],
+          { explica: "PRO-022721 8.1 e 8.5: regiões críticas são JIC, agulhas e jacaré. É proibido o encerramento técnico com pendência dessas regiões que possa ser corrigida." }) },
+      { decisao: escolha("Encerramento", "Ainda dentro do tempo da MI. Qual é o encerramento correto?",
+          "Retirar os cepos, testar no mínimo 3 movimentos para reta e reversa e fazer o reset da MCH (Anexo 10).",
+          ["Devolver a LDL; o centro de controle testa o AMV depois.", "Testar uma vez para cada lado e deixar o cepo para a próxima equipe."],
+          { explica: "PRO-022721 14.1: retirar os cepos, no mínimo 3 movimentos reta e reversa (pode ser pelo centro de controle) e reset conforme o Anexo 10.",
+            critico: { e1: "Deixou o cepo nas agulhas depois de encerrar." }, apos: () => moverAmv("normal", false) }) },
+      { decisao: escolha("Primeiro trem", "Houve socaria de travessão do AMV. Ao devolver a LDL, o que informar ao controlador?",
+          "Restrição de 30 km/h para o primeiro trem de carga ou locomotiva; não pode ser de passageiros nem de produtos perigosos.",
+          ["Nada: a velocidade progressiva já está na via.", "Restrição de 30 km/h só se o primeiro trem for de passageiros."],
+          { explica: "ROF (PGS-002722) 14.28: 30 km/h para o primeiro trem após substituição de componente de AMV ou socaria de travessão." }) },
+      { decisao: escolha("Registro", "Onde registrar as anomalias e os serviços feitos?",
+          "No ValeForms/PowerApp; o formulário impresso vai anexado à OM só se o sistema estiver fora.",
+          ["Só no caderno da equipe.", "Não precisa: a OM já diz o que foi feito."],
+          { explica: "PRO-022721 15: registro no ValeForms/PowerApp pelo técnico VP responsável; impresso anexado à OM se o sistema estiver inoperante.",
+            apos: () => devolverLdlRoteiro("Preventiva do AMV 03 concluída. Restrição de 30 quilômetros por hora para o primeiro trem.") }) }
+    ];
+  }
+
+  // ---- PRO-022721 Anexo 10 (IT-SIN-N001-2024): manivela e reset da MCH sem a EE ----
+  function etapasReset(f) {
+    const contatosOk = Math.random() < 0.7, ledsOk = Math.random() < 0.7;
+    return [
+      { decisao: escolha("Antes de começar", "A EE trabalhou no housing de manhã. Antes de aplicar a IT de manivela e reset sem a EE, o que confirmar?",
+          "Com o CCO/CCP, que não há controle local estabelecido.", ["Nada: controle local é assunto da EE.", "Colocar a máquina em controle local para ficar mais seguro."],
+          { explica: "IT etapa 1: a IT não pode ser aplicada com controle local; ter controle local antes ou durante a preventiva pode gerar comando elétrico indevido.",
+            critico: { e1: "Aplicou a IT com controle local estabelecido." }, apos: () => abrirLdlRoteiro("preventiva do AMV com manivela") }) },
+      { decisao: escolha("CDV de chave", "LDL aberta. O que confirmar pelo rádio antes de abrir o compartimento da manivela?",
+          "Que o circuito de via (CDV) de chave dos AMVs da atividade está interditado.", ["Só o número da LDL.", "Nada: com a LDL aberta já pode abrir."],
+          { explica: "IT etapa 2: a interdição do CDV de chave é a única barreira que garante a rota na linha adjacente (proteção de flanco) e evita movimentos indevidos da MCH.",
+            critico: { e1: "Abriu o compartimento da manivela sem o CDV de chave interditado." },
+            apos: () => { coordenadorFala(`CCP, ${f.prefixo}. Confirme a interdição do CDV de chave do AMV 03.`, false, "Técnico"); ccpFala(`${f.prefixo}, confirmo CDV de chave do AMV 03 interditado.`); } }) },
+      tocar("agulhas", "Instale o cepo", "Instale o cepo entre a agulha aberta e o trilho de encosto, no limite de movimentação da agulha. Toque nas agulhas.",
+        { feito: () => { mostrarCepo(true); som.encaixe(); } }),
+      tocar("manivela", "Abra o compartimento da manivela", "Abra o cadeado com a chave de punho e depois a portinhola da manivela. Ao abrir, o contato corta o motor e sobe a indicação de manivela para o centro de controle. Toque no bloco da manivela.",
+        { feito: () => som.chave() }),
+      { decisao: escolha("Contatos de manivela", `Com a chave allen de 6 mm você abre a tampa do compartimento de reset. Os contatos de manivela ${contatosOk ? "estão abertos" : "continuam fechados"}.`,
+          contatosOk ? "Fechar a tampa sem o cadeado jabuti e seguir com a manutenção." : "Parar e acionar a EE: não seguir com a IT até a correção.",
+          contatosOk ? ["Parar e acionar a EE."] : ["Seguir: os contatos fecham sozinhos depois.", "Abrir os contatos com a mão, tocando na lâmina."],
+          { explica: "IT etapa 7: se os contatos de manivela não abrem, não prosseguir; informar a EE. Com contatos fechados pode haver movimentação indevida da MCH.",
+            critico: contatosOk ? {} : { e0: "Seguiu com os contatos de manivela fechados.", e1: "Mexeu na lâmina do contato com a mão." } }) },
+      { decisao: escolha("Testar a movimentação", "Fim da manutenção, etapa de devolução. Na ponta de agulha há duas máquinas de chave. Como testar a livre movimentação?",
+          "Tirar o cepo e movimentar pela manivela para os dois lados, uma máquina por vez.", ["Movimentar as duas máquinas ao mesmo tempo.", "Movimentar com o cepo no lugar."],
+          { explica: "IT etapa 8: remover o cepo, movimentar pela manivela para os dois lados; nas MCH da ponta de agulha, uma por vez.",
+            apos: () => { mostrarCepo(false); moverAmv("reverso", true, () => moverAmv("normal", true)); } }) },
+      { decisao: escolha("Posição para entregar", "Em que posição deixar o AMV antes de entregar a LDL?",
+          "NORMAL/RETA, conferindo ponta de agulha, intermediária e JPM.", ["Na posição em que a equipe terminou.", "REVERSA, para proteger a linha de desvio."],
+          { explica: "IT etapa 9: posição favorável de rotas nas duas linhas depois da entrega da LDL." }) },
+      tocar("agulhas", "Cepo de novo", "Antes de mexer na manivela e no reset, instale o cepo de novo. Toque nas agulhas.", { feito: () => { mostrarCepo(true); som.encaixe(); } }),
+      tocar("manivela", "Feche o compartimento", "Retire a manivela, feche a portinhola travando no suporte e instale o cadeado com a chave de punho. Toque no bloco da manivela.", { feito: () => som.chave() }),
+      tocar("manivela", "Resete a MCH", "Abra o compartimento de reset e empurre o dispositivo de reset para baixo até ouvir o clique. Toque no bloco da manivela.",
+        { feito: () => { som.clique(); setTimeout(() => som.rele(), 250); } }),
+      { decisao: escolha("Indicação no ECC", `No ECC, os 4 LEDs da posição NORMAL estão ${ledsOk ? "acesos em verde" : "apagados"}.`,
+          ledsOk ? "MCH travada em NORMAL: fechar a tampa do reset com o cadeado jabuti." : "Refazer cepo, cadeado, portinhola e reset; sem sucesso, acionar a EE.",
+          ledsOk ? ["Refazer o reset por garantia."] : ["Seguir: o CCO resolve a indicação.", "Abrir a portinhola e deixar a manivela inserida."],
+          { explica: "IT etapas 15 e 16: os 4 LEDs da NORMAL em verde confirmam a MCH movimentada e travada e permitem o reconhecimento da manivela pelo centro de controle.",
+            apos: () => { if (ledsOk) { lampMat.color.set(0x23c552); lampMat.emissive.set(0x18a540); } } }) },
+      tocar("cepo", "Retire o cepo", "Retire o cepo pela alça, deixando as agulhas livres. Toque no cepo.", { feito: () => { mostrarCepo(false); som.encaixe(); } }),
+      tocar("jumper", "Retire o shunt", "Retire o shunt (jumper) do CDV de chave para o centro de controle poder testar a máquina. Toque no jumper.",
+        { feito: () => { estadoLdlObjetos("on", false, "off"); som.encaixe(); } }),
+      { decisao: escolha("Teste com o centro de controle", "CDV livre, AMV em NORMAL, máquinas sem manivela e resetadas. O que pedir ao centro de controle?",
+          "Reconhecer as manivelas e comandar os dois lados, com todos fora do raio de ação, conferindo a correspondência campo e centro.",
+          ["Devolver a LDL direto: o reset já foi feito.", "Comandar com um colega perto da agulha para conferir a vedação."],
+          { explica: "IT etapas 20 e 21: reconhecimento das manivelas e teste de movimentação e correspondência antes de entregar a LDL. Ninguém no raio de ação das partes móveis.",
+            critico: { e1: "Pessoa no raio de ação durante o comando do centro de controle." },
+            apos: () => { coordenadorFala(`CCP, ${f.prefixo}. AMV 03 em normal, sem manivela e resetado, pessoas fora do raio de ação. Peço reconhecer a manivela e testar os dois lados.`, false, "Técnico");
+              ccpFala(`${f.prefixo}, manivela reconhecida. Comando para reversa e para normal com correspondência.`);
+              moverAmv("reverso", false, () => moverAmv("normal", false, () => devolverLdlRoteiro("Reset concluído e AMV 03 com correspondência."))); } }) }
+    ];
+  }
+
+  // ---- ROF (PGS-002722): comunicação via rádio ----
+  function etapasRadio(f) {
+    const p = f.prefixo;
+    return [
+      { decisao: escolha("Antes de transmitir", "Você vai chamar o CCP pelo rádio. O que fazer antes de apertar o botão?",
+          "Ouvir e confirmar que o canal não está sendo usado.", ["Apertar e falar alto para passar por cima.", "Usar o botão de emergência para ser atendido mais rápido."],
+          { explica: "ROF 20.2: certificar-se de que o meio não está em uso. 23.8: o botão de emergência só em situação crítica, porque interrompe todas as comunicações do canal." }) },
+      { decisao: escolha("Qual rede", "Na EFC, você está no pátio e precisa falar com o CCP.",
+          "Rede OPERAÇÃO, no canal de MANOBRA do pátio.", ["Rede FERROVIA, canal TRÁFEGO.", "Rede MANUTENÇÃO, canal VP."],
+          { explica: "ROF 23.7: TRÁFEGO é com o CCO; CCMi com o MCM; a rede OPERAÇÃO (MANOBRA) liga o CCP aos trens e equipes nos pátios; a rede MANUTENÇÃO é entre equipes." }) },
+      { decisao: escolha("Contato inicial", "Como abrir a chamada?",
+          `"CCP, aqui é ${p}, equipe de manutenção, no pátio, linha 02, AMV 03."`, ["\"CCP, CCP, tá na escuta?\"", "\"Fala, CCP, beleza? Preciso de uma ajuda aqui.\""],
+          { explica: "ROF 21.1: o contato inicial tem identificação e localização. 20.1: clara, objetiva e breve, sem conversa informal ou gíria.",
+            apos: () => { coordenadorFala(`CCP, aqui é ${p}, equipe de manutenção, no pátio, linha 02, AMV 03.`, false, "Você"); ccpFala(`${p}, CCP na escuta. Prossiga.`); } }) },
+      { decisao: escolha("Fim da transmissão", "Como encerrar cada mensagem?",
+          "Com a palavra CÂMBIO.", ["Com \"valeu\".", "Não precisa: o CCP sabe quando você parou."],
+          { explica: "ROF 21.4: toda comunicação é encerrada com CÂMBIO. A exceção (21.5) é só para o operador de trem a 10 vagões ou menos da parada ou do engate." }) },
+      { decisao: escolha("Cotejamento", "O CCP diz: \"Autorizado a movimentar manualmente o AMV 03 para a linha 02.\" O que responder?",
+          `"${p} repete: autorizado a movimentar manualmente o AMV 03 para a linha 02."`, ["\"Ok, entendido.\"", `"${p} repete: autorizado a movimentar o AMV 05 para a linha 02."`],
+          { repetir: true, explica: "ROF 20.4: quem recebe repete a mensagem na íntegra (cotejamento) e quem emite responde \"entendido\" ou \"confere\". É proibido supor ou interpretar.",
+            antes: () => ccpFala(`${p}, autorizado a movimentar manualmente o AMV 03 para a linha 02.`),
+            apos: () => { coordenadorFala(`${p} repete: autorizado a movimentar manualmente o AMV 03 para a linha 02.`, false, "Você"); ccpFala(`${p}, confere.`); } }) },
+      { decisao: escolha("Errou no cotejamento", "Você percebe que acabou de cotejar \"linha 03\" no lugar de \"linha 02\". Como corrigir?",
+          `"Correção: ${p} repete, AMV 03 para a linha 02."`, ["Ficar quieto: o CCP vai perceber.", `"Não, não, é a outra linha, a 02."`],
+          { explica: "ROF 20.5: para corrigir uma ordem ou um cotejamento, usar a palavra CORREÇÃO antes da nova mensagem." }) },
+      { decisao: escolha("Operação manual do AMV", "Você movimentou o AMV na manivela para a linha 02 e o trem está aguardando. O que passar para o operador do trem?",
+          "\"Agulha vedada, AMV travado e posicionado para a linha 02, câmbio.\"", ["\"AMV virado, pode vir.\"", "\"Tudo certo com a chave, pode passar.\""],
+          { explica: "ROF 44.8: a confirmação é \"agulha vedada, AMV travado e posicionado para a linha tal, câmbio\". 44.11: com JPM, primeiro o jacaré e depois a agulha, e informar o controlador.",
+            apos: () => coordenadorFala("Agulha vedada, AMV travado e posicionado para a linha 02, câmbio.", false, "Você") }) },
+      { decisao: escolha("Colega não responde", "Um colega na ponta do pátio não responde. Foram 5 chamadas seguidas e ele não avisou que ia sair do local.",
+          "Acionar a cadeia de ajuda imediatamente.", ["Esperar mais 15 minutos.", "Seguir o serviço: deve ser bateria."],
+          { explica: "ROF 22.5: cinco chamadas sem resposta, sem aviso de ausência, obrigam o acionamento imediato da cadeia de ajuda." }) },
+      { decisao: escolha("Emergência", "Um colega se machuca e, ao mesmo tempo, outro avisa um vazamento de óleo.",
+          "Chamada em emergência, repetida até ter resposta; o acidente pessoal tem prioridade.", ["Chamar normal e esperar o canal liberar.", "Comunicar primeiro o vazamento, para evitar dano ambiental."],
+          { explica: "ROF 22.1 a 22.3: a emergência é prioritária, interrompe as outras comunicações, é repetida até a resposta e o acidente pessoal vem primeiro.",
+            apos: () => coordenadorFala(`Emergência, emergência, emergência. CCP, aqui é ${p}, no pátio, AMV 03. Acidente pessoal com um empregado.`, true, "Você") }) },
+      { decisao: escolha("Sair do local", "Você precisa ir até o caminhão, fora da área de trabalho, por alguns minutos.",
+          "Avisar o controlador antes de sair.", ["Ir rápido sem avisar.", "Avisar só a equipe."],
+          { explica: "ROF 20.7: é proibido às equipes em área do centro de controle sair do local de trabalho sem comunicar o controlador." }) }
+    ];
+  }
+  const ROF_MANUT = [
+    ["Deixar ferramentas e materiais na entrevia, dentro do gabarito da linha adjacente.", "n", "ROF 14.6: materiais às margens, fora do gabarito, sem atingir o gabarito da linha adjacente."],
+    ["Começar um serviço de manutenção na via sem autorização do controlador.", "n", "ROF 14.7: proibido; para ocupar o gabarito vale o procedimento de LDL."],
+    ["Esmerilhar trilho com o trem de passageiros se aproximando.", "n", "ROF 14.15 e 14.16: paralisar esmerilhamento e serviços com fagulha antes da passagem do trem de passageiros e de produtos perigosos."],
+    ["Intervenção de até 30 minutos sem a placa Pessoas Trabalhando, com LDL e dois empregados.", "s", "ROF 14.17: até 30 minutos dispensa a placa, mas exige LDL e no mínimo dois empregados."],
+    ["Ficar na entrevia, dentro do gabarito, enquanto passa trem na linha liberada.", "n", "ROF 14.4: ficar fora do gabarito de circulação e da entrevia na passagem do trem."],
+    ["Movimentar AMV na manivela com o comando elétrico ligado (LCB aberta).", "n", "ROF 44.10: manter a LCB fechada ou o comando elétrico isolado."],
+    ["Operar manualmente um AMV com máquina de chave sem autorização do controlador.", "n", "ROF 44.3: só após autorização do controlador da área."],
+    ["Em AMV com JPM, mover primeiro a ponta do jacaré e depois a agulha.", "s", "ROF 44.11: primeiro o JPM, conferir travamento e vedação, depois a agulha."],
+    ["Liberar um trem de passageiros como primeiro trem depois da troca de um componente de AMV.", "n", "ROF 14.28: o primeiro trem passa a 30 km/h e não pode ser de passageiros nem de produtos perigosos."],
+    ["Descarregar trilhos e dormentes enquanto passa trem na via adjacente.", "n", "ROF 14.27: paralisar durante a passagem de trens na via adjacente."],
+    ["Usar o botão de emergência do rádio para falar mais rápido com o CCO.", "n", "ROF 23.8: só em situação crítica; ele interrompe todas as comunicações do canal."],
+    ["Conversa informal e gíria no rádio quando o canal está calmo.", "n", "ROF 20.1: proibida conversa informal, gíria e brincadeira."]
+  ];
+
+  // ---- PRO-001164 + PGS-006334: inspeção sensitiva e classificação de defeitos ----
+  const CLASSIF = [
+    ["Desgaste do boleto medido com o vampiro: 33%.", "P0 com restrição imediata", ["P0 com restrição programada", "P1F"]],
+    ["Desgaste do boleto medido com o vampiro: 32%.", "P0 com restrição programada", ["P0 com restrição imediata", "P1"]],
+    ["Desgaste do boleto medido com o vampiro: 31%.", "P1F", ["P1", "P0 com restrição programada"]],
+    ["Desgaste do boleto medido com o vampiro: 30%.", "P1", ["P1F", "P2"]],
+    ["Placa de apoio na ponta da agulha se movendo 9 mm com a passagem do trem (dormente de madeira).", "Dormente inservível (I)", ["Dormente bom: o limite é 12 mm", "Dormente ausente (A)"]],
+    ["Dormente queimado, sem resistência vertical nem lateral.", "Dormente ausente (A)", ["Dormente inservível (I)", "Dormente bom"]],
+    ["Dormente de concreto com abrasão de 22 mm na região do trilho.", "Dormente inservível (I)", ["Dormente bom", "Dormente ausente (A)"]],
+    ["Placa de apoio em linha de pátio se movendo 10 mm, fora da região da agulha.", "Dormente ainda dentro do limite (12 mm)", ["Dormente inservível (I)", "Dormente ausente (A)"]]
+  ].concat(ANOMALIAS_AMV);
+  function etapasSensitiva(f) {
+    const classif = embaralhar(CLASSIF).slice(0, 5).map(([visto, certa, erradas]) => ({ decisao: escolha("Classifique", visto + "\nComo classificar?", certa, erradas,
+      { nome: "Classificação: " + visto, explica: "PGS-006334: " + visto.replace(/\.$/, "") + " → " + certa + "." }) }));
+    return [
+      { decisao: escolha("Equipe da inspeção", "Quantas pessoas, no mínimo, fazem a inspeção sensitiva de via?",
+          "Duas.", ["Uma, com rádio.", "Três: inspetor, auxiliar e coordenador."], { explica: "PRO-001164 8.2.1: no mínimo duas pessoas." }) },
+      { decisao: escolha("Inspeção sobre a via", "A rota inclui o AMV 03 do pátio, inspecionado sobre a via.",
+          "Só com LDL aberta e usando o EAT o tempo todo.", ["Pode ir sem LDL: inspeção visual não precisa.", "Basta avisar o CCP que vai entrar."],
+          { explica: "PRO-001164 8.2.5 e 10.1: inspeção sobre a via em pátio, terminal, AMV e TU só com LDL aberta, com EAT durante toda a inspeção.",
+            critico: { e0: "Inspecionou sobre a via sem LDL.", e1: "Inspecionou sobre a via sem LDL." }, apos: () => abrirLdlRoteiro("inspeção sensitiva") }) },
+      tocar("agulhas", "Meça o desgaste", "Com o vampiro, meça o desgaste do trilho de encosto. Toque no trilho junto às agulhas.",
+        { feito: () => mostrarFerramenta("regua", centroPeca("agulhas"), "F e C") }),
+      { decisao: escolha("Uso do vampiro", "Como posicionar o medidor de desgaste (vampiro)?",
+          "Trilho limpo, agulha C para o lado de dentro da bitola, ler F e C e converter pela tabela de desgaste.",
+          ["Agulha C para fora da bitola e ler só a F.", "Medir sem limpar: a sujeira não altera a leitura."],
+          { explica: "PRO-001164 10.5: limpar o local, agulha C para a parte interna da bitola, registrar F e C e conferir na tabela do Anexo 01.", apos: guardarFerramentas }) },
+      { decisao: escolha("Trilho fraturado na rota", "Mais à frente você encontra um trilho fraturado.",
+          "Chamar o centro de controle em emergência e depois comunicar o MCM.", ["Registrar no ValeForms no fim do dia.", "Marcar com tinta e seguir a rota."],
+          { explica: "PRO-001164 10.1 e 8.3.3: anomalia com risco à circulação (fratura de trilho, solda, tala) é comunicada em emergência ao centro de controle; depois ao MCM." }) },
+      { decisao: escolha("Prazo do P0 programado", "Um defeito foi classificado como P0 com restrição programada numa linha de pátio. Qual o prazo para retirá-lo antes de a velocidade ser reduzida?",
+          "30 dias (na linha tronco são 15 dias).", ["15 dias.", "7 dias."],
+          { explica: "PGS-006334: P0 com restrição programada tem prazo de 30 dias em pátios e terminais e de 15 dias nas linhas 01 e 02 da linha tronco." }) }
+    ].concat(classif).concat([
+      { decisao: escolha("Fim da inspeção", "A inspeção terminou. O que fazer com os registros?",
+          "Registrar todas as anomalias com dados de localização e evidências no ValeForms/PowerApp, dentro do prazo de cada prioridade.",
+          ["Passar por rádio ao CCP e não registrar.", "Registrar só os P0."],
+          { explica: "PRO-001164 8.4 e PGS-006334: cadastro com localização, evidências e prazos por prioridade (P0, P1F, P1, P2).",
+            apos: () => devolverLdlRoteiro("Inspeção sensitiva concluída.") }) }
+    ]);
+  }
+
+  // ---- PRO-016249: lubrificação manual em AMV ----
+  function etapasLubrif(f) {
+    const chuva = Math.random() < 0.4, semIndicacao = Math.random() < 0.35;
+    const e = [
+      { decisao: escolha("Acesso à via", "A lubrificação das placas do AMV 03 está programada. Como entrar na via?",
+          "Pedir a LDL ao CCP (PGS-003781) e entrar só com a linha jumpeada ou ocupada.", ["Entrar rápido entre dois trens.", "Avisar o CCP e entrar sem LDL: é serviço curto."],
+          { explica: "PRO-016249, atividades preliminares: solicitar a LDL conforme o PGS-003781; parâmetro: linha jumpeada ou ocupada com EVP.",
+            critico: { e0: "Entrou na via sem LDL.", e1: "Entrou na via sem LDL." }, apos: () => abrirLdlRoteiro("lubrificação do AMV") }) },
+      tocar("agulhas", "Bloqueie o AMV", "Coloque o cepo (mão amiga) entre a agulha e o trilho de encosto, sempre segurando pela alça. Toque nas agulhas.",
+        { feito: () => { mostrarCepo(true); som.encaixe(); } }),
+      { decisao: escolha("Limpeza das placas", "Como limpar as placas de deslizamento?",
+          "Raspar com espátula (escova de aço e pano se preciso) e coletar o resíduo num recipiente.", ["Jogar desengripante e deixar escorrer na brita.", "Não limpar: a graxa nova empurra a velha."],
+          { explica: "PRO-016249 9: raspar graxa e sujeira com espátula, escova de aço e pano; recolher o resíduo, sem deixar graxa na brita ou nos dormentes." }) }
+    ];
+    if (chuva) e.push({ decisao: escolha("Começou a chover", "Começa a chover forte durante a limpeza das placas.",
+      "Parar a atividade e aguardar o tempo normalizar.", ["Acelerar para terminar antes de molhar.", "Passar a graxa assim mesmo: ela protege da água."],
+      { explica: "PRO-016249 9: com chuva, parar e aguardar o tempo normalizar." }) });
+    e.push(
+      tocar("agulhas", "Lubrifique a posição reta", "Com o pincel de 2\", passe uma camada fina e uniforme de graxa grafitada nas placas da posição reta. Toque nas agulhas.", { feito: () => som.clique() }),
+      { decisao: escolha("Onde passar graxa", "Quais placas recebem graxa?",
+          "Só as placas com movimento efetivo das agulhas: primeiro na reta, depois na reversa.", ["Todas as placas do AMV, inclusive as fixas.", "Também o boleto do trilho de encosto, para a agulha deslizar."],
+          { explica: "PRO-016249 9: graxa só nas placas com ação efetiva de movimentação; lubrificar a reta e depois a reversa. Na lateral da ponta da agulha, só se houver desgaste por contato do friso." }) },
+      { decisao: escolha("Mover para a reversa", "É uma máquina de chave elétrica sem controle local. Como levar as agulhas para a reversa?",
+          "Retirar o cepo e pedir ao centro de controle; com a autorização e após retirar o jumper, a MCH é movimentada.",
+          ["Abrir a portinhola e mover na manivela sem avisar ninguém.", "Pedir o comando com o cepo instalado."],
+          { explica: "PRO-016249 9: o AMV elétrico sem controle local só é movimentado com autorização do centro de controle, após a retirada do jumper da via.",
+            critico: { e0: "Movimentou a MCH sem autorização do centro de controle." },
+            apos: () => { mostrarCepo(false); estadoLdlObjetos("on", false, "off"); coordenadorFala(`CCP, ${f.prefixo}. Cepo retirado, pessoal fora das agulhas. Peço comando do AMV 03 para reversa.`, false, "Técnico");
+              ccpFala(`${f.prefixo}, comando para reversa.`); moverAmv("reverso", false); } }) }
+    );
+    if (semIndicacao) e.push({ decisao: escolha("Perdeu a indicação", "Depois do comando, o AMV ficou sem indicação.",
+      "Acionar o MCM e seguir o fluxo do processo.", ["Forçar na manivela até indicar.", "Devolver a LDL e deixar a falha para a EE achar."],
+      { explica: "PRO-016249 9, desvios: perda de indicação do AMV → acionar o MCM e seguir o fluxo." }) });
+    e.push(
+      tocar("agulhas", "Lubrifique a reversa", "Recoloque o jumper e o cepo e passe a graxa nas placas da posição reversa. Toque nas agulhas.",
+        { feito: () => { estadoLdlObjetos("on", false, "on"); mostrarCepo(true); som.clique(); } }),
+      { decisao: escolha("Roletes das agulhas", "O AMV tangencial tem roletes nas agulhas com pino graxeiro. Como lubrificar?",
+          "Encaixar o bico da bomba no pino graxeiro, bombear até encher o rolete e limpar o excesso.", ["Passar graxa com o pincel por fora do rolete.", "Roletes não se lubrificam."],
+          { explica: "PRO-016249 9: bomba de graxa no pino graxeiro até o completo enchimento e retirada das sobras." }) },
+      tocar("cepo", "Encerre", "Retire o cepo pela alça e recolha os resíduos de graxa. Toque no cepo.",
+        { feito: () => { mostrarCepo(false); som.encaixe(); devolverLdlRoteiro("Lubrificação do AMV 03 concluída."); moverAmv("normal", false); } })
+    );
+    return e;
+  }
+
+  // ---- PRO-020971: substituição de componentes de AMV ----
+  function etapasComponentes(f) {
+    const temp = sorte(28, 50), naFtn = temp >= 34 && temp <= 44, esc = umDe([0.8, 1.2, 2.0, 2.5]);
+    return [
+      { decisao: escolha("Acesso à via", "Programada a troca da meia chave do AMV nº 20 VAE. O primeiro passo no campo?",
+          "Abrir a LDL com o CCO/CCP e bloquear a linha com jumper antes de ocupar o gabarito.", ["Descarregar a meia chave na via e depois pedir a LDL.", "Começar a soltar a fixação enquanto o CCP responde."],
+          { explica: "PRO-020971, Anexo 6 passo 1 e atividades preliminares: só acessar a via com LDL concedida e bloqueio físico do circuito.",
+            critico: { e0: "Ocupou o gabarito antes da LDL.", e1: "Ocupou o gabarito antes da LDL." }, apos: () => abrirLdlRoteiro("substituição da meia chave") }) },
+      { decisao: escolha("Temperatura do trilho", `Termômetro na alma do trilho, do lado contrário ao sol, depois de 5 a 10 minutos: ${temp} °C.`,
+          naFtn ? "Dentro da Faixa de Temperatura Neutra (34 a 44 °C): seguir." : "Fora da Faixa de Temperatura Neutra (34 a 44 °C): não seguir com a troca.",
+          [naFtn ? "Fora da faixa: não seguir." : "Seguir: a temperatura não importa para a meia chave."],
+          { explica: "PRO-020971 8, passo 1: a troca do JPM e dos trilhos complementares é feita com a temperatura monitorada na FTN, 34 a 44 °C." }) },
+      tocar("agulhas", "Bloqueie as partes móveis", "Com a via liberada pelo centro de controle, aplique o cepo nas agulhas. Toque nas agulhas.", { feito: () => { mostrarCepo(true); som.encaixe(); } }),
+      { decisao: escolha("Marcação do corte", "Como marcar o corte para a meia chave nova?",
+          "Medir a peça com trena milimetrada e marcar no boleto ou patim com tolerância de ± 3 mm, indicando o corte com duas setas.",
+          ["Marcar a olho pela peça velha.", "Tolerância de ± 10 mm: a junta compensa."],
+          { explica: "PRO-020971 8, marcação do corte: comprimento da meia chave com ± 3 mm (abertura da junta) e duas setas na posição do corte." }) },
+      { decisao: escolha("Qualidade do corte", `Corte feito com policorte. A esconsidade entre boleto e patim ficou em ${num(esc, 1)} mm.`,
+          esc <= 1.5 ? "Aceitável: até 1,5 mm." : "Fora do padrão (máx. 1,5 mm): refazer o corte.", [esc <= 1.5 ? "Refazer: precisa ser zero." : "Aceitar: o oxicorte acerta depois."],
+          { explica: "PRO-020971 8, corte: perpendicular ao eixo vertical, esconsidade admissível até 1,5 mm. Corte com oxicorte não serve para assentamento definitivo." }) },
+      { decisao: escolha("Retirar a meia chave", "A meia chave nº 20 VAE vai ser içada para fora da via.",
+          "Seguir o plano de rigging específico e manter as pessoas na zona segura.", ["Içar com o guindauto sem plano: a peça é conhecida.", "Arrastar com a alavanca, com a equipe em volta guiando."],
+          { explica: "PRO-020971 7 e 8: plano de rigging obrigatório para meia chave nº 20 VAE e JPM; pessoas fora da zona crítica.",
+            critico: { e0: "Içamento sem plano de rigging.", e1: "Equipe na zona de risco durante a movimentação da peça." } }) },
+      { decisao: escolha("Zona crítica", "Durante a movimentação dos trilhos, qual a distância mínima da zona crítica até a área de circulação segura?",
+          "20 m.", ["5 m.", "2 m, a largura da entrevia."], { explica: "PRO-020971 7.2: zona crítica delimitada a no mínimo 20 m das áreas de circulação segura." }) },
+      { decisao: escolha("EVP no perímetro", "Qual a velocidade máxima do EVP dentro do perímetro da atividade?",
+          "3 km/h.", ["10 km/h.", "5 km/h."], { explica: "PRO-020971 7.14: no máximo 3 km/h no deslocamento do EVP dentro do perímetro." }) },
+      { decisao: escolha("Junta metálica", "Vai ficar uma junta metálica até a solda. Como ela deve estar?",
+          "4 parafusos (2 de cada lado) e no mínimo 3 dormentes bons de cada lado, com grampos fixados.", ["2 parafusos bastam até a solda.", "4 parafusos; dormentes não importam."],
+          { explica: "PRO-020971 7.5 e 7.11: junta metálica com 4 parafusos e 3 dormentes com resistência mecânica de cada lado. Furos biselados, a 100 mm do início da solda." }) },
+      { decisao: escolha("Diferença de perfil", "Na junta, a diferença de altura entre os boletos é de 2 mm.",
+          "Esmerilhar 2 m para cada lado, a partir do início da junta (1 m por mm).", ["Esmerilhar 20 cm.", "Deixar: o trem assenta o degrau."],
+          { explica: "PRO-020971 7.4 (ABNT NBR 16387): para cada 1 mm de diferença de perfil, esmerilhar 1 m." }) },
+      { decisao: escolha("Bondeamento provisório", "O cabo de bondeamento definitivo não chegou.",
+          "Não usar arame: aguardar o material correto.", ["Amarrar com arame até o cabo chegar.", "Deixar sem bondeamento."],
+          { explica: "PRO-020971 7.7: proibido arame para bondeamento, mesmo provisório." }) },
+      tocar("cepo", "Libere as agulhas", "Componente assentado e fixado. Retire o cepo pela alça. Toque no cepo.", { feito: () => { mostrarCepo(false); som.encaixe(); } }),
+      { decisao: escolha("Encerramento", "Componente assentado e fixado. O que fazer antes de devolver a LDL?",
+          "Registrar a data de instalação, recolher sucata em bags fora do gabarito e deixar o caminho seguro livre.", ["Deixar a sucata na entrevia para o próximo recolhimento.", "Só recolher as ferramentas."],
+          { explica: "PRO-020971 7.16, 7.17 e 11: data de instalação registrada; sucata em bags fora do gabarito, sem obstruir drenagem nem o caminho seguro." }) },
+      { decisao: escolha("Primeiro trem", "Ao devolver a LDL depois da troca da meia chave, o que informar?",
+          "Restrição de 30 km/h para o primeiro trem de carga ou locomotiva, que não pode ser de passageiros nem de produtos perigosos.", ["Circulação normal.", "Restrição de 30 km/h por 24 horas para todos os trens."],
+          { explica: "ROF 14.28: após substituição de componentes de AMV, 30 km/h para o primeiro trem.",
+            apos: () => devolverLdlRoteiro("Troca da meia chave do AMV 03 concluída. Restrição de 30 quilômetros por hora para o primeiro trem.") }) }
+    ];
+  }
+
+  // ---- Catálogo dos roteiros e menu de cada treinamento ----
+  const ROTEIROS = {
+    amv:     { grupo: "amv", etiqueta: "Preventiva de AMV", modulo: "AMV · Preventiva de AMV (PRO-022721)", etapas: etapasAmv, pref: "VP",
+               falaIni: "Equipe, preventiva do AMV 03. Ninguém entra na via antes da LDL aberta.", falaFim: "Preventiva do AMV encerrada sem desvios. Bom trabalho." },
+    reset:   { grupo: "reset", etiqueta: "Manivela e reset sem a EE", modulo: "AMV · Manivela e reset da MCH sem a EE (PRO-022721 Anexo 10)", etapas: etapasReset, pref: "VP",
+               falaIni: "Equipe, vamos operar a máquina na manivela e fazer o reset sem a eletroeletrônica. Sigam a IT etapa por etapa.", falaFim: "Reset concluído e AMV com correspondência. Bom trabalho." },
+    radio:   { grupo: "radio", etiqueta: "Rádio · padrão do ROF", modulo: "Rádio · Padrão de comunicação (ROF PGS-002722)", etapas: etapasRadio, pref: "VP",
+               falaIni: "Treino de rádio. Lembrem: identificação, localização, cotejamento e câmbio.", falaFim: "Comunicação dentro do padrão do ROF." },
+    rof:     { grupo: "radio", etiqueta: "ROF na manutenção", modulo: "Rádio · ROF na manutenção (PGS-002722)", quiz: ROF_MANUT, pref: "VP" },
+    sens:    { grupo: "sens", etiqueta: "Inspeção sensitiva", modulo: "Via · Inspeção sensitiva e classificação (PRO-001164 / PGS-006334)", etapas: etapasSensitiva, pref: "VP",
+               falaIni: "Equipe, inspeção sensitiva da linha 02 e do AMV 03. Duas pessoas, EAT ligado.", falaFim: "Inspeção registrada e classificada corretamente." },
+    lub:     { grupo: "lub", etiqueta: "Lubrificação do AMV", modulo: "AMV · Lubrificação manual (PRO-016249)", etapas: etapasLubrif, pref: "VP",
+               falaIni: "Equipe, lubrificação das placas do AMV 03. Cepo sempre pela alça.", falaFim: "Lubrificação concluída sem desvios." },
+    comp:    { grupo: "comp", etiqueta: "Troca de componente", modulo: "AMV · Substituição de componentes (PRO-020971)", etapas: etapasComponentes, pref: "VP",
+               falaIni: "Equipe, troca da meia chave do AMV 03. Plano de rigging na mão e zona crítica isolada.", falaFim: "Troca concluída dentro do padrão." }
+  };
+  const MENUS_RT = {
+    amv:   { tag: "PRO-022721 rev. 13 · EFC", titulo: "Inspeção e manutenção preventiva em AMV", txt: "Você é o técnico VP: inspeção prévia, LDL, cepo, zona de risco, medições, classificação de anomalias, Yoshi Yoshi, socaria sem a EE e encerramento.", botoes: [["rt:go:amv", "Começar"]] },
+    reset: { tag: "PRO-022721 Anexo 10 · IT-SIN-N001-2024", titulo: "Manivela e reset da MCH sem a EE", txt: "As 21 etapas da IT: controle local, CDV de chave interditado, cepo, portinhola, contatos de manivela, posição NORMAL, reset, LEDs do ECC e teste com o centro de controle.", botoes: [["rt:go:reset", "Começar"]] },
+    radio: { tag: "PGS-002722 rev. 10 · ROF", titulo: "Comunicação via rádio", txt: "Padrão de rádio: canal livre, rede certa, identificação e localização, cotejamento, correção, câmbio, emergência.\nROF na manutenção: pode ou não pode? Regras dos itens 14, 23 e 44.", botoes: [["rt:go:radio", "Padrão de\nrádio"], ["rt:go:rof", "ROF na\nmanutenção"]] },
+    sens:  { tag: "PRO-001164 rev. 11 · PGS-006334 rev. 03", titulo: "Inspeção sensitiva e classificação de defeitos", txt: "Regras da inspeção, uso do vampiro, fratura na rota e 5 defeitos sorteados para classificar (P0, P1F, P1, P2, dormentes A e I).", botoes: [["rt:go:sens", "Começar"]] },
+    lub:   { tag: "PRO-016249 rev. 08 · EFC", titulo: "Lubrificação manual do AMV", txt: "LDL, cepo, limpeza das placas, graxa grafitada na reta e na reversa, comando com autorização do centro de controle e roletes. Chuva e perda de indicação podem ser sorteadas.", botoes: [["rt:go:lub", "Começar"]] },
+    comp:  { tag: "PRO-020971 rev. 10 · EFC", titulo: "Substituição de componentes de AMV", txt: "Troca da meia chave nº 20 VAE em decisões: temperatura neutra, marcação e corte, rigging, zona crítica, junta metálica, bondeamento e primeiro trem.\nAinda sem os modelos 3D da meia chave e do jacaré.", botoes: [["rt:go:comp", "Começar"]] }
+  };
+  function menuRoteiro(g) {
+    fecharDemo();
+    mode = "menuRt"; pulseIds = []; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar();
+    estadoLdlObjetos("off", false, "off"); mostrarCepo(false);
+    if (posicao !== "normal") moverAmv("normal", false);
+    const m = MENUS_RT[g];
+    drawPanel(m.tag, m.titulo, "Participante: " + quem() + ".\n" + m.txt);
+    setButtons(m.botoes.concat([["menu", "Menu\nCTS-2"]]));
+  }
+  function startRoteiro(id) {
+    const r = ROTEIROS[id];
+    menuRoteiro(r.grupo);
+    if (licenca.ativa) devolverLinha("Linha devolvida ao iniciar outro treino");
+    const f = { num: 100 + Math.floor(Math.random() * 900), prefixo: r.pref + "-" + (10 + Math.floor(Math.random() * 80)) };
+    const cfg = Object.assign({ id }, r);
+    let etapas;
+    if (r.quiz) {
+      const P = "Pode", N = "Não pode";
+      etapas = embaralhar(r.quiz).slice(0, 6).map(([t, s, ex]) => ({ decisao: { titulo: "Pode ou não pode?", visto: t, opcoes: s === "s" ? [["c", P], ["e0", N]] : [["e0", P], ["c", N]], explica: ex, fixas: true, nome: t,
+        botoes: s === "s" ? { c: P, e0: N } : { c: N, e0: P } } }));
+    } else etapas = r.etapas(f);
+    mode = "ldl";
+    ldl = { tipo: "rt", cfg, f, etapas, i: -1, achados: [], criticos: [], errosPeca: 0, t0: performance.now(), d: null, ev0: licenca.eventos.length, aberta: false };
+    if (r.falaIni) coordenadorFala(r.falaIni);
+    avancarLdl();
+  }
+  function acaoRoteiro(b) {
+    if (b.startsWith("rt:menu:")) return menuRoteiro(b.slice(8));
+    if (b.startsWith("rt:go:")) return startRoteiro(b.slice(6));
+  }
+
   // ---------- Biblioteca de treinamentos ----------
   const TREINAMENTOS = [
     { id: "cts2", titulo: "Manutenção preventiva da máquina de chave CTS-2", pro: "PRO-001122 · Anexo 5", txt: "Tour, passo 1, passos 2 a 17, máquina funcionando e explorar por dentro.", abrir: () => showMenu() },
     { id: "desafios", titulo: "Desafios de defeitos em máquinas de chave", pro: "Baseado no PRO-001122", txt: "Um defeito é sorteado: ouça o sintoma, inspecione, meça e diagnostique a causa.", abrir: () => menuDesafios() },
     { id: "ldl", titulo: "Liberação e Devolução de Linha (LDL)", pro: "PGS-003781 rev. 06 · EFC", txt: "Seja o coordenador mestre de uma LDL com o CCP: placa, chamada, jumper, cotejamento, imprevistos, devolução. E o quiz Precisa de LDL?", abrir: () => menuLdl() },
-    { id: "radio", titulo: "Comunicação via rádio", pro: "Procedimento de comunicação", txt: "Padrão de comunicação com o CCP e a equipe. Será usado também nos outros treinamentos.", abrir: null }
+    { id: "radio", titulo: "Comunicação via rádio", pro: "PGS-002722 rev. 10 · ROF", txt: "Padrão de rádio do ROF (canal, identificação, cotejamento, correção, câmbio, emergência) e o quiz ROF na manutenção.", abrir: () => menuRoteiro("radio") },
+    { id: "amv", titulo: "Inspeção e manutenção preventiva em AMV", pro: "PRO-022721 rev. 13 · EFC", txt: "Técnico VP: inspeção prévia, LDL, cepo, zona de risco, medições, classificação de anomalias, Yoshi Yoshi e encerramento.", abrir: () => menuRoteiro("amv") },
+    { id: "reset", titulo: "Manivela e reset da MCH sem a EE", pro: "PRO-022721 Anexo 10 · IT-SIN-N001-2024", txt: "As 21 etapas da IT, do controle local e do CDV de chave interditado ao reset e ao teste de correspondência.", abrir: () => menuRoteiro("reset") },
+    { id: "sens", titulo: "Inspeção sensitiva e classificação de defeitos", pro: "PRO-001164 rev. 11 · PGS-006334 rev. 03", txt: "Regras da inspeção sensitiva e defeitos sorteados para classificar em P0, P1F, P1 e P2.", abrir: () => menuRoteiro("sens") },
+    { id: "lub", titulo: "Lubrificação manual do AMV", pro: "PRO-016249 rev. 08 · EFC", txt: "Cepo, limpeza das placas, graxa grafitada na reta e na reversa, comando com autorização e roletes.", abrir: () => menuRoteiro("lub") },
+    { id: "comp", titulo: "Substituição de componentes de AMV", pro: "PRO-020971 rev. 10 · EFC", txt: "Troca da meia chave nº 20 VAE em decisões: temperatura, corte, rigging, zona crítica, junta e primeiro trem.", abrir: () => menuRoteiro("comp") }
   ];
   const bibEl = document.getElementById("bib");
   function abrirBib() {
@@ -2308,7 +2756,12 @@ body.vr #stick { display: none; }
     for (const t of TREINAMENTOS) {
       const b = document.createElement("button"); b.type = "button"; b.disabled = !t.abrir;
       b.innerHTML = `<small>${esc(t.pro)}</small><b>${esc(t.titulo)}</b><span>${esc(t.txt)}</span><i>${t.abrir ? "Disponível" : "Em preparação"}</i>`;
-      if (t.abrir) b.onclick = () => { bibEl.hidden = true; t.abrir(); };
+      if (t.abrir) b.onclick = () => {
+        bibEl.hidden = true;
+        if (ldl) { if (ldl.aberta) devolverLinha(`LDL ${ldl.f.num} interrompida (saiu pela biblioteca)`); ldl = null; }
+        estadoLdlObjetos("off", false, "off"); mostrarCepo(false);
+        t.abrir();
+      };
       l.appendChild(b);
     }
     bibEl.hidden = false;
@@ -2450,6 +2903,7 @@ body.vr #stick { display: none; }
       if (b === "menu") return showMenu();
       if (b.startsWith("linha:")) return respostaCcp(b === "linha:devolver");
       if (b.startsWith("ldl:")) return acaoLdl(b);
+      if (b.startsWith("rt:")) return acaoRoteiro(b);
       if (b === "licenca") return pedirLicenca(() => { if (mode === "pro" && pro && pro.i < 0) telaInicioPro(); else if (mode === "menu") showMenu(); else if (mode === "desafio" && dz) telaDesafio("Licença concedida. Pode investigar a máquina."); });
       if (b === "devolver") { devolverLinha("Devolveu a linha ao CCP ao terminar"); coordenadorFala("CCP, a equipe terminou e devolve a linha. Via livre para circulação.", false, "Mantenedor"); return showMenu(); }
       if (mode === "pro" && pro && pro.d) return decidirPro(b);
