@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v13/10 locomotiva</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v13/10 trem e encosto</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -224,7 +224,8 @@ body.vr #stick { display: none; }
 (() => {
   // ---------- Conteúdo (Anexo 5 do PRO-001122) ----------
   const PARTS = {
-    agulhas:   { nome: "Agulhas e trilhos de encosto", txt: "A MCH movimenta as agulhas (normal/reverso) e as faceia no trilho de encosto. Passo 2: agulha desgastada, calço solto, lança tensionada." },
+    agulhas:   { nome: "Agulhas", txt: "A MCH movimenta as agulhas (normal/reverso) e as faceia no trilho de encosto. Passo 2: agulha desgastada, calço solto, lança tensionada." },
+    encosto:   { nome: "Trilho de encosto", txt: "Trilho fixo onde a agulha fecha (encosta). Medir o desgaste com o vampiro; o cepo vai entre ele e a agulha aberta. Do lado do desvio, é curvo." },
     clips:     { nome: "Clips (engates)", txt: "Ligam as barras às agulhas. Passo 4: clips folgados ou com isolante danificado. Passo 10: espaçadores ajustam a pressão." },
     barra:     { nome: "Barra de acionamento e barra auxiliar", txt: "Passo 8: verificar pino, porca e livre movimentação. Teste de quebra de clipe após ajuste de porca ou chapas espaçadoras." },
     dormente:  { nome: "Dormente oco", txt: "Abriga as barras. Passo 2: remover pedras, brita ou minério de dentro. Passo 5: alinhado ao eixo central da MCH." },
@@ -410,6 +411,22 @@ body.vr #stick { display: none; }
   const agF = trilho(-1, 6, 0.6579, 0.85, aco); agulhas.add(agF);
   const agA = trilho(-1, 6, -0.7264, 0.85, aco); agulhas.add(agA);
   scene.add(part("agulhas", agulhas));
+  // Trilhos de encosto na região das agulhas: o modelo da ferrovia não separa essas peças, então uma capa
+  // invisível acompanha cada um (medido no ferrovia_amv.glb) para o toque e para o brilho quando é a peça da etapa.
+  // Lado +z: reto em z = 0,80. Lado -z (desvio): curvo, abrindo de 0,83 para 1,00 m até o fim das agulhas.
+  const encosto = new THREE.Group();
+  const ENCOSTO_LINHAS = [
+    [[-1.5, 0.8], [4.5, 0.8]],
+    [[-1.5, -0.832], [-1, -0.84], [-0.5, -0.852], [0, -0.86], [0.5, -0.872], [1, -0.884], [1.5, -0.9], [2, -0.916], [2.5, -0.932], [3, -0.948], [3.5, -0.964], [4, -0.984], [4.5, -1.004]]
+  ];
+  const capaMat = mat(0xffc94a, { transparent: true, opacity: 0, depthWrite: false });
+  ENCOSTO_LINHAS.forEach(L => L.slice(1).forEach(([x1, z1], i) => {
+    const [x0, z0] = L[i], c = box(Math.hypot(x1 - x0, z1 - z0) + 0.01, 0.18, 0.09, capaMat);
+    c.position.set((x0 + x1) / 2, Y_PATIM + 0.085, (z0 + z1) / 2); c.rotation.y = -Math.atan2(z1 - z0, x1 - x0);
+    encosto.add(c);
+  }));
+  scene.add(part("encosto", encosto));
+  encosto.traverse(o => { if (o.isMesh) { o.userData.capa = true; o.castShadow = o.receiveShadow = false; } });
 
   const clips = new THREE.Group();
   const ferro = mat(0x3f4449, { metalness: 0.6 });
@@ -1060,7 +1077,7 @@ body.vr #stick { display: none; }
     const agora = performance.now();
     if (!trem.prox) trem.prox = agora + intervaloTrem();
     if (licenca.ativa) {
-      if (!licenca.pedido && !busy && mode !== "ldl" && agora - licenca.desde > intervaloTrem()) pedidoCcp();
+      if (!licenca.pedido && !busy && !ccpSalvo && agora - licenca.desde > intervaloTrem()) pedidoCcp();
     } else if (!trem.ativo && agora >= trem.prox) chamarTrem();
     if (!trem.ativo) return;
     trem.x += trem.dir * 16 * dt;
@@ -1084,7 +1101,10 @@ body.vr #stick { display: none; }
       trem.ativo = false; tremGrupo.visible = false; trem.prox = agora + intervaloTrem();
       if (licenca.retomar) {
         licenca.retomar = false; licenca.ativa = true; licenca.desde = performance.now(); licenca.pedido = false;
-        coordenadorFala("Trem passou. Licença renovada: a equipe pode voltar à via.", false, "CCP");
+        coordenadorFala(`${quemLdl()[0].toUpperCase() + quemLdl().slice(1)}, aqui é o CCP. O trem passou e a via está livre. Linha liberada de novo às ${horaTxt(new Date())}: reinstalem o jumper e a equipe pode voltar à via.`, false, "CCP");
+        licenca.eventos.push("CCP liberou a linha de novo depois da passagem do trem");
+        if (ccpSalvo) { estadoLdlObjetos(ccpSalvo.pt ? "on" : "off", false, ccpSalvo.jp ? "on" : "off"); mostrarCepo(ccpSalvo.cepo); }
+        restaurarCcp();
       }
     }
   }
@@ -1115,28 +1135,63 @@ body.vr #stick { display: none; }
     licenca.ativa = false; licenca.pedido = false; trem.prox = performance.now() + intervaloTrem();
     licenca.eventos.push(motivo || "Linha devolvida ao CCP");
   }
+  // Com a linha licenciada (licença ou LDL), o trem só passa depois do protocolo: o CCP avisa o coordenador que vai
+  // passar trem, a equipe para, recolhe o material e sai da via pela rota de fuga, o coordenador confirma pelo rádio
+  // e devolve a linha; só então o CCP autoriza o trem. Depois que ele passa, o CCP libera a linha de novo.
   let ccpSalvo = null;
+  const quemLdl = () => ldl && ldl.f && ldl.aberta ? `coordenador da LDL ${ldl.f.num}` : "equipe da máquina de chave";
   function pedidoCcp() {
     licenca.pedido = true;
-    ccpSalvo = { painel: ultimoPainel, botoes: ultimaLista, pulse: pulseIds };
+    ccpSalvo = { painel: ultimoPainel, botoes: ultimaLista, pulse: pulseIds, cepo: cepo.visible, pt: placaPT.visible, jp: jumper.visible };
     pulseIds = [];
-    coordenadorFala("Equipe, aqui é o CCP. Precisamos circular um trem de minério nesta via. Vocês devolvem a linha para circulação parcial?", true, "CCP");
-    drawPanel("Rádio · CCP", "O CCP pede a linha para passar um trem",
-      "Devolver a linha exige recolher ferramentas, deixar a máquina travada e com indicação, e sair da via. Se a máquina não estiver em condição segura, mantenha a interdição e informe o CCP.", "#3ea0e4");
-    setButtons([["linha:devolver", "Devolver a\nlinha"], ["linha:manter", "Manter a\ninterdição"]]);
+    const q = quemLdl();
+    coordenadorFala(`${q[0].toUpperCase() + q.slice(1)}, aqui é o CCP. Trem de minério previsto para passar pelo AMV 03 em poucos minutos. Parem a atividade, retirem a equipe e o material da via e devolvam a linha para a passagem do trem.`, true, "CCP");
+    drawPanel("Rádio · CCP", "O CCP avisa que vai passar trem",
+      "Antes de devolver a linha: parar a atividade, recolher as ferramentas, retirar o cepo e o jumper, deixar a máquina travada e com indicação e tirar todos da via pela rota de fuga. Só depois confirmar ao CCP.\nSe a máquina não estiver em condição segura, mantenha a interdição e informe o CCP.", "#3ea0e4");
+    setButtons([["linha:retirar", "Retirar a\nequipe"], ["linha:manter", "Manter a\ninterdição"]]);
   }
-  function respostaCcp(devolver) {
-    const min = Math.round((performance.now() - licenca.desde) / 60000);
-    if (devolver) {
-      devolverLinha(`Devolveu a linha ao CCP para circulação parcial (após ${min} min de licença)`);
-      licenca.retomar = true; trem.prox = performance.now() + 15000;
-      coordenadorFala("Linha devolvida. Trem autorizado em circulação parcial. Equipe, saiam da via!", true, "CCP");
-    } else {
-      licenca.eventos.push(`Manteve a interdição quando o CCP pediu a linha (após ${min} min de licença)`);
-      licenca.desde = performance.now(); licenca.pedido = false;
-      coordenadorFala("CCP ciente. Trem retido aguardando a liberação da via. Agilizem a atividade.", false, "CCP");
+  function acaoLinha(b) {
+    if (b === "linha:manter") return manterInterdicao();
+    if (b === "linha:retirar") return retirarEquipe();
+    if (b === "linha:confirmar") return confirmarDevolucao();
+  }
+  function retirarEquipe() {
+    coordenadorFala(`CCP, ${quemLdl()}. Ciente do trem. Vamos retirar a equipe e o material e confirmo a devolução.`, false, "Coordenador");
+    coordenadorFala("Equipe, parar a atividade. Recolham as ferramentas, retirem o cepo e o jumper e saiam da via pela rota de fuga.", false, "Coordenador");
+    guardarFerramentas(); mostrarCepo(false); mantenedorVoltar();
+    estadoLdlObjetos(ccpSalvo && ccpSalvo.pt ? "on" : "off", false, "off");
+    licenca.eventos.push("CCP avisou a passagem do trem; equipe parou e saiu da via");
+    drawPanel("Rádio · CCP", "Saia da via antes de confirmar",
+      "A equipe está saindo pela rota de fuga. Você também precisa ficar fora do gabarito, a mais de 2,12 m do eixo da via. Ande para fora dos trilhos e só então confirme ao CCP.", "#3ea0e4");
+    setButtons([["linha:confirmar", "Confirmar\nao CCP"]]);
+  }
+  function confirmarDevolucao() {
+    if (olhoNaVia().naVia) {
+      som.erro(); licenca.eventos.push("Tentou devolver a linha ao CCP ainda dentro da via");
+      if (mode === "ldl" && ldl) ldl.errosPeca++;
+      drawPanel("Rádio · CCP", "Você ainda está na via", "Não confirme ao CCP com alguém dentro do gabarito. Saia da via (mais de 2,12 m do eixo) e confirme de novo.", "#e5533d");
+      return setButtons([["linha:confirmar", "Confirmar\nao CCP"]]);
     }
-    if (ccpSalvo) { drawPanel.apply(null, ccpSalvo.painel); setButtons(ccpSalvo.botoes); pulseIds = ccpSalvo.pulse; ccpSalvo = null; }
+    const min = Math.round((performance.now() - licenca.desde) / 60000);
+    coordenadorFala(`CCP, ${quemLdl()}. Equipe e material fora da via, cepo e jumper retirados, AMV 03 travado e com indicação. Linha devolvida para a passagem do trem.`, false, "Coordenador");
+    coordenadorFala(`Ciente. Linha recebida às ${horaTxt(new Date())}. Trem de minério autorizado. Permaneçam fora da via até nova liberação.`, false, "CCP");
+    devolverLinha(`Devolveu a linha ao CCP para a passagem do trem, com a equipe fora da via (após ${min} min de licença)`);
+    licenca.retomar = true; trem.prox = performance.now() + 22000;
+    drawPanel("Rádio · CCP", "Aguarde o trem passar", "Linha devolvida. Fique fora da via até o CCP liberar de novo.", "#3ea0e4");
+    setButtons([]);
+  }
+  function manterInterdicao() {
+    const min = Math.round((performance.now() - licenca.desde) / 60000);
+    licenca.eventos.push(`Manteve a interdição quando o CCP avisou o trem (após ${min} min de licença)`);
+    licenca.desde = performance.now(); licenca.pedido = false;
+    coordenadorFala(`CCP, ${quemLdl()}. A máquina não está em condição segura; mantenho a interdição.`, false, "Coordenador");
+    coordenadorFala("CCP ciente. Trem retido aguardando a liberação da via. Agilizem a atividade.", false, "CCP");
+    restaurarCcp();
+  }
+  function restaurarCcp() {
+    if (!ccpSalvo) return;
+    drawPanel.apply(null, ccpSalvo.painel); setButtons(ccpSalvo.botoes); pulseIds = ccpSalvo.pulse;
+    ccpSalvo = null;
   }
 
   // ---------- Painel de texto e botões no mundo 3D ----------
@@ -2363,7 +2418,7 @@ body.vr #stick { display: none; }
   function tocarLdl(id) {
     const e = ldl.etapas[ldl.i];
     if (!e || !e.alvo) return;
-    if (id === "cepo" && e.alvo === "agulhas") id = "agulhas";   // o cepo fica sobre as agulhas
+    if ((id === "cepo" || id === "encosto") && e.alvo === "agulhas") id = "agulhas";   // o cepo vai entre a agulha e o trilho de encosto
     if (e.errado && e.errado[id]) { ldl.criticos.push(e.errado[id]); alertaRisco(e.errado[id]); return; }
     if (id !== e.alvo) {
       ldl.errosPeca++; som.erro();
@@ -2667,8 +2722,8 @@ body.vr #stick { display: none; }
           "Só com LDL aberta e usando o EAT o tempo todo.", ["Pode ir sem LDL: inspeção visual não precisa.", "Basta avisar o CCP que vai entrar."],
           { explica: "PRO-001164 8.2.5 e 10.1: inspeção sobre a via em pátio, terminal, AMV e TU só com LDL aberta, com EAT durante toda a inspeção.",
             critico: { e0: "Inspecionou sobre a via sem LDL.", e1: "Inspecionou sobre a via sem LDL." }, apos: () => abrirLdlRoteiro("inspeção sensitiva") }) },
-      tocar("agulhas", "Meça o desgaste", "Com o vampiro, meça o desgaste do trilho de encosto. Toque no trilho junto às agulhas.",
-        { feito: () => mostrarFerramenta("regua", centroPeca("agulhas"), "F e C") }),
+      tocar("encosto", "Meça o desgaste", "Com o vampiro, meça o desgaste do trilho de encosto. Toque no trilho de encosto, o trilho fixo do lado de fora da agulha.",
+        { feito: () => mostrarFerramenta("regua", centroPeca("encosto"), "F e C") }),
       { decisao: escolha("Uso do vampiro", "Como posicionar o medidor de desgaste (vampiro)?",
           "Trilho limpo, agulha C para o lado de dentro da bitola, ler F e C e converter pela tabela de desgaste.",
           ["Agulha C para fora da bitola e ler só a F.", "Medir sem limpar: a sujeira não altera a leitura."],
@@ -2991,6 +3046,7 @@ body.vr #stick { display: none; }
 
   function select(id) {
     if (!id || busy) return;
+    if (ccpSalvo && id !== "chao" && !id.startsWith("btn:linha:")) { hint("Primeiro atenda o CCP: a passagem do trem vem antes da atividade."); return; }
     if (id !== "chao") {
       const b = id.startsWith("btn:") && ultimaLista.find(x => "btn:" + x[0] === id);
       avalEnviar("toque", b ? "Botão: " + b[1].replace(/\n/g, " ") : (PARTS[id] ? PARTS[id].nome : objToque && objToque.name ? rotulo(objToque.name) : id));
@@ -2999,7 +3055,7 @@ body.vr #stick { display: none; }
       som.selecionar();
       const b = id.slice(4);
       if (b === "menu") return showMenu();
-      if (b.startsWith("linha:")) return respostaCcp(b === "linha:devolver");
+      if (b.startsWith("linha:")) return acaoLinha(b);
       if (b.startsWith("ldl:")) return acaoLdl(b);
       if (b.startsWith("rt:")) return acaoRoteiro(b);
       if (b === "licenca") return pedirLicenca(() => { if (mode === "pro" && pro && pro.i < 0) telaInicioPro(); else if (mode === "menu") showMenu(); else if (mode === "desafio" && dz) telaDesafio("Licença concedida. Pode investigar a máquina."); });
@@ -3229,7 +3285,12 @@ body.vr #stick { display: none; }
   el.addEventListener("pointerdown", () => { toqueInicio = performance.now(); });
   // primeiro acerto visível e que não esteja transparente (raio-X)
   function visivel(o) { while (o) { if (!o.visible) return false; o = o.parent; } return true; }
-  const acerto = hits => hits.find(h => !h.object.userData.ghost && visivel(h.object));
+  const acerto = hits => {
+    const vis = hits.filter(h => !h.object.userData.ghost && visivel(h.object)), h0 = vis[0];
+    if (!h0 || !pulseIds.length) return h0;
+    const alvo = vis.find(h => h.object.userData.id === pulseIds[0] && h.distance < h0.distance + 0.35);
+    return alvo || h0;
+  };
   function alvoDoToque(e) {
     if (vr) return { id: hovered, ponto: pontoChao, obj: hoveredObj, p3: hoveredPt };
     const r = el.getBoundingClientRect();
@@ -3441,7 +3502,11 @@ body.vr #stick { display: none; }
   let pontoChao = null;
 
   function highlight(id, amount, color) {
-    for (const m of partGroups[id] || []) { if (m === lampObj && amount === 0) continue; m.material.emissive.setHex(color); m.material.emissiveIntensity = amount; }
+    for (const m of partGroups[id] || []) {
+      if (m === lampObj && amount === 0) continue;
+      m.material.emissive.setHex(color); m.material.emissiveIntensity = amount;
+      if (m.userData.capa) m.material.opacity = amount > 0 ? Math.min(0.8, 0.25 + amount) : 0;   // capa do trilho de encosto: só aparece quando brilha
+    }
   }
 
   function loop() {
