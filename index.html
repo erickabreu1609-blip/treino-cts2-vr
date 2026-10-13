@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v09/10 00h</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v13/10 LDL</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -240,6 +240,9 @@ body.vr #stick { display: none; }
     conA:      { nome: "Conector militar A", txt: "Passo 1: inspecionar visualmente e girar com a mão. Folgado: reapertar. Quebrado: substituir." },
     conB:      { nome: "Conector militar B", txt: "Passo 1: inspecionar visualmente e girar com a mão. Folgado: reapertar. Quebrado: substituir." },
     cordoalha: { nome: "Cordoalha de aterramento", txt: "Passo 6: ausente, desconectada, terminal folgado, quebrado ou oxidado." },
+    placaPT:   { nome: "Placa Pessoas Trabalhando", txt: "Fora do gabarito de circulação (2,12 m do eixo), instalada antes de chamar o centro de controle (PGS-003781)." },
+    placaDentro: { nome: "Placa dentro do gabarito", txt: "Posição errada: entre os trilhos, dentro do gabarito de circulação." },
+    jumper:    { nome: "Jumper fixo (shunt)", txt: "Gera a ocupação forçada do circuito de via. Instalar e retirar só com autorização do centro de controle (PGS-003781 Anexo 06)." },
     dam:       { nome: "DAM", txt: "Dispositivo de Acionamento da MCH. Com o DAM, todo comando elétrico segue a etapa 3 da IT-DAM e dispensa o Yoshi Yoshi." }
   };
 
@@ -958,7 +961,7 @@ body.vr #stick { display: none; }
     const agora = performance.now();
     if (!trem.prox) trem.prox = agora + intervaloTrem();
     if (licenca.ativa) {
-      if (!licenca.pedido && !busy && agora - licenca.desde > intervaloTrem()) pedidoCcp();
+      if (!licenca.pedido && !busy && mode !== "ldl" && agora - licenca.desde > intervaloTrem()) pedidoCcp();
     } else if (!trem.ativo && agora >= trem.prox) chamarTrem();
     if (!trem.ativo) return;
     trem.x += trem.dir * 16 * dt;
@@ -993,6 +996,7 @@ body.vr #stick { display: none; }
     licenca.eventos.push("ATINGIDO PELO TREM (estava na via durante a circulação)");
     if (mode === "pro" && pro) pro.criticos++;
     if (mode === "desafio" && dz) dz.riscos++;
+    if (mode === "ldl" && ldl) ldl.criticos.push("Atingido pelo trem: estava na via durante a circulação");
     registrarResultado({ modulo: "Segurança · circulação de trem", segundos: 0, avaliacoes: 1, avaliacoesCertas: 0, errosPeca: 0, bloqueios: 1, detalhes: "Atingido pelo trem de minério: estava na via sem licença do CCP ou após devolver a linha" });
     teleportar({ x: rig.position.x, z: 3.6 });
   }
@@ -1352,6 +1356,7 @@ body.vr #stick { display: none; }
   function showMenu() {
     fecharDemo();
     mode = "menu"; pulseIds = []; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar();
+    try { estadoLdlObjetos("off", false, "off"); } catch (e) {}   // placas e jumper do treino de LDL
     drawPanel("Treinamento PRO-001122 · Anexo 5", "Manutenção preventiva da máquina de chave CTS-2",
       "Participante: " + quem() + ".\nEscolha um módulo tocando no botão. Antes de entrar na via, peça licença ao CCP. Sem licença passa trem de minério a cada " + (cfg.trem || 10) + " min.");
     setButtons([["tour", "Tour da\nmáquina"], ["passos0", "Passos\n1 a 17"], ["demo", "Máquina\nfuncionando"], ["explorar", "Explorar\npor dentro"], ["desafios", "Desafios\nde defeitos"], [licenca.ativa ? "devolver" : "licenca", licenca.ativa ? "Devolver a\nlinha ao CCP" : "Pedir licença\nao CCP"]]);
@@ -1996,10 +2001,305 @@ body.vr #stick { display: none; }
     setButtons([["dz:sorte", "Novo\ndesafio"], ["desafios", "Desafios"], ["menu", "Menu"]]);
   }
 
+  // ---------- LDL: Liberação e Devolução de Linha (PGS-003781 rev. 06, EFC) ----------
+  // LDL MT em pátio sinalizado, com o CCP, para manutenção eletroeletrônica na MCH CTS-2 da cena.
+  // O participante é o coordenador mestre (dono da LDL). Mapeamento: vr-cts2/ldl/mapeamento-pro-ldl.md
+  function placaLosango(linhas, fundo, letra) {
+    const tx = canvasTex(512, 512), g = tx.ctx;
+    g.translate(256, 256); g.rotate(Math.PI / 4);
+    g.fillStyle = "#d8c000"; g.fillRect(-172, -172, 344, 344);
+    g.fillStyle = fundo; g.fillRect(-156, -156, 312, 312);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = letra; g.font = `700 54px ${FONT}`; g.textAlign = "center"; g.textBaseline = "middle";
+    linhas.forEach((l, k) => g.fillText(l, 256, 256 + (k - (linhas.length - 1) / 2) * 62, 400));
+    tx.t.needsUpdate = true;
+    const grupo = new THREE.Group();
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.75), mat(0xffffff, { map: tx.t, transparent: true, side: THREE.DoubleSide, roughness: 0.6 }));
+    face.position.y = 1.55; grupo.add(face);
+    const poste = cyl(0.03, 1.25, mat(0x8a8f94, { metalness: 0.5 }), 8); poste.position.y = 0.62; grupo.add(poste);
+    return grupo;
+  }
+  function translucido(obj, k) {
+    obj.traverse(o => { if (o.isMesh) { o.material.transparent = true; o.material.opacity = k; o.material.depthWrite = k > 0.9; } });
+  }
+  const placaPT = placaLosango(["PESSOAS", "TRABALHANDO"], "#f07a1a", "#111111");
+  placaPT.position.set(-11, alturaLastro(2.7), 2.7); placaPT.rotation.y = Math.PI / 4; placaPT.visible = false;
+  scene.add(part("placaPT", placaPT));
+  const placaDentro = placaLosango(["PESSOAS", "TRABALHANDO"], "#f07a1a", "#111111");
+  placaDentro.position.set(-11, alturaLastro(0), 0); placaDentro.rotation.y = Math.PI / 4; placaDentro.visible = false;
+  scene.add(part("placaDentro", placaDentro));
+  const jumper = new THREE.Group();
+  (function montarJumper() {
+    const yb = Y_PATIM + 6.5 * 0.0254;
+    const garra = mat(0xb0b4b8, { metalness: 0.7, roughness: 0.4 }), cabo = mat(0xd9c400, { roughness: 0.5 });   // cor do mês no cabo
+    [-BITOLA_Z, BITOLA_Z].forEach(z => { const g = box(0.08, 0.06, 0.1, garra); g.position.set(0, yb - 0.02, z + Math.sign(z) * 0.06); jumper.add(g); });
+    const pts = []; for (let k = 0; k <= 16; k++) { const t = k / 16; pts.push(new THREE.Vector3(Math.sin(t * Math.PI * 3) * 0.06, yb - 0.04 - Math.sin(t * Math.PI) * 0.1, -BITOLA_Z - 0.06 + t * (2 * BITOLA_Z + 0.12))); }
+    jumper.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.012, 6), cabo));
+  })();
+  jumper.position.set(-3, 0, 0); jumper.visible = false;
+  scene.add(part("jumper", jumper));
+  function estadoLdlObjetos(pt, dentro, jp) {
+    placaPT.visible = pt !== "off"; translucido(placaPT, pt === "on" ? 1 : 0.4);
+    placaDentro.visible = !!dentro; translucido(placaDentro, 0.4);
+    jumper.visible = jp !== "off"; translucido(jumper, jp === "on" ? 1 : 0.4);
+  }
+
+  const embaralhar = a => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+  const horaTxt = d => String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  // Decisão de múltipla escolha: opções [id, texto]; a primeira é a correta (são embaralhadas na tela).
+  const escolha = (titulo, visto, certa, erradas, extra) => Object.assign({ titulo, visto, opcoes: [["c", certa]].concat(erradas.map((t, k) => ["e" + k, t])) }, extra);
+
+  function etapasLdl(f) {
+    const pref = f.prefixo, lin = "linha 02", amv = "AMV 03";
+    const licencaTxt = `LDL número ${f.num}, ${lin} e ${amv}, das ${f.ini} às ${f.fim}, rota de fuga pela linha 03`;
+    const imprevistos = {
+      equipe: escolha("Outra equipe quer entrar", "Um coordenador da Via Permanente chega com 3 executantes e pede para trabalhar na sua LDL.",
+        "Só entra se estiver na programação D-1, com coordenador secundário, jumper próprio e na mesma frequência de rádio.",
+        ["Pode entrar e usar o nosso jumper: o circuito já está ocupado.", "Pode entrar; se precisar falar com a gente, o CCP faz a ponte pelo rádio."],
+        { explica: "PGS item 12: inclusão só se programada em D-1, jumper exclusivo por equipe, uma única frequência de rádio e proibido usar o CCO/CCP como ponte." }),
+      alerta: escolha("Alerta vermelho", "O CCP avisa alerta vermelho na região e a equipe confirma descargas atmosféricas próximas.",
+        "Paralisar as atividades, sair da via e informar o CCP.",
+        ["Acelerar para terminar antes de a chuva chegar.", "Continuar: com a LDL aberta não passa trem."],
+        { explica: "PGS item 11: em alerta vermelho (chuva, vento, descarga atmosférica ou fogo) confirmado no campo, paralisar e informar o centro de controle." }),
+      extensao: escolha("Serviço fora da programação", "Para trocar um cabo seria preciso trabalhar também no AMV 05, que não está na programação desta LDL.",
+        "Não pedir extensão: o serviço no AMV 05 precisa ser reprogramado.",
+        ["Pedir ao CPT para incluir o AMV 05 nesta LDL.", "Ir até o AMV 05 rapidamente, sem avisar o CCP."],
+        { explica: "PGS item 11, \"Importante\": não fazer solicitações ao CPT para extensão da região de trabalho que não esteja na programação.", critico: { e1: "Foi trabalhar em AMV fora da LDL sem avisar o CCP." } }),
+      exclusivo: escolha("Pedido de ajuda", "A equipe tem 5 executantes e falta uma pessoa para apertar os bornes. Pedem para você, coordenador, ajudar.",
+        "Não: com mais de 3 executantes o coordenador fica só coordenando.",
+        ["Ajudar, mantendo o rádio na cintura.", "Ajudar e pedir ao CCP para avisar se vier trem."],
+        { explica: "PGS item 8: em atividades com mais de 3 executantes o coordenador não pode fazer outras atividades nem intervir em ativos." })
+    };
+    const imp = embaralhar(Object.keys(imprevistos)).slice(0, 2).map(k => ({ decisao: imprevistos[k] }));
+    return [
+      { decisao: escolha("Quem pede a LDL", `Ordem de manutenção programada em D-1: preventiva da MCH CTS-2 do ${amv}, ${lin} do pátio. Quem chama o CCP para pedir a LDL?`,
+          "Você, coordenador mestre: treinado no PGS de LDL, na lista de autorizados e indicado na programação.",
+          ["Qualquer executante da equipe que chegar primeiro ao local.", "O técnico mais experiente, mesmo fora da lista de autorizados."],
+          { explica: "PGS itens 6 e 8: a LDL é concedida ao coordenador mestre, que é o solicitante e dono da LDL. O CCP confere a lista de autorizados e a programação." }) },
+      { alvo: "placaPT", titulo: "Instale a placa \"Pessoas Trabalhando\"", corpo: "Passo 1 do PGS: ao chegar, afixe a placa na parte externa da via, sem ocupar o gabarito de circulação (2,12 m do eixo). Toque no local certo entre as placas marcadas.",
+        prep: () => estadoLdlObjetos("ghost", true, "off"), errado: { placaDentro: "Placa instalada dentro do gabarito, sem LDL: a equipe ocupou a via." },
+        feito: () => { estadoLdlObjetos("on", false, "off"); som.encaixe(); } },
+      { decisao: escolha("Chamada ao CCP", "Passo 2: apresente-se ao CCP. Qual chamada fazer?",
+          `"CCP, aqui é ${pref}, coordenador mestre, no pátio, ${lin}, ${amv}. Solicito LDL para a preventiva da MCH CTS-2, programada para hoje."`,
+          ["\"CCP, aqui é a equipe da via. Vamos entrar na linha para mexer na chave.\"", `Instalar o jumper na ${lin} e só depois chamar o CCP.`],
+          { explica: "Passo 2 do PGS: o coordenador mestre se apresenta chamando com seu prefixo e local de trabalho. A ocupação forçada (jumper) só pode ser feita após contato com o centro de controle.",
+            critico: { e1: "Instalou o jumper antes de falar com o CCP." }, apos: () => {
+              coordenadorFala(`CCP, aqui é ${pref}, coordenador mestre, no pátio, ${lin}, ${amv}. Solicito LDL para a preventiva da máquina de chave, programada para hoje.`, false, "Coordenador mestre");
+              coordenadorFala(`${pref}, aqui é o CCP. Atividade conferida na programação e na lista de autorizados. Vamos ao check-list.`, false, "CCP");
+            } }) },
+      { decisao: escolha("Check-list do CCP", "O CCP pergunta: o solicitante e a equipe são treinados em LDL e ROF? A equipe tem as placas conforme o ROF?",
+          "Sim para os dois: todos treinados e a placa Pessoas Trabalhando instalada.",
+          ["Sim, só um executante novo não fez o treinamento; ele fica apenas olhando.", "Não temos placa, mas o serviço é rápido."],
+          { explica: "Anexo 01, check-list de liberação: equipe treinada em LDL e ROF e placas conforme o ROF. A preventiva da MCH passa de 30 minutos, então a placa não é dispensada.", apos: () => {
+              coordenadorFala(`${pref}, ${lin} e ${amv} bloqueados no painel. Retirem a indicação da máquina de chave e instalem o jumper. Autorizado.`, false, "CCP");
+            } }) },
+      { alvo: "caixa", titulo: "Retire a indicação da máquina de chave", corpo: "Pátio sinalizado com trabalho no AMV: o CCP pede para retirar a indicação da máquina de chave. Toque na caixa de junção.",
+        prep: () => estadoLdlObjetos("on", false, "off"), anim: (f, done) => { som.tampa(); tween(0.8, k => { tampaCx.rotation.z = -ease(k) * 1.45; }, () => done()); } },
+      { decisao: escolha("Instalação do jumper", "Antes de encaixar o jumper fixo no trilho, o que fazer?",
+          "Limpar as laterais dos boletos com escova de aço, encaixar a garra faceando o passeio do trilho e apertar as tarraxas.",
+          ["Encaixar sobre a graxa mesmo: se não ocupar, o CCP avisa.", "Prender o jumper enrolando o cabo no trilho."],
+          { explica: "Anexo 06: definir local com boa visibilidade, limpar e lixar os boletos, encaixar a garra faceando o passeio do trilho e apertar e reapertar as tarraxas." }) },
+      { alvo: "jumper", titulo: "Instale o jumper", corpo: "Toque no jumper marcado entre os trilhos para instalá-lo. Depois peça ao CCP a confirmação da ocupação.",
+        prep: () => estadoLdlObjetos("on", false, "ghost"), feito: () => {
+          estadoLdlObjetos("on", false, "on"); som.rosca();
+          coordenadorFala(`CCP, ${pref}. Jumper instalado na ${lin}, junto ao ${amv}. Confirma a ocupação?`, false, "Coordenador mestre");
+          coordenadorFala(f.shuntFalha ? `${pref}, negativo. Não temos ocupação no painel.` : `${pref}, ocupação confirmada no painel.`, false, "CCP");
+        } },
+      ...(f.shuntFalha ? [{ decisao: escolha("Shunt não confirmado", "O CCP não vê a ocupação do jumper no painel. O que fazer?",
+          "Instalar em outro local; se ainda não confirmar, trocar o jumper por outro e repetir.",
+          ["Pedir ao CCP para liberar a LDL assim mesmo.", "Seguir o trabalho sem o jumper: a linha já está bloqueada."],
+          { explica: "Anexo 06: se o Controlador não confirma o shunt, instalar em outro local; se ainda não confirmar, substituir o dispositivo e voltar ao passo de instalação.",
+            critico: { e0: "Pediu a LDL sem a ocupação confirmada.", e1: "Trabalhou sem jumper confirmado." }, apos: () => {
+              coordenadorFala(`CCP, ${pref}. Jumper trocado e reinstalado. Confirma a ocupação?`, false, "Coordenador mestre");
+              coordenadorFala(`${pref}, ocupação confirmada no painel.`, false, "CCP");
+            } }) }] : []),
+      { decisao: escolha("Cotejar a licença", `O CCP licencia: "${pref}, ${licencaTxt}." Como responder?`,
+          `"CCP, ${pref} repete: ${licencaTxt}."`,
+          [`"CCP, ${pref} repete: LDL número ${f.numErrado}, ${lin} e ${amv}, das ${f.ini} às ${f.fim}, rota de fuga pela linha 03."`, "\"Entendido, CCP.\""],
+          { repetir: true, explica: "Passo 3 do PGS: o coordenador mestre repete a sentença completa do licenciamento, com número da LDL, tempo da licença e rota de fuga. Anexo 01: a mensagem é repetida na íntegra e cotejada pelo CCP.",
+            antes: () => coordenadorFala(`${pref}, ${licencaTxt}.`, false, "CCP"),
+            senao: () => coordenadorFala(`${pref}, negativo. Repita a licença na íntegra.`, false, "CCP"),
+            apos: () => {
+              coordenadorFala(`CCP, ${pref} repete: ${licencaTxt}.`, false, "Coordenador mestre");
+              coordenadorFala(`${pref}, correto. LDL ${f.num} aberta às ${horaTxt(new Date())}.`, false, "CCP");
+              licenca.ativa = true; licenca.desde = performance.now(); licenca.pedido = false;
+              licenca.eventos.push(`LDL ${f.num} aberta pelo CCP`); ldl.aberta = true;
+            } }) },
+      { decisao: escolha("Informar a equipe", `LDL ${f.num} aberta. O que passar para os executantes antes de começar?`,
+          `Número da LDL (${f.num}), horário das ${f.ini} às ${f.fim} e rota de fuga pela linha 03.`,
+          ["Só que a linha está liberada; o número da LDL fica comigo.", "Número e horário; a rota de fuga cada um vê na hora."],
+          { explica: "Passo 4 do PGS: informar a equipe o número da LDL, o horário liberado e a rota de fuga. Nenhum executante começa sem saber o número, o início e o término." }) },
+      { decisao: escolha("Placa Linha Impedida", "Manutenção eletroeletrônica no circuito de chave, com jumper instalado e AMV bloqueado pelo CCP. Precisa da placa Linha Impedida entre os trilhos?",
+          "Não é necessária nesta atividade.",
+          ["Sim, entre os trilhos, sempre que houver LDL.", "Só se o CCP pedir."],
+          { explica: "Quadro 03 do PGS: a Linha Impedida vai entre os trilhos quando não há bloqueio físico ou shunt; em manutenção de eletroeletrônica no circuito de chave ela não é necessária." }) },
+      { alvo: "motor", titulo: "Execute a manutenção", corpo: "LDL aberta, equipe informada. Toque na máquina para executar a preventiva (os passos 2 a 17 da CTS-2 ficam no outro treinamento).",
+        anim: (f, done) => { som.chave(); setTimeout(done, 900); } },
+      ...imp,
+      f.restricao
+        ? { decisao: escolha("Restrição na via", "Terminada a preventiva, ficou uma restrição: o AMV 03 só pode ser passado a 10 km/h até nova regulagem. O que fazer?",
+            "Informar ao CCP antes de encerrar e manter o jumper até ele inserir a restrição no SGF.",
+            ["Retirar o jumper e informar a restrição depois de encerrar a LDL.", "Não informar: a máquina está funcionando."],
+            { explica: "PGS item 11: para condições que gerem restrição, chamar o centro de controle antes de encerrar a LDL e manter a ocupação forçada com jumper até a restrição entrar no SGF.",
+              critico: { e1: "Deixou restrição na via sem informar o CCP." }, apos: () => {
+                coordenadorFala(`CCP, ${pref}. Restrição de 10 quilômetros por hora no ${amv} até nova regulagem. Jumper mantido.`, false, "Coordenador mestre");
+                coordenadorFala(`${pref}, restrição registrada no SGF.`, false, "CCP");
+              } }) }
+        : null,
+      { alvo: "caixa", titulo: "Devolva a indicação da máquina", corpo: "Terminado o serviço, recoloque a indicação da máquina de chave e feche a caixa de junção.",
+        anim: (f, done) => { som.tampa(); tween(0.8, k => { tampaCx.rotation.z = -(1 - ease(k)) * 1.45; }, () => done()); } },
+      { decisao: escolha("Retirada do jumper", "Qual a sequência para retirar o jumper?",
+          "Tirar equipe e ferramentas do gabarito, comunicar a conclusão ao CCP, receber autorização, retirar o jumper e confirmar a retirada.",
+          ["Retirar o jumper primeiro e depois recolher a equipe e as ferramentas.", "Retirar o jumper e avisar o CCP só na devolução da LDL."],
+          { explica: "Anexo 06 e PGS item 11: a desocupação do circuito só pode ser feita após contato com o centro de controle, com a equipe e o ferramental já fora do gabarito.",
+            critico: { e0: "Retirou o jumper sem autorização do CCP.", e1: "Retirou o jumper sem autorização do CCP." }, apos: () => {
+              coordenadorFala(`CCP, ${pref}. Equipe e ferramentas fora do gabarito. Solicito retirar o jumper.`, false, "Coordenador mestre");
+              coordenadorFala(`${pref}, autorizado retirar o jumper.`, false, "CCP");
+            } }) },
+      { alvo: "jumper", titulo: "Retire o jumper", corpo: "Toque no jumper para retirá-lo, folgando as tarraxas. Depois confirme a retirada com o CCP.",
+        feito: () => { estadoLdlObjetos("on", false, "off"); som.rosca(); coordenadorFala(`CCP, ${pref}. Jumper retirado.`, false, "Coordenador mestre"); coordenadorFala(`${pref}, desocupação confirmada.`, false, "CCP"); } },
+      { alvo: "placaPT", titulo: "Recolha a sinalização", corpo: "Recolha a placa Pessoas Trabalhando: ferramentas, materiais e sinalização saem junto com a equipe.",
+        feito: () => { estadoLdlObjetos("off", false, "off"); som.encaixe(); } },
+      { decisao: escolha("Devolver a LDL", "Passo 5: devolva a LDL ao CCP. Qual a devolução correta?",
+          `"CCP, ${pref}. Preventiva concluída na ${lin}, ${amv}. Equipes fora da via, ferramentas, materiais e sinalização recolhidos, jumper retirado. ${f.restricao ? "Restrição de 10 km/h no AMV 03" : "Circulação normal"}. Devolvo a LDL ${f.num}."`,
+          ["\"CCP, terminamos aqui. Pode liberar.\"", `"CCP, ${pref}. Devolvo a LDL ${f.num}; a placa e o jumper ficam para a próxima equipe."`],
+          { explica: "Passo 5 e Anexo 01 (check-list de devolução): manutenção concluída, equipes fora, ferramentas, materiais e sinalização recolhidos, posição de equipamentos e restrições informadas.",
+            critico: { e1: "Devolveu a linha deixando material e jumper na via." }, apos: () => {
+              coordenadorFala(`CCP, ${pref}. Preventiva concluída. Equipes fora da via, material e sinalização recolhidos, jumper retirado. ${f.restricao ? "Restrição de 10 quilômetros por hora no AMV 03" : "Circulação normal"}. Devolvo a LDL ${f.num}.`, false, "Coordenador mestre");
+              coordenadorFala(`${pref}, LDL ${f.num} encerrada às ${horaTxt(new Date())}. ${lin} liberada para circulação. Fiquem fora da via.`, false, "CCP");
+              devolverLinha(`LDL ${f.num} devolvida e encerrada`); ldl.aberta = false;
+              trem.prox = performance.now() + 25000;   // um trem passa logo depois: a equipe tem de estar fora da via
+            } }) }
+    ].filter(Boolean);
+  }
+
+  let ldl = null;
+  function menuLdl() {
+    fecharDemo();
+    mode = "menuLdl"; pulseIds = []; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar(); estadoLdlObjetos("off", false, "off");
+    drawPanel("PGS-003781 · LDL EFC", "Liberação e Devolução de Linha",
+      "Participante: " + quem() + ".\nLDL no pátio: você é o coordenador mestre de uma LDL com o CCP para a preventiva da CTS-2, da chamada ao encerramento.\nPrecisa de LDL?: perguntas rápidas do Anexo 04.");
+    setButtons([["ldl:mt", "LDL no\npátio"], ["ldl:quiz", "Precisa\nde LDL?"], ["menu", "Menu\nCTS-2"]]);
+  }
+  function startLdl() {
+    menuLdl();
+    if (licenca.ativa) devolverLinha("Linha devolvida ao iniciar o treino de LDL");
+    const ini = new Date(), fim = new Date(ini.getTime() + 2 * 3600000), num = 100 + Math.floor(Math.random() * 900);
+    const f = { num, numErrado: num + (Math.random() < 0.5 ? 10 : -10), ini: horaTxt(ini), fim: horaTxt(fim), prefixo: "EE-" + (10 + Math.floor(Math.random() * 80)),
+      shuntFalha: Math.random() < 0.35, restricao: Math.random() < 0.4 };
+    mode = "ldl";
+    ldl = { tipo: "mt", f, etapas: etapasLdl(f), i: -1, achados: [], criticos: [], errosPeca: 0, t0: performance.now(), d: null, ev0: licenca.eventos.length, aberta: false, tentou: false };
+    coordenadorFala("Equipe, vamos abrir uma LDL no pátio para a preventiva da máquina de chave. Até a LDL estar aberta, ninguém entra na via.");
+    avancarLdl();
+  }
+  function startQuizLdl() {
+    menuLdl();
+    const S = "Precisa de LDL", N = "Não precisa de LDL";
+    const itens = [
+      ["Preventiva da MCH CTS-2 no AMV do pátio, com intervenção na máquina.", "s", "Toda atividade que ocupa o gabarito da via para manutenção exige LDL (PGS item 8)."],
+      ["Atravessar a via férrea sem caminhar ao longo dela e sem carregar material.", "n", "Anexo 04, item 22: cumprir o item 10.37 do ROF, olhando para os dois lados antes de atravessar."],
+      ["Deslocar-se até o local de trabalho sem ocupar o gabarito da via.", "n", "Anexo 04, item 7: basta informar o centro de controle."],
+      ["Instalar placas na linha tronco antes da manutenção, sem ocupar o gabarito.", "n", "Anexo 04, item 5: informar o centro de controle e instalar a placa Pessoas Trabalhando."],
+      ["Equipe de manutenção vai consertar um ponto de descarga elevado.", "s", "Anexo 04, item 17: para manutenção desses locais a LDL é obrigatória."],
+      ["Manutenção na cabine ou no passadiço da locomotiva, sem mexer na parte de baixo.", "n", "Anexo 04, item 14: só com conhecimento do centro de controle e sem intervenção na parte inferior."],
+      ["Bombeiros e ambulância atendendo uma emergência ferroviária.", "n", "Anexo 04, item 24: usar a chamada em emergência do ROF; o centro de controle paralisa a circulação."],
+      ["Trocar dormentes na linha 02 do pátio.", "s", "Serviço de via que ocupa o gabarito: exige LDL (PGS item 8)."],
+      ["Verificação rápida (até 30 s) no gabarito, sem andar ao longo da via, com dois empregados.", "n", "Anexo 04, item 21: dois empregados atentos à aproximação de trem."],
+      ["Instalar o jumper para testar o circuito de via no meio do pátio.", "s", "A ocupação forçada só é feita dentro do processo de LDL e após contato com o centro de controle (PGS item 11)."]
+    ];
+    mode = "ldl";
+    ldl = { tipo: "quiz", f: {}, i: -1, achados: [], criticos: [], errosPeca: 0, t0: performance.now(), d: null, ev0: licenca.eventos.length,
+      etapas: embaralhar(itens).slice(0, 6).map(([t, r, ex]) => ({ decisao: { titulo: "Precisa de LDL?", visto: t, opcoes: r === "s" ? [["c", S], ["e0", N]] : [["c", N], ["e0", S]], explica: ex, fixas: true, nome: t } })) };
+    avancarLdl();
+  }
+  function avancarLdl() { ldl.i++; mostrarLdl(); }
+  function etiquetaLdl() { return (ldl.tipo === "quiz" ? "Precisa de LDL? · " : (ldl.aberta ? `LDL ${ldl.f.num} aberta · ` : "LDL no pátio · ")) + `etapa ${ldl.i + 1} de ${ldl.etapas.length}`; }
+  function mostrarLdl() {
+    const e = ldl.etapas[ldl.i];
+    if (!e) return fimLdl();
+    pulseIds = []; ldl.d = null;
+    if (e.prep) e.prep();
+    if (e.decisao) {
+      const d = e.decisao;
+      if (d.antes && !d.jaFalou) { d.antes(); d.jaFalou = true; }
+      if (!d.ordem) d.ordem = d.fixas ? d.opcoes : embaralhar(d.opcoes);
+      ldl.d = d;
+      const L = "ABC";
+      drawPanel(etiquetaLdl(), d.titulo, d.visto + "\n" + d.ordem.map((o, k) => `${L[k]}) ${o[1]}`).join("\n"));
+      return setButtons(d.ordem.map((o, k) => ["ldl:o:" + o[0], d.fixas ? o[1].replace("Não precisa", "Não\nprecisa").replace("Precisa de", "Precisa\nde") : L[k]]).concat([["ldl:sair", "Sair"]]));
+    }
+    drawPanel(etiquetaLdl(), e.titulo, e.corpo);
+    setButtons([["ldl:sair", "Sair"]]);
+    pulseIds = [e.alvo].concat(Object.keys(e.errado || {}));
+  }
+  function tocarLdl(id) {
+    const e = ldl.etapas[ldl.i];
+    if (!e || !e.alvo) return;
+    if (e.errado && e.errado[id]) { ldl.criticos.push(e.errado[id]); alertaRisco(e.errado[id]); return; }
+    if (id !== e.alvo) {
+      ldl.errosPeca++; som.erro();
+      drawPanel(etiquetaLdl(), e.titulo, `Isso é: ${PARTS[id].nome}. Siga o que pisca.`, "#e5533d");
+      return;
+    }
+    pulseIds = []; som.selecionar();
+    if (e.feito) e.feito();
+    if (!e.anim) return avancarLdl();
+    busy = true;
+    e.anim(ldl.f, () => { busy = false; avancarLdl(); });
+  }
+  function decidirLdl(id) {
+    const d = ldl.d; if (!d) return;
+    const certo = id === "c", lab = k => d.opcoes.find(o => o[0] === k)[1];
+    const risco = !certo && d.critico && d.critico[id];
+    if (!d.respondida) {
+      ldl.achados.push({ titulo: d.nome || d.titulo, escolha: lab(id), correto: lab("c"), certo, critico: !!risco });
+      d.respondida = true;
+    }
+    if (risco) { ldl.criticos.push(risco); alertaRisco(risco); } else if (!certo) som.erro(); else som.selecionar();
+    if (!certo && d.repetir) {
+      if (d.senao) d.senao();
+      drawPanel(etiquetaLdl(), "Não foi cotejado: " + d.titulo, d.explica + "\nEscolha de novo.", "#e5533d");
+      return setButtons([["ldl:de-novo", "Tentar de\nnovo"]]);
+    }
+    if (d.apos) d.apos();
+    ldl.d = null;
+    drawPanel(etiquetaLdl(), (certo ? "Certo: " : "Atenção: ") + d.titulo, (certo ? "" : "O correto: " + lab("c") + "\n") + d.explica, certo ? "#23c552" : "#e5533d");
+    setButtons([["ldl:seguir", "Continuar"]]);
+  }
+  function fimLdl() {
+    mode = "fim"; pulseIds = []; mantenedorVoltar();
+    const quiz = ldl.tipo === "quiz";
+    if (ldl.aberta) { devolverLinha(`LDL ${ldl.f.num} interrompida (treino encerrado)`); ldl.aberta = false; }
+    const seg = Math.round((performance.now() - ldl.t0) / 1000), tot = ldl.achados.length, certas = ldl.achados.filter(a => a.certo).length;
+    const crit = [...new Set(ldl.criticos)], ok = certas === tot && !ldl.errosPeca && !crit.length;
+    const extra = crit.map(c => "ERRO CRÍTICO: " + c).concat(licenca.eventos.slice(ldl.ev0).map(t => "CCP: " + t));
+    const modulo = quiz ? "LDL · Precisa de LDL? (PGS-003781 Anexo 04)" : "LDL · LDL no pátio com o CCP (PGS-003781)";
+    registrarResultado({ modulo, segundos: seg, avaliacoesCertas: certas, avaliacoes: tot, errosPeca: ldl.errosPeca, bloqueios: crit.length,
+      detalhes: ldl.achados.map(a => `${a.titulo}: ${a.certo ? "certo" : "errado"}` + (a.critico ? " [crítico]" : "")).concat(extra).join("; ") });
+    const linhas = ldl.achados.map(a => `${a.certo ? "✓" : "✗"} ${a.titulo}`).concat(crit.map(c => "✗ Crítico: " + c));
+    const resumo = `${certas} de ${tot} decisões certas · ${tempoTxt(seg)}`;
+    drawPanel(quiz ? "Precisa de LDL? · resultado" : "LDL no pátio · resultado", crit.length ? "Erro crítico: reprovado" : ok ? "Sem erros" : resumo,
+      quem() + "\n" + (ok || crit.length ? resumo + "\n" : "") + linhas.join("\n"), ok ? "#23c552" : "#e5533d");
+    if (!quiz) coordenadorFala(crit.length ? "LDL reprovada por erro crítico. Vamos revisar antes de seguir." : ok ? "LDL encerrada sem desvios. Bom trabalho, equipe." : "LDL encerrada. Revisem os pontos marcados no quadro.");
+    setButtons([[quiz ? "ldl:quiz" : "ldl:mt", "Refazer"], ["ldl:menu", "Treino\nde LDL"], ["menu", "Menu\nCTS-2"]]);
+    ldl = null;
+  }
+  function acaoLdl(b) {
+    if (b === "ldl:menu") return menuLdl();
+    if (b === "ldl:mt") return startLdl();
+    if (b === "ldl:quiz") return startQuizLdl();
+    if (!ldl) return menuLdl();
+    if (b === "ldl:sair") { ldl.achados.push({ titulo: "Treino interrompido antes do fim", escolha: "", correto: "", certo: false }); ldl.i = ldl.etapas.length; return fimLdl(); }
+    if (b === "ldl:seguir") return avancarLdl();
+    if (b === "ldl:de-novo") return mostrarLdl();
+    if (b.startsWith("ldl:o:")) return decidirLdl(b.slice(6));
+  }
+
   // ---------- Biblioteca de treinamentos ----------
   const TREINAMENTOS = [
     { id: "cts2", titulo: "Manutenção preventiva da máquina de chave CTS-2", pro: "PRO-001122 · Anexo 5", txt: "Tour, passo 1, passos 2 a 17, máquina funcionando e explorar por dentro.", abrir: () => showMenu() },
     { id: "desafios", titulo: "Desafios de defeitos em máquinas de chave", pro: "Baseado no PRO-001122", txt: "Um defeito é sorteado: ouça o sintoma, inspecione, meça e diagnostique a causa.", abrir: () => menuDesafios() },
+    { id: "ldl", titulo: "Liberação e Devolução de Linha (LDL)", pro: "PGS-003781 rev. 06 · EFC", txt: "Seja o coordenador mestre de uma LDL com o CCP: placa, chamada, jumper, cotejamento, imprevistos, devolução. E o quiz Precisa de LDL?", abrir: () => menuLdl() },
     { id: "radio", titulo: "Comunicação via rádio", pro: "Procedimento de comunicação", txt: "Padrão de comunicação com o CCP e a equipe. Será usado também nos outros treinamentos.", abrir: null }
   ];
   const bibEl = document.getElementById("bib");
@@ -2149,6 +2449,7 @@ body.vr #stick { display: none; }
       const b = id.slice(4);
       if (b === "menu") return showMenu();
       if (b.startsWith("linha:")) return respostaCcp(b === "linha:devolver");
+      if (b.startsWith("ldl:")) return acaoLdl(b);
       if (b === "licenca") return pedirLicenca(() => { if (mode === "pro" && pro && pro.i < 0) telaInicioPro(); else if (mode === "menu") showMenu(); else if (mode === "desafio" && dz) telaDesafio("Licença concedida. Pode investigar a máquina."); });
       if (b === "devolver") { devolverLinha("Devolveu a linha ao CCP ao terminar"); coordenadorFala("CCP, a equipe terminou e devolve a linha. Via livre para circulação.", false, "Mantenedor"); return showMenu(); }
       if (mode === "pro" && pro && pro.d) return decidirPro(b);
@@ -2179,6 +2480,7 @@ body.vr #stick { display: none; }
     }
     if (mode === "demo" && id === "comutador") { const t = alternarComutador(); drawPanel("Máquina em funcionamento", "Comutador em " + (comutador === "manual" ? "MANUAL" : "AUTOMÁTICO"), t); return; }
     if (id === "chao" || !PARTS[id]) return;
+    if (mode === "ldl" && ldl) return tocarLdl(id);
     if (mode === "desafio" && dz) return tocarDesafio(id);
     if (mode === "tour") { som.selecionar(); drawPanel("Tour da máquina", PARTS[id].nome, PARTS[id].txt); return; }
     if (mode === "pro" && pro) return tocarPro(id);
