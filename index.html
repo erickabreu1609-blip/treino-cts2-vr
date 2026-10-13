@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v13/10 lastro</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v13/10 bonecos</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -768,7 +768,7 @@ body.vr #stick { display: none; }
   function apontarBraco(av, b, ponto, k) {   // estica o braço na direção do ponto (em coordenadas do avatar)
     av.updateMatrixWorld(true);
     b.ombro.getWorldPosition(vA);
-    vB.copy(ponto).sub(vA).applyQuaternion(b.ombro.parent.getWorldQuaternion(qA).invert()).normalize();
+    vB.copy(ponto).sub(vA).applyQuaternion(qA.copy(av.quaternion).invert()).normalize();
     qB.setFromUnitVectors(BAIXO, vB);
     b.ombro.quaternion.slerp(qB, Math.min(1, k));
     b.cot.rotation.x += (0 - b.cot.rotation.x) * Math.min(1, k);
@@ -776,22 +776,11 @@ body.vr #stick { display: none; }
   function atualizarAvatar(av, dt) {
     const u = av.userData;
     u.fase += dt;
-    if (u.esq) {   // funcionário articulado: tronco e cabeça
-      const e = u.esq, k = Math.min(1, dt * 6), anda = u.estado === "andando", age = u.estado === "agindo";
-      u.corpo.position.y = anda ? Math.abs(Math.sin(u.fase * 9)) * 0.02 : 0;
-      e.coluna.rotation.x += ((age ? 0.3 : anda ? 0.06 : 0) - e.coluna.rotation.x) * k;           // curva-se para a peça
-      e.peito.rotation.x += ((age ? 0.12 : Math.sin(u.fase * 1.6) * 0.02) - e.peito.rotation.x) * k;  // respiração
-      e.peito.rotation.y += ((anda ? Math.sin(u.fase * 9) * 0.1 : 0) - e.peito.rotation.y) * k;      // tronco gira com o passo
-      // cabeça: olha a peça ao agir; parado, acompanha o aluno; ao falar, acena de leve
-      let yaw = 0, pitch = age ? 0.35 : 0;
-      if (!anda && !age) {
-        const olho = new THREE.Vector3(); camera.getWorldPosition(olho);
-        let d = Math.atan2(olho.x - av.position.x, olho.z - av.position.z) - av.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
-        yaw = THREE.MathUtils.clamp(d, -0.9, 0.9);
-        if (u.falando > 0) pitch = Math.sin(u.fase * 6) * 0.08;
-      }
-      e.cabeca.rotation.y += (yaw * 0.6 - e.cabeca.rotation.y) * k; e.pescoco.rotation.y += (yaw * 0.4 - e.pescoco.rotation.y) * k;
-      e.cabeca.rotation.x += (pitch - e.cabeca.rotation.x) * k;
+    if (u.corpo) {   // funcionário do modelo: balança ao andar e se inclina para a peça ao agir
+      const anda = u.estado === "andando";
+      u.corpo.position.y = anda ? Math.abs(Math.sin(u.fase * 9)) * 0.03 : 0;
+      u.corpo.rotation.z = anda ? Math.sin(u.fase * 9) * 0.035 : 0;
+      u.corpo.rotation.x += ((u.estado === "agindo" ? 0.14 : 0) - u.corpo.rotation.x) * Math.min(1, dt * 6);
     }
     const [bE, bD] = u.bracos;
     if (u.estado === "andando" && u.destino) {
@@ -835,80 +824,26 @@ body.vr #stick { display: none; }
   coordenador.userData.prancheta = true;
   posAvatar(coordenador, 3.6, 3.5); coordenador.rotation.y = Math.PI * 1.15;
   const CASA_MANT = new THREE.Vector3(-0.7, 0, 3.0);
-  // Funcionário fardado (modelo do SketchUp do Erick) em pé e articulado, no lugar dos bonecos feitos com formas simples.
-  // A malha veio inclinada; funcionario_em_pe.glb traz a versão endireitada e os pesos de cada osso (_joints/_weights).
-  // Os ossos seguem o mesmo contrato dos bonecos: pernas [quadril, joelho], braços { ombro, cot, mao }, com o braço pendendo em -y.
-  const OSSOS = [
-    ["raiz", -1, [0.0039, 0.9469, -0.0961]],
-    ["coluna", 0, [0.0039, 1.0769, -0.0661]],
-    ["peito", 1, [0.0039, 1.2875, -0.0429]],
-    ["pescoco", 2, [-0.0261, 1.5063, -0.005]],
-    ["cabeca", 3, [-0.0461, 1.6312, 0.0193]],
-    ["ombro_D", 2, [-0.1861, 1.4217, -0.0416]],
-    ["cotovelo_D", 5, [-0.2183, 1.1529, -0.0362]],
-    ["mao_D", 6, [-0.2247, 0.8318, -0.0105]],
-    ["ombro_E", 2, [0.1939, 1.4574, -0.0368]],
-    ["cotovelo_E", 8, [0.2283, 1.1709, -0.0311]],
-    ["mao_E", 9, [0.232, 0.9845, -0.0161]],
-    ["quadril_D", 0, [-0.0861, 0.9269, -0.0761]],
-    ["joelho_D", 11, [-0.0861, 0.511, -0.0138]],
-    ["pe_D", 12, [-0.0861, 0.1287, -0.0138]],
-    ["quadril_E", 0, [0.0939, 0.9269, -0.0761]],
-    ["joelho_E", 14, [0.0939, 0.511, -0.0138]],
-    ["pe_E", 15, [0.0939, 0.1287, -0.0138]]
-  ];
-  let auxiliar = null;
-  new THREE.GLTFLoader().load("funcionario_em_pe.glb", g => {
-    function montar(capacete) {
-      const ossos = OSSOS.map(([nome]) => { const b = new THREE.Bone(); b.name = nome; return b; });
-      OSSOS.forEach(([, pai, p], i) => {
-        const q = pai >= 0 ? OSSOS[pai][2] : [0, 0, 0];
-        ossos[i].position.set(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
-        if (pai >= 0) ossos[pai].add(ossos[i]);
-      });
-      const corpo = new THREE.Group(); corpo.add(ossos[0]); corpo.updateMatrixWorld(true);
-      const esq = new THREE.Skeleton(ossos), malhas = [];
-      g.scene.traverse(m => {
-        if (!m.isMesh || !m.geometry.attributes._joints) return;
-        const geo = m.geometry.clone();
-        geo.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(Array.from(geo.attributes._joints.array), 4));
-        geo.setAttribute("skinWeight", new THREE.Float32BufferAttribute(geo.attributes._weights.array, 4));
-        geo.computeVertexNormals();
-        const mt = m.material.clone(); mt.skinning = true; mt.flatShading = true; mt.side = THREE.FrontSide;
-        if (capacete && /auto_11/.test(m.name)) mt.color.setHex(capacete);
-        const sm = new THREE.SkinnedMesh(geo, mt); sm.castShadow = true; sm.frustumCulled = false; sm.userData.avatar = true;
-        corpo.add(sm); malhas.push(sm);
-      });
-      corpo.updateMatrixWorld(true);
-      malhas.forEach(sm => sm.bind(esq, sm.matrixWorld));
-      const B = n => ossos[OSSOS.findIndex(o => o[0] === n)];
-      return { corpo, B };
-    }
+  // Funcionários fardados (modelo do SketchUp do Erick) no lugar dos bonecos feitos com formas simples.
+  // "funcionario" veste o mantenedor e o coordenador (capacete azul); "funcionario_maleta" é o auxiliar da equipe com a caixa de ferramentas.
+  new THREE.GLTFLoader().load("funcionarios.glb", g => {
+    const modelo = nome => { const o = new THREE.Group(); g.scene.children.filter(c => c.name.startsWith(nome + "__")).forEach(c => o.add(c.clone())); return o; };
     function vestir(av, capacete) {
-      const u = av.userData, { corpo, B } = montar(capacete);
-      u.boneco.forEach(c => { c.visible = false; });
-      u.pernas = [[B("quadril_D"), B("joelho_D")], [B("quadril_E"), B("joelho_E")]];
-      u.bracos = [{ ombro: B("ombro_D"), cot: B("cotovelo_D"), mao: B("mao_D") }, { ombro: B("ombro_E"), cot: B("cotovelo_E"), mao: B("mao_E") }];
-      u.esq = { coluna: B("coluna"), peito: B("peito"), pescoco: B("pescoco"), cabeca: B("cabeca") };
-      u.nome.position.set(0, 0.0, 0.235); u.nome.rotation.set(0, 0, 0); u.esq.peito.add(u.nome); u.nome.visible = true;   // crachá no peito
-      if (u.radio) {   // rádio na mão do braço que sobe para falar
-        const r = new THREE.Group(); r.add(box(0.05, 0.11, 0.03, mat(0x161616)));
-        const ant = cyl(0.006, 0.09, mat(0x161616), 6); ant.position.set(0.015, 0.1, 0); r.add(ant);
-        r.position.set(0, -0.36, 0.04); u.bracos[0].cot.add(r);
-      }
-      if (u.prancheta) { const p = box(0.22, 0.3, 0.012, mat(0x8a6a44)); const f = box(0.19, 0.25, 0.013, mat(0xf4f4f0)); f.position.z = 0.002; p.add(f); p.position.set(0, -0.36, 0.08); p.rotation.x = -0.4; u.bracos[1].cot.add(p); }
+      const u = av.userData, corpo = modelo("funcionario");
+      corpo.traverse(m => {
+        if (!m.isMesh) return;
+        m.material = m.material.clone(); m.castShadow = true; m.userData.avatar = true;
+        if (capacete && /auto_11/.test(m.name)) m.material.color.setHex(capacete);
+      });
+      u.boneco.forEach(c => { if (c !== u.nome) c.visible = false; });
+      u.nome.position.set(0, 1.2, 0.36); u.nome.rotation.x = -0.35;   // crachá no peito, que fica inclinado para a frente
       av.add(corpo); u.corpo = corpo;
     }
-    mantenedor.userData.radio = false; coordenador.userData.radio = true;
     vestir(mantenedor); vestir(coordenador, 0x2f6fd6);
-    // auxiliar da equipe, parado ao lado da via com a caixa de ferramentas
-    const aux = new THREE.Group();
-    aux.userData = { fase: 1.3, estado: "parado", destino: null, alvo: null, girar: false, tAcao: 0, falando: 0, nome: new THREE.Group(), boneco: [] };
-    vestir(aux);
-    const caixaF = g.scene.getObjectByName("caixa_ferramentas");
-    if (caixaF) { const c = caixaF.clone(); c.position.set(0, -0.085, 0.02); c.traverse(m => { if (m.isMesh) m.castShadow = true; }); aux.userData.bracos[1].mao.add(c); }
+    const aux = modelo("funcionario_maleta");
+    aux.traverse(m => { if (m.isMesh) { m.castShadow = true; m.userData.avatar = true; } });
     aux.position.set(5.2, alturaLastro(2.6), 2.6); aux.rotation.y = Math.atan2(0 - 5.2, 1.5 - 2.6);
-    scene.add(aux); auxiliar = aux;
+    scene.add(aux);
   }, undefined, () => {});
   function mantenedorAgir(ponto, girar) {
     const u = mantenedor.userData;
@@ -929,7 +864,6 @@ body.vr #stick { display: none; }
     const olho = new THREE.Vector3(); camera.getWorldPosition(olho);
     virarPara(coordenador, olho.x, olho.z, dt * 2);
     atualizarAvatar(coordenador, dt);
-    if (auxiliar) atualizarAvatar(auxiliar, dt);
   }
 
   // ---------- Rádio do coordenador: voz sintetizada em português, bip de rádio e legenda ----------
