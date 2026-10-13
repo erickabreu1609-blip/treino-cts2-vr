@@ -138,6 +138,10 @@ body.vr #stick { display: none; }
 #bib .bibTopo { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
 #bib h2 { margin: 0 auto 0 0; font-size: 19px; }
 #bib > p { margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+.bibCarregar { font: 500 13px var(--font-ui); border: 1px solid var(--accent); color: var(--accent); border-radius: 6px; padding: 7px 11px; cursor: pointer; }
+#bibExtras { margin-top: 14px; font-size: 13px; color: var(--muted); }
+#bibExtras p { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+#bibExtras .bibAviso { color: #e5533d; }
 #bibLista { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
 #bibLista button { text-align: left; display: grid; gap: 6px; padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: #0b0f13; color: var(--fg); font: inherit; cursor: pointer; }
 #bibLista button:not(:disabled):hover { border-color: var(--accent); }
@@ -153,12 +157,13 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v13/10 trem e encosto</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v13/10 papéis e PROs</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
   <button id="btnCentro" type="button">Centralizar</button>
   <button id="btnRel" type="button">Relatório</button>
+  <button id="btnLer" type="button" title="Ler em voz alta o texto do quadro, sem rádio">Ler quadro</button>
   <button id="btnBib" type="button">Treinamentos</button>
   <button id="btnAjustes" type="button">Ajustes</button>
   <button id="btnTx" type="button" aria-pressed="false" title="Deixar um avaliador acompanhar em outro aparelho">Avaliador</button>
@@ -184,9 +189,10 @@ body.vr #stick { display: none; }
   <div class="txBotoes"><button id="txParar" type="button">Parar transmissão</button><button id="txFechar" type="button">Fechar</button></div>
 </div>
 <section id="bib" hidden aria-label="Biblioteca de treinamentos">
-  <div class="bibTopo"><h2>Biblioteca de treinamentos</h2><button id="bibFechar" type="button">Fechar</button></div>
-  <p>Escolha o treinamento. Cada procedimento (PRO) em VR aparece aqui; os resultados vão para o mesmo relatório.</p>
+  <div class="bibTopo"><h2>Biblioteca de treinamentos</h2><label class="bibCarregar">Carregar PRO (.json)<input id="bibArquivo" type="file" accept=".json,application/json" hidden></label><button id="bibFechar" type="button">Fechar</button></div>
+  <p>Escolha o treinamento. Cada procedimento (PRO) em VR aparece aqui; os resultados vão para o mesmo relatório. Para testar um PRO novo no celular, use "Carregar PRO" com o arquivo .json montado a partir do PDF (guia em pros/COMO-CRIAR-UM-PRO.md).</p>
   <div id="bibLista"></div>
+  <div id="bibExtras"></div>
 </section>
 <div id="alertaRisco" hidden role="alert"><b>AÇÃO DE RISCO</b><span></span></div>
 <div id="dicaAval" hidden role="status"><small>Dica do avaliador</small><span></span></div>
@@ -214,6 +220,7 @@ body.vr #stick { display: none; }
   <div class="cfgRow"><span>Quem executa as ações</span><button id="btnExecutor" type="button">Avatar</button></div>
   <div class="cfgRow"><span>Trem de minério a cada</span><button id="tremMenos" type="button">−</button><output id="tremVal"></output><button id="tremMais" type="button">+</button></div>
   <div class="cfgRow"><span>Voz do coordenador</span><button id="btnVoz" type="button">Ligada</button></div>
+  <div class="cfgRow"><span>Ler o quadro em voz alta</span><button id="btnLerAuto" type="button">Só no botão</button></div>
   <button id="cfgOk" type="button">Pronto</button>
 </div>
 
@@ -887,36 +894,54 @@ body.vr #stick { display: none; }
   let vozPt = null;
   function acharVoz() { if (!window.speechSynthesis) return; vozPt = speechSynthesis.getVoices().find(v => /^pt(-|_)BR/i.test(v.lang)) || speechSynthesis.getVoices().find(v => /^pt/i.test(v.lang)) || null; }
   if (window.speechSynthesis) { acharVoz(); speechSynthesis.onvoiceschanged = acharVoz; }
-  // Toda fala de rádio começa com o bip do botão do rádio e termina com "câmbio".
-  // As falas entram numa fila para que o bip venha sempre logo antes de cada uma.
+  // Dois tipos de fala (regra do Erick, 13/10/2026):
+  // - rádio entre a equipe de campo e o CCP (nos dois sentidos): bip do botão do rádio antes e "câmbio" no fim (ROF 21.4);
+  // - instrução ao participante do treinamento e leitura do texto do quadro/placa: só a voz, sem bip e sem câmbio.
+  // As falas entram numa fila para que o bip venha sempre logo antes de cada fala de rádio.
   const filaRadio = []; let radioOcupado = false, radioTimer = 0;
+  let papel = null;   // papel do participante no treino em curso: "coordenador" ou "executante"
   function comCambio(t) {
     t = t.trim();
     if (/câmbio[.!]?$/i.test(t)) return t;
     return (/[.!?]$/.test(t) ? t : t + ".") + " Câmbio.";
   }
-  function coordenadorFala(texto, urgente, quem) {
-    const item = { texto: comCambio(texto), urgente, quem: quem || "Coordenador" };
-    if (urgente) { filaRadio.length = 0; radioOcupado = false; clearTimeout(radioTimer); try { window.speechSynthesis && speechSynthesis.cancel(); } catch (e) {} }
+  function enfileirarFala(item) {
+    if (item.urgente) { filaRadio.length = 0; radioOcupado = false; clearTimeout(radioTimer); try { window.speechSynthesis && speechSynthesis.cancel(); } catch (e) {} }
+    if (item.leitura) for (let i = filaRadio.length - 1; i >= 0; i--) if (filaRadio[i].leitura) filaRadio.splice(i, 1);   // só a leitura do quadro atual
     filaRadio.push(item);
     proximaFala();
   }
+  function radioFala(texto, quem, urgente, semCambio) { enfileirarFala({ texto: semCambio ? texto.trim() : comCambio(texto), urgente, quem: quem || "Coordenador", radio: true }); }
+  function instrucao(texto, quem, urgente) { enfileirarFala({ texto: texto.trim(), urgente, quem: quem || "Coordenador", radio: false }); }
+  // Compatível com as chamadas antigas: com quem informado é rádio com o CCP; sem quem é instrução do coordenador ao participante.
+  function coordenadorFala(texto, urgente, quem) { if (quem) radioFala(texto, quem, urgente); else instrucao(texto, "Coordenador", urgente); }
+  const rotuloQuem = q => papel && q.toLowerCase().startsWith(papel) ? `Você (${q.toLowerCase()})` : q;
   function proximaFala() {
     if (radioOcupado || !filaRadio.length) return;
-    const { texto, urgente, quem } = filaRadio.shift();
+    const { texto, urgente, quem, radio, leitura } = filaRadio.shift();
     radioOcupado = true;
-    som.radio();
-    coordenador.userData.falando = Math.max(2.5, texto.length * 0.07);
-    mostrarDica(texto, quem + " · rádio", true);
-    avalEnviar("sistema", quem + ": " + texto);
+    if (radio) som.radio();
+    if (!leitura && /^coordenador/i.test(quem)) coordenador.userData.falando = Math.max(2.5, texto.length * 0.07);
+    if (!leitura) mostrarDica(texto, rotuloQuem(quem) + (radio ? " · rádio" : " · instrução"), true);
+    avalEnviar("sistema", quem + (radio ? " (rádio): " : ": ") + texto);
     const fim = () => { if (!radioOcupado) return; radioOcupado = false; clearTimeout(radioTimer); setTimeout(proximaFala, 350); };
     radioTimer = setTimeout(fim, 1500 + texto.length * 85);   // garante a fila mesmo se a voz não avisar o fim
     if (!cfg.voz || !window.speechSynthesis) return;
     try {
-      const u = new SpeechSynthesisUtterance(texto); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = urgente ? 1.15 : 1.05; u.pitch = quem === "CCP" ? 1.15 : 0.9;
+      const u = new SpeechSynthesisUtterance(texto); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = urgente ? 1.15 : 1.05; u.pitch = quem === "CCP" ? 1.15 : leitura ? 1 : 0.9;
       u.onend = u.onerror = fim;
-      setTimeout(() => speechSynthesis.speak(u), 480);
+      setTimeout(() => speechSynthesis.speak(u), radio ? 480 : 60);
     } catch (e) {}
+  }
+  // Leitura do texto do quadro (sem bip e sem câmbio): botão "Ler quadro" ou automática nos Ajustes
+  let leituraTimer = 0;
+  function lerQuadro(agora) {
+    clearTimeout(leituraTimer);
+    leituraTimer = setTimeout(() => {
+      if (!ultimoPainel) return;
+      const [, titulo, corpo] = ultimoPainel;
+      enfileirarFala({ texto: (titulo + ". " + (corpo || "")).replace(/\n+/g, ". ").replace(/\.\s*\./g, "."), quem: "Quadro", radio: false, leitura: true });
+    }, agora ? 0 : 400);
   }
 
   const GIRAM_NA_MAO = new Set(["chave", "conA", "conB", "comutador", "manivela"]);
@@ -1122,7 +1147,7 @@ body.vr #stick { display: none; }
   function pedirLicenca(depois) {
     if (licenca.ativa) { coordenadorFala("A licença já está concedida.", false, "CCP"); return depois && depois(); }
     if (trem.ativo) { coordenadorFala("Aguarde: tem trem circulando nesta via. Peça de novo depois que ele passar.", false, "CCP"); return; }
-    coordenadorFala("CCP, aqui é a equipe da via. Solicito licença para manutenção na máquina de chave.", false, "Mantenedor");
+    radioFala("CCP, aqui é o coordenador da equipe da via. Solicito licença para manutenção na máquina de chave.", "Coordenador");
     setTimeout(() => {
       licenca.ativa = true; licenca.desde = performance.now(); licenca.pedido = false;
       licenca.eventos.push("Licença concedida pelo CCP");
@@ -1157,7 +1182,7 @@ body.vr #stick { display: none; }
   }
   function retirarEquipe() {
     coordenadorFala(`CCP, ${quemLdl()}. Ciente do trem. Vamos retirar a equipe e o material e confirmo a devolução.`, false, "Coordenador");
-    coordenadorFala("Equipe, parar a atividade. Recolham as ferramentas, retirem o cepo e o jumper e saiam da via pela rota de fuga.", false, "Coordenador");
+    instrucao("Equipe, parar a atividade. Recolham as ferramentas, retirem o cepo e o jumper e saiam da via pela rota de fuga.", "Coordenador");
     guardarFerramentas(); mostrarCepo(false); mantenedorVoltar();
     estadoLdlObjetos(ccpSalvo && ccpSalvo.pt ? "on" : "off", false, "off");
     licenca.eventos.push("CCP avisou a passagem do trem; equipe parou e saiu da via");
@@ -1230,6 +1255,7 @@ body.vr #stick { display: none; }
   let ultimoPainel = null;
   function drawPanel(etiqueta, titulo, corpo, cor) {
     ultimoPainel = [etiqueta, titulo, corpo, cor];
+    try { if (cfg.lerQuadro) lerQuadro(); } catch (e) {}   // cfg ainda não existe no primeiro desenho
     avalEnviar(cor === "#e5533d" ? "erro" : "painel", etiqueta + " · " + titulo, corpo);
     const { ctx, c, t } = panelTx, W = 1400, H = 800;
     // fonte grande; se o texto não couber, reduz aos poucos até caber
@@ -1488,6 +1514,7 @@ body.vr #stick { display: none; }
   relFiltro.addEventListener("change", abrirRelatorio);
   function quem() { return pessoa.nome ? `${pessoa.nome} · Matrícula ${pessoa.mat}` : "Participante não identificado"; }
   function registrarResultado(r) {
+    if (papel && r.modulo && !/ · (coordenador|executante)$/.test(r.modulo)) r.modulo += " · " + papel;
     try {
       const h = JSON.parse(localStorage.getItem("cts2-vr-resultados") || "[]");
       h.push(Object.assign({ nome: pessoa.nome, matricula: pessoa.mat, data: new Date().toISOString() }, r));
@@ -1509,11 +1536,11 @@ body.vr #stick { display: none; }
   }
   function showMenu() {
     fecharDemo();
-    mode = "menu"; pulseIds = []; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar();
+    mode = "menu"; pulseIds = []; papel = null; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar();
     try { estadoLdlObjetos("off", false, "off"); mostrarCepo(false); } catch (e) {}   // placas, jumper e cepo dos treinos de LDL e de AMV
     drawPanel("Treinamento PRO-001122 · Anexo 5", "Manutenção preventiva da máquina de chave CTS-2",
       "Participante: " + quem() + ".\nEscolha um módulo tocando no botão. Antes de entrar na via, peça licença ao CCP. Sem licença passa trem de minério a cada " + (cfg.trem || 10) + " min.");
-    setButtons([["tour", "Tour da\nmáquina"], ["passos0", "Passos\n1 a 17"], ["demo", "Máquina\nfuncionando"], ["explorar", "Explorar\npor dentro"], ["desafios", "Desafios\nde defeitos"], [licenca.ativa ? "devolver" : "licenca", licenca.ativa ? "Devolver a\nlinha ao CCP" : "Pedir licença\nao CCP"]]);
+    setButtons([["tour", "Tour da\nmáquina"], ["passosInicio", "Passos\n1 a 17"], ["demo", "Máquina\nfuncionando"], ["explorar", "Explorar\npor dentro"], ["desafios", "Desafios\nde defeitos"], [licenca.ativa ? "devolver" : "licenca", licenca.ativa ? "Devolver a\nlinha ao CCP" : "Pedir licença\nao CCP"]]);
   }
 
   // ---------- Máquina em funcionamento: comando normal / reverso ----------
@@ -1614,7 +1641,17 @@ body.vr #stick { display: none; }
     { alvo: null, decisao: "conB" }
   ];
 
+  // Papéis nos passos 1 a 17 da CTS-2 (o PRO-001122 não separa; definido pelo bom senso):
+  // coordenador pede e devolve a licença ao CCP, cobra o Apontar e Falar e confere cada avaliação do executante;
+  // executante faz o serviço na máquina e decide a ação em cada desvio.
+  const PAPEIS_CTS2 = {
+    coordenador: "Pede a licença ao CCP, cobra o Apontar e Falar e confere cada avaliação do executante (confere ou não confere). O avatar do mantenedor faz o serviço.",
+    executante: "Faz o serviço: toca nas peças, mede, faz o Apontar e Falar e decide a ação em cada desvio. O coordenador fala com o CCP."
+  };
+  let papelCts2 = null;
+  const propor = (certo, opcoes) => Math.random() < 0.6 ? certo : umDe(opcoes.filter(o => o !== certo));
   function startPasso1() {
+    papel = papelCts2;
     mode = "passo1"; step = 0; erros = 0; errosPeca = 0; achados = []; inicioModulo = performance.now(); resetMaquina();
     coordenadorFala("Equipe, vamos ao passo 1: DAM e conectores. Sigam a peça que pisca.");
     const opcoes = ["ok", "folgado", "quebrado"];
@@ -1632,14 +1669,36 @@ body.vr #stick { display: none; }
       const visto = estado === "ok" ? "O conector girou firme, sem folga e sem trinca."
         : estado === "folgado" ? "O conector gira solto na rosca e balança com a mão."
         : "Há uma trinca na carcaça do conector e um pedaço lascado.";
+      if (papel === "coordenador") {
+        const nomes = { ok: "sem desvio", folgado: "reapertar", quebrado: "substituir" };
+        s.proposta = propor(estado, ["ok", "folgado", "quebrado"]);
+        drawPanel("Passo 1 · Confira o executante", nome, visto + "\nO executante vai registrar: " + nomes[s.proposta] + ".\nEstá certo?", "#f2a400");
+        setButtons([["c1:sim", "Confere"], ["c1:nao", "Não confere:\ncorrigir"]]);
+        pulseIds = [];
+        return;
+      }
       drawPanel("Passo 1 · Desvio?", nome + ": qual a ação?", visto);
       setButtons([["d:ok", "Sem desvio"], ["d:folgado", "Reapertar"], ["d:quebrado", "Substituir"]]);
       pulseIds = [];
       return;
     }
+    if (papel === "coordenador" && s.alvo) {
+      drawPanel(`Passo 1 · etapa ${s.n} de 5 · executante`, s.titulo, "Acompanhe: o executante faz esta etapa. Fique fora da área de movimentação.", "#3ea0e4");
+      setButtons([]); pulseIds = []; busy = true;
+      mantenedorAgir(centroPeca(s.alvo), GIRAM_NA_MAO.has(s.alvo));
+      setTimeout(() => { busy = false; acaoAlvo(s.alvo); }, 1400);
+      return;
+    }
     drawPanel(s.etiqueta || `Passo 1 · etapa ${s.n} de 5`, s.titulo, s.corpo, s.alvo ? null : "#f2a400");
     setButtons(s.botoes || []);
     pulseIds = s.alvo ? [s.alvo] : [];
+  }
+  // Coordenador confere a avaliação do executante no passo 1
+  function conferirPasso1(sim) {
+    const s = STEPS[step], certo = falhas[s.decisao], propostaCerta = s.proposta === certo, acertou = sim === propostaCerta;
+    achados.push({ peca: "Conferência: " + PARTS[s.decisao].nome, certo, escolha: acertou ? certo : sim ? s.proposta : "naoconfere" });
+    if (!acertou) { erros++; som.erro(); } else som.selecionar();
+    next();
   }
 
   function next() { step++; showStep(); }
@@ -1689,8 +1748,8 @@ body.vr #stick { display: none; }
 
   function finish() {
     mode = "fim"; pulseIds = [];
-    const nomes = { ok: "sem desvio", folgado: "reapertar", quebrado: "substituir" };
-    const linhas = achados.map(a => `${a.escolha === a.certo ? "✓" : "✗"} ${a.peca}: você escolheu ${nomes[a.escolha]}` + (a.escolha === a.certo ? "" : `, o correto era ${nomes[a.certo]}`));
+    const nomes = { ok: "sem desvio", folgado: "reapertar", quebrado: "substituir", naoconfere: "não confere (a ação do executante estava certa)" };
+    const linhas = achados.map(a => `${a.escolha === a.certo ? "✓" : "✗"} ${a.peca}: ${a.peca.startsWith("Conferência") ? "ficou registrado" : "você escolheu"} ${nomes[a.escolha]}` + (a.escolha === a.certo ? "" : `, o correto era ${nomes[a.certo]}`));
     const ok = erros === 0 && errosPeca === 0;
     const quando = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
     const seg = Math.round((performance.now() - inicioModulo) / 1000);
@@ -1918,26 +1977,34 @@ body.vr #stick { display: none; }
     mode = "menuPassos"; pulseIds = []; resetMaquina(); restaurarModelo(true); moverMecanismo(0);
     agulhas.position.z = clips.position.z = barras.position.z = 0; posicao = "normal";
     const ns = pag ? [10, 11, 12, 13, 14, 15, 16, 17] : [1, 2, 3, 4, 5, 6, 7, 8, 9];
-    drawPanel("Treinamento PRO-001122 · Anexo 5", "Passos " + (pag ? "10 a 17" : "1 a 9"),
-      "Escolha o passo. Os desvios são sorteados a cada vez: inspecione, decida a ação e o resultado vai para o relatório.");
-    setButtons(ns.map(n => n === 1 ? ["passo1", "Passo 1\nDAM e\nconectores"] : ["p:" + n, "Passo " + n + "\n" + PASSOS[n].curto]).concat([[pag ? "passos0" : "passos1", pag ? "Passos\n1 a 9" : "Passos\n10 a 17"], ["menu", "Menu"]]));
+    papel = papelCts2;
+    drawPanel("Treinamento PRO-001122 · Anexo 5", "Passos " + (pag ? "10 a 17" : "1 a 9") + (papel ? " · você é o " + papel : ""),
+      "Escolha o passo. Os desvios são sorteados a cada vez: inspecione, decida a ação e o resultado vai para o relatório." + (papel ? "\n" + NOME_PAPEL[papel] + ": " + PAPEIS_CTS2[papel] : ""));
+    setButtons(ns.map(n => n === 1 ? ["passo1", "Passo 1\nDAM e\nconectores"] : ["p:" + n, "Passo " + n + "\n" + PASSOS[n].curto]).concat([[pag ? "passos0" : "passos1", pag ? "Passos\n1 a 9" : "Passos\n10 a 17"], ["passosInicio", "Trocar\npapel"], ["menu", "Menu"]]));
   }
   function startPro(n) {
     const def = PASSOS[n];
     menuPassos(n >= 10 ? 1 : 0);
-    mode = "pro";
+    mode = "pro"; papel = papelCts2;
     pro = { n, def, i: -1, f: def.sortear ? def.sortear() : {}, achados: [], errosPeca: 0, bloqueios: 0, criticos: 0, t0: performance.now(), d: null, ev0: licenca.eventos.length };
     if (def.prep) def.prep();
     telaInicioPro();
-    coordenadorFala(`Equipe, vamos ao passo ${n}: ${def.titulo}.` + (licenca.ativa ? "" : " Peçam licença ao CCP antes de entrar na via."));
+    instrucao(`Equipe, vamos ao passo ${n}: ${def.titulo}.` + (licenca.ativa ? "" : papel === "executante" ? " Vou pedir a licença ao CCP." : " Peçam licença ao CCP antes de entrar na via."), "Coordenador");
   }
   function telaInicioPro() {
     const n = pro.n, def = pro.def;
-    drawPanel(`Passo ${n} · Antes de começar`, def.titulo, (def.seg !== "—" ? `Procedimentos de Segurança ${def.seg} valem para este passo. ` : "") +
-      (licenca.ativa ? "Licença do CCP concedida. " : "Sem licença do CCP: peça antes de começar. ") + "Siga a peça que pisca e decida a ação em cada desvio.", "#f2a400");
-    setButtons((licenca.ativa ? [] : [["licenca", "Pedir licença\nao CCP"]]).concat([["pok", "Começar"], [voltarLista(n), "Voltar"]]));
+    const exec = papel === "executante", coord = papel === "coordenador";
+    drawPanel(`Passo ${n} · Antes de começar` + (papel ? " · " + papel : ""), def.titulo, (def.seg !== "—" ? `Procedimentos de Segurança ${def.seg} valem para este passo. ` : "") +
+      (licenca.ativa ? "Licença do CCP concedida. " : exec ? "O coordenador pede a licença ao CCP quando você começar. " : "Sem licença do CCP: peça antes de começar. ") +
+      (coord ? "O executante faz o serviço; você cobra o Apontar e Falar e confere cada avaliação dele." : "Siga a peça que pisca e decida a ação em cada desvio."), "#f2a400");
+    setButtons((licenca.ativa || exec ? [] : [["licenca", "Pedir licença\nao CCP"]]).concat([["pok", "Começar"], [voltarLista(n), "Voltar"]]));
   }
   function comecarPro() {
+    if (!licenca.ativa && papel === "executante") {
+      drawPanel(`Passo ${pro.n} · Antes de começar`, "O coordenador está pedindo a licença", "Aguarde o CCP conceder a licença pelo rádio.", "#3ea0e4");
+      setButtons([]);
+      return pedirLicenca(() => avancarPro());
+    }
     if (!licenca.ativa) {
       pro.bloqueios++;
       alertaRisco("Tentou começar a atividade na via sem licença do CCP.");
@@ -1955,6 +2022,7 @@ body.vr #stick { display: none; }
     if (!e) return fimPro();
     pulseIds = []; pro.d = null;
     if (!e.decisao) guardarFerramentas();
+    if (papel === "coordenador") return mostrarProCoord(e);
     if (e.yoshi) {
       coordenadorFala("Antes de intervir, façam o Apontar e Falar.");
       drawPanel(`Passo ${pro.n} · Apontar e Falar`, "Faça o Yoshi Yoshi", "Aponte para a máquina e fale em voz alta: \"Máquina bloqueada, área livre, posso intervir\". Só depois toque nela.", "#f2a400");
@@ -1970,6 +2038,59 @@ body.vr #stick { display: none; }
     pulseIds = [e.alvo];
   }
   function avancarPro() { pro.i++; mostrarPro(); }
+  // Passos 2 a 17 com o participante no papel de coordenador: o avatar do mantenedor (executante) faz o serviço,
+  // o coordenador cobra o Apontar e Falar e confere cada avaliação proposta pelo executante.
+  function mostrarProCoord(e) {
+    pro.conf = null;
+    if (e.yoshi) {
+      const esqueceu = Math.random() < 0.3;
+      pro.conf = { yoshi: true, esqueceu };
+      if (!esqueceu) instrucao("Máquina bloqueada, área livre, posso intervir.", "Executante");
+      drawPanel(`Passo ${pro.n} · Apontar e Falar`, "O executante vai intervir na máquina",
+        esqueceu ? "Ele já está com a mão na máquina e não fez o Apontar e Falar." : "Ele apontou para a máquina e falou: \"Máquina bloqueada, área livre, posso intervir\".", "#f2a400");
+      return setButtons([["pc:sim", "Pode\nseguir"], ["pc:nao", "Parar e cobrar\no Yoshi Yoshi"]]);
+    }
+    if (e.decisao) {
+      const d = e.decisao(pro.f), ids = d.opcoes.map(o => o[0]);
+      pro.conf = { d, proposta: propor(d.certo, ids) };
+      const lab = d.opcoes.find(o => o[0] === pro.conf.proposta)[1].replace(/\n/g, " ");
+      drawPanel(`Passo ${pro.n} · Confira o executante`, d.titulo, d.visto + "\nO executante vai registrar: " + lab + ".\nEstá certo?", "#f2a400");
+      return setButtons([["pc:sim", "Confere"], ["pc:nao", "Não confere:\ncorrigir"]]);
+    }
+    drawPanel(etiquetaPro() + " · executante", e.titulo, "Acompanhe: o executante faz esta etapa. Fique fora da área de movimentação das agulhas.", "#3ea0e4");
+    setButtons([]); busy = true;
+    mantenedorAgir(centroPeca(e.alvo), GIRAM_NA_MAO.has(e.alvo));
+    setTimeout(() => {
+      if (!pro || pro.def.etapas[pro.i] !== e) { busy = false; return; }
+      if (e.ferramenta) mostrarFerramenta(e.ferramenta, centroPeca(e.alvo), e.leitura ? e.leitura(pro.f) : "");
+      if (!e.anim) { busy = false; return avancarPro(); }
+      e.anim(pro.f, ok => {
+        busy = false;
+        if (ok === false) return setButtons([["pseg:repetir", "Saí da área:\ntentar de novo"]]);
+        avancarPro();
+      });
+    }, 1400);
+  }
+  function conferirPro(sim) {
+    const c = pro.conf; if (!c) return;
+    pro.conf = null;
+    if (c.yoshi) {
+      const certo = c.esqueceu ? !sim : sim;
+      pro.achados.push({ titulo: "Conferência do Apontar e Falar", escolha: sim ? "deixou seguir" : "parou e cobrou", correto: c.esqueceu ? "parar e cobrar" : "deixar seguir", certo, critico: false });
+      if (c.esqueceu && sim) { pro.bloqueios++; alertaRisco("Deixou o executante intervir sem o Apontar e Falar (Yoshi Yoshi)."); }
+      else if (!certo) som.erro(); else som.selecionar();
+      if (c.esqueceu && !sim) instrucao("Máquina bloqueada, área livre, posso intervir.", "Executante");
+      return avancarPro();
+    }
+    const d = c.d, lab = id => ((d.opcoes.find(o => o[0] === id) || [id, id])[1]).replace(/\n/g, " ");
+    const propostaCerta = c.proposta === d.certo, certo = sim === propostaCerta, critico = !certo && sim && !!d.critico;
+    if (critico) { pro.criticos++; alertaRisco(d.risco || "Conferiu e liberou uma decisão crítica errada: " + d.titulo + "."); }
+    else if (!certo) som.erro(); else som.selecionar();
+    pro.achados.push({ titulo: "Conferência: " + d.titulo, escolha: sim ? "confere (" + lab(c.proposta) + ")" : "não confere", correto: propostaCerta ? "confere" : "não confere; o certo era " + lab(d.certo), certo, critico });
+    drawPanel(`Passo ${pro.n} · Conferência`, (certo ? "Certo: " : "Atenção: ") + d.titulo,
+      (propostaCerta ? "O executante estava certo: " : "O executante estava errado. O certo: ") + lab(d.certo) + ".", certo ? "#23c552" : "#e5533d");
+    setButtons([["pseg", "Continuar"]]);
+  }
   function tocarPro(id) {
     const e = pro.def.etapas[pro.i];
     if (!e || !e.alvo) return;
@@ -2074,22 +2195,62 @@ body.vr #stick { display: none; }
     if (britaObj) { britaObj.visible = sim; if (sim) { const c = centroPeca("agulhas"); britaObj.position.set(c.x, Y_PATIM + 0.17, 0.7); } }
   }
   function limparDesafio() { mostrarBrita(false); if (mode !== "desafio") dz = null; }
-  function menuDesafios(lista) {
-    mode = "menuDesafios"; pulseIds = []; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas();
-    if (lista) {
-      drawPanel("Desafios de defeitos", "Instrutor: escolha o defeito", "O participante não vê qual foi escolhido; o sintoma é relatado pelo CCP no rádio.");
-      return setButtons(Object.keys(DEFEITOS).map(k => ["dz:" + k, DEFEITOS[k].curto]).concat([["desafios", "Voltar"]]));
-    }
-    drawPanel("Desafios de defeitos", "Resolva o defeito na máquina de chave",
-      "Um defeito é sorteado. Ouça o sintoma do CCP, inspecione as peças, faça as medições e diga a causa. A nota considera o diagnóstico, o número de verificações, o tempo e a segurança.");
-    setButtons([["dz:sorte", "Novo desafio\nsorteado"], ["dzlista", "Instrutor:\nescolher defeito"], ["menu", "Menu"]]);
+  // Desafios: temas = CTS-2 (defeitos da máquina, abaixo) + cada PRO carregado que traga "desafios" (motor genérico).
+  function temasDesafio() {
+    return [["cts2", "Máquina de\nchave CTS-2"]].concat(ordemPros.filter(id => PROS[id] && (PROS[id].desafios || []).length > 1)
+      .map(id => [id, duasLinhas(PROS[id].etiqueta || PROS[id].titulo)]));
   }
-  function startDesafio(k) {
-    if (k === "sorte") k = umDe(Object.keys(DEFEITOS));
+  function menuDesafios(tema) {
+    mode = "menuDesafios"; pulseIds = []; papel = null; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas();
+    estadoLdlObjetos("off", false, "off"); mostrarCepo(false); if (posicao !== "normal") moverAmv("normal", false);
+    if (tema) return menuTemaDesafio(tema);
+    const t = temasDesafio();
+    drawPanel("Desafios", "Escolha o tema do desafio",
+      "Um problema é sorteado no tema escolhido: ouça o relato, inspecione as peças, faça as verificações e diga a causa. A nota considera o diagnóstico, o número de verificações, o tempo e a segurança.\nSorteio geral: tema e problema sorteados entre os " + t.length + " temas.");
+    setButtons(t.map(([id, r]) => ["dzc:" + id, r]).concat([["dz:geral", "Sorteio\ngeral"], ["menu", "Menu"]]));
+  }
+  function menuTemaDesafio(tema, instrutor) {
+    const cts = tema === "cts2", def = PROS[tema];
+    if (!cts && !def) return menuDesafios();
+    const lista = cts ? Object.keys(DEFEITOS).map(k => [k, DEFEITOS[k].curto]) : def.desafios.map(d => [d.id, d.curto]);
+    const tag = "Desafios · " + (cts ? "PRO-001122 · CTS-2" : def.pro);
+    if (instrutor) {
+      drawPanel(tag, "Instrutor: escolha o problema", "O participante não vê qual foi escolhido; ele só ouve o relato.");
+      return setButtons(lista.map(([k, c]) => ["dz:" + tema + ":" + k, c]).concat([["dzc:" + tema, "Voltar"]]));
+    }
+    drawPanel(tag, cts ? "Resolva o defeito na máquina de chave" : def.titulo,
+      (cts ? "Um defeito é sorteado. Ouça o sintoma do CCP, inspecione as peças, faça as medições e diga a causa."
+        : "Um problema baseado no " + def.pro + " é sorteado. Ouça o relato, toque nas peças para inspecionar, use as verificações e diga a causa.") + `\n${lista.length} problemas possíveis.`);
+    setButtons([["dz:" + tema + ":sorte", "Novo desafio\nsorteado"], ["dzl:" + tema, "Instrutor:\nescolher"], ["desafios", "Outros\ntemas"], ["menu", "Menu"]]);
+  }
+  function startDesafioPro(tema, k) {
+    const def = PROS[tema];
+    if (!def || !(def.desafios || []).length) return menuDesafios();
+    const d = def.desafios.find(x => x.id === k) || umDe(def.desafios);
+    menuDesafios();
+    mode = "desafio";
+    const f = sortearVars(def), temPecas = Object.keys(d.pistas || {}).length > 0;
+    const relato = (d.relato || []).map(x => (x.quem ? x.quem + ": " : "") + tpl(x.texto, f)).join("\n");
+    dz = { gen: true, tema, def, k: d.id, d, f, relato, verif: 0, riscos: 0, t0: performance.now(), feitos: [], ev0: licenca.eventos.length, exige: def.exigeLicenca !== false && temPecas };
+    rodarEfeitos(d.prep, f);
+    falar(d.relato, f);
+    telaDesafio(relato + (dz.exige && !licenca.ativa ? "\nAntes de tocar nas peças da via, peça licença ao CCP (primeiro botão)." : "") + (temPecas ? "\nToque nas peças para inspecionar." : ""), null, "Relato");
+  }
+  function verificacaoDesafio(id) {
+    const v = (dz.d.verificacoes || []).find(x => x.id === id); if (!v) return;
+    verificar(v.botao.replace(/\n/g, " ")); som.clique();
+    telaDesafio(tpl(v.texto, dz.f), null, v.botao.replace(/\n/g, " "));
+  }
+  function startDesafio(arg) {
+    let tema = "cts2", k = arg;
+    if (arg === "geral") { tema = umDe(temasDesafio())[0]; k = "sorte"; }
+    else if (arg.includes(":")) [tema, k] = arg.split(":");
+    if (tema !== "cts2") return startDesafioPro(tema, k);
+    if (k === "sorte" || !DEFEITOS[k]) k = umDe(Object.keys(DEFEITOS));
     menuDesafios();
     mode = "desafio";
     const d = DEFEITOS[k];
-    dz = { k, d, verif: 0, riscos: 0, t0: performance.now(), feitos: [], ev0: licenca.eventos.length };
+    dz = { tema: "cts2", k, d, verif: 0, riscos: 0, t0: performance.now(), feitos: [], ev0: licenca.eventos.length };
     if (d.prep) d.prep();
     if (k === "obstrucao") mostrarBrita(true);
     coordenadorFala(d.sintoma + (licenca.ativa ? "" : " Peçam licença antes de entrar na via."), false, "CCP");
@@ -2097,12 +2258,22 @@ body.vr #stick { display: none; }
   }
   function telaDesafio(texto, cor, titulo) {
     drawPanel(`Desafio · ${dz.verif} verificaç${dz.verif === 1 ? "ão" : "ões"}`, titulo || "Sintoma relatado pelo CCP", texto, cor);
+    if (dz.gen) return setButtons((dz.exige && !licenca.ativa ? [["licenca", "Pedir licença\nao CCP"]] : []).concat((dz.d.verificacoes || []).map(v => ["dv:" + v.id, v.botao]))
+      .concat([["dt:sintoma", "Repetir\nrelato"], ["dt:diag", "Diagnosticar"], ["menu", "Desistir"]]));
     setButtons((licenca.ativa ? [] : [["licenca", "Pedir licença\nao CCP"]]).concat([["dt:alim", "Medir\nalimentação\n(6 e 8)"], ["dt:ind", "Medir\nindicação\n(32 e 52)"], ["dt:forca", "Medir força\n(célula)"], ["dt:cmd", "Comandar\nteste"],
       ["dt:sintoma", "Repetir\nsintoma"], ["dt:diag", "Diagnosticar"], ["menu", "Desistir"]]));
   }
   function verificar(nome) { dz.verif++; dz.feitos.push(nome); }
   function testeDesafio(t) {
     const d = dz.d;
+    if (dz.gen) {
+      if (t === "sintoma") { falar(d.relato, dz.f); return telaDesafio(dz.relato, null, "Relato"); }
+      if (t === "diag") {
+        drawPanel(`Desafio · ${dz.verif} verificaç${dz.verif === 1 ? "ão" : "ões"}`, "Qual é a causa do problema?", "Escolha a causa. Só diagnostique quando tiver evidência suficiente.");
+        return setButtons(dz.def.desafios.map(x => ["dd:" + x.id, x.curto]).concat([["dt:sintoma", "Voltar à\ninvestigação"]]));
+      }
+      return;
+    }
     if (t === "sintoma") return telaDesafio(d.sintoma);
     if (t === "diag") {
       drawPanel(`Desafio · ${dz.verif} verificaç${dz.verif === 1 ? "ão" : "ões"}`, "Qual é a causa do defeito?", "Escolha a causa. Só diagnostique quando tiver evidência suficiente.");
@@ -2130,6 +2301,11 @@ body.vr #stick { display: none; }
   }
   function abrirCaixaDesafio() { tampaCx.rotation.z = -1.45; }
   function tocarDesafio(id) {
+    if (dz.gen) {
+      if (dz.exige && !licenca.ativa) { dz.riscos++; alertaRisco("Inspeção na via sem licença do CCP."); return telaDesafio("Peça licença ao CCP antes de entrar na via.", "#e5533d", "Sem licença do CCP"); }
+      verificar(PARTS[id].nome); som.selecionar();
+      return telaDesafio(tpl((dz.d.pistas || {})[id] || `Nada anormal em ${PARTS[id].nome.toLowerCase()}.`, dz.f), null, PARTS[id].nome);
+    }
     if (!licenca.ativa) { dz.riscos++; alertaRisco("Intervenção na máquina sem licença do CCP."); return telaDesafio("Peça licença ao CCP antes de mexer na máquina.", "#e5533d", "Sem licença do CCP"); }
     verificar(PARTS[id].nome);
     som.selecionar();
@@ -2142,17 +2318,19 @@ body.vr #stick { display: none; }
   function diagnosticar(k) {
     const d = dz.d, certo = k === dz.k, seg = Math.round((performance.now() - dz.t0) / 1000);
     const nota = certo ? Math.max(10, 100 - Math.max(0, dz.verif - 3) * 5 - Math.floor(seg / 60) * 2 - dz.riscos * 20) : 0;
-    const critico = !certo && d.critico;
-    if (critico) alertaRisco("Diagnóstico errado com agulha solta: a chave seria liberada com risco de descarrilamento.");
+    const critico = !certo && d.critico, gen = dz.gen;
+    const nomeDe = x => gen ? (dz.def.desafios.find(y => y.id === x) || { nome: x }).nome : DEFEITOS[x].nome;
+    if (critico) alertaRisco(gen ? "Diagnóstico errado num problema crítico: " + d.nome + "." : "Diagnóstico errado com agulha solta: a chave seria liberada com risco de descarrilamento.");
     if (!certo) som.erro(); else som.bip();
     const evs = licenca.eventos.slice(dz.ev0).map(t => "CCP: " + t);
-    registrarResultado({ modulo: "Desafio · " + d.nome, segundos: seg, avaliacoes: 1, avaliacoesCertas: certo ? 1 : 0, errosPeca: 0, bloqueios: dz.riscos,
-      detalhes: [`Causa escolhida: ${DEFEITOS[k].nome}` + (certo ? " (certo)" : ` (correto: ${d.nome})${critico ? " [crítico]" : ""}`), `nota ${nota}`, `${dz.verif} verificações: ${dz.feitos.join(", ") || "nenhuma"}`].concat(dz.riscos ? [`${dz.riscos} ação(ões) de risco`] : []).concat(evs).join("; ") });
+    registrarResultado({ modulo: "Desafio · " + (gen ? (dz.def.grupo || dz.def.titulo) + " · " : "") + d.nome, segundos: seg, avaliacoes: 1, avaliacoesCertas: certo ? 1 : 0, errosPeca: 0, bloqueios: dz.riscos,
+      detalhes: [`Causa escolhida: ${nomeDe(k)}` + (certo ? " (certo)" : ` (correto: ${d.nome})${critico ? " [crítico]" : ""}`), `nota ${nota}`, `${dz.verif} verificações: ${dz.feitos.join(", ") || "nenhuma"}`].concat(dz.riscos ? [`${dz.riscos} ação(ões) de risco`] : []).concat(evs).join("; ") });
     mode = "fim"; guardarFerramentas(); mostrarBrita(false); mantenedorVoltar();
+    if (gen) { estadoLdlObjetos("off", false, "off"); mostrarCepo(false); }
     drawPanel(`Desafio concluído · nota ${nota}`, certo ? "Diagnóstico correto: " + d.nome : "Diagnóstico errado. Era: " + d.nome,
       quem() + `\n${dz.verif} verificações · ${tempoTxt(seg)}` + (dz.riscos ? ` · ${dz.riscos} ação(ões) de risco` : "") + "\nCorreção: " + d.correcao, certo ? "#23c552" : "#e5533d");
-    coordenadorFala(certo ? "Diagnóstico correto. Executem a correção e confirmem com o CCP." : "Diagnóstico errado. Vamos revisar as evidências.");
-    setButtons([["dz:sorte", "Novo\ndesafio"], ["desafios", "Desafios"], ["menu", "Menu"]]);
+    instrucao(certo ? (gen ? "Diagnóstico correto. Executem a correção." : "Diagnóstico correto. Executem a correção e confirmem com o CCP.") : "Diagnóstico errado. Vamos revisar as evidências.", "Coordenador");
+    setButtons([["dz:" + (dz.tema || "cts2") + ":sorte", "Novo\ndesafio"], ["dzc:" + (dz.tema || "cts2"), "Mesmo\ntema"], ["desafios", "Outros\ntemas"], ["menu", "Menu"]]);
   }
 
   // ---------- LDL: Liberação e Devolução de Linha (PGS-003781 rev. 06, EFC) ----------
@@ -2231,177 +2409,50 @@ body.vr #stick { display: none; }
   const horaTxt = d => String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
   // Decisão de múltipla escolha: opções [id, texto]; a primeira é a correta (são embaralhadas na tela).
   const escolha = (titulo, visto, certa, erradas, extra) => Object.assign({ titulo, visto, opcoes: [["c", certa]].concat(erradas.map((t, k) => ["e" + k, t])) }, extra);
+  // Rótulo de botão em até duas linhas
+  const duasLinhas = t => { if (t.includes("\n") || t.length <= 12) return t; const p = t.split(" "), m = Math.ceil(p.length / 2); return p.slice(0, m).join(" ") + "\n" + p.slice(m).join(" "); };
 
-  function etapasLdl(f) {
-    const pref = f.prefixo, lin = "linha 02", amv = "AMV 03";
-    const licencaTxt = `LDL número ${f.num}, ${lin} e ${amv}, das ${f.ini} às ${f.fim}, rota de fuga pela linha 03`;
-    const imprevistos = {
-      equipe: escolha("Outra equipe quer entrar", "Um coordenador da Via Permanente chega com 3 executantes e pede para trabalhar na sua LDL.",
-        "Só entra se estiver na programação D-1, com coordenador secundário, jumper próprio e na mesma frequência de rádio.",
-        ["Pode entrar e usar o nosso jumper: o circuito já está ocupado.", "Pode entrar; se precisar falar com a gente, o CCP faz a ponte pelo rádio."],
-        { explica: "PGS item 12: inclusão só se programada em D-1, jumper exclusivo por equipe, uma única frequência de rádio e proibido usar o CCO/CCP como ponte." }),
-      alerta: escolha("Alerta vermelho", "O CCP avisa alerta vermelho na região e a equipe confirma descargas atmosféricas próximas.",
-        "Paralisar as atividades, sair da via e informar o CCP.",
-        ["Acelerar para terminar antes de a chuva chegar.", "Continuar: com a LDL aberta não passa trem."],
-        { explica: "PGS item 11: em alerta vermelho (chuva, vento, descarga atmosférica ou fogo) confirmado no campo, paralisar e informar o centro de controle." }),
-      extensao: escolha("Serviço fora da programação", "Para trocar um cabo seria preciso trabalhar também no AMV 05, que não está na programação desta LDL.",
-        "Não pedir extensão: o serviço no AMV 05 precisa ser reprogramado.",
-        ["Pedir ao CPT para incluir o AMV 05 nesta LDL.", "Ir até o AMV 05 rapidamente, sem avisar o CCP."],
-        { explica: "PGS item 11, \"Importante\": não fazer solicitações ao CPT para extensão da região de trabalho que não esteja na programação.", critico: { e1: "Foi trabalhar em AMV fora da LDL sem avisar o CCP." } }),
-      exclusivo: escolha("Pedido de ajuda", "A equipe tem 5 executantes e falta uma pessoa para apertar os bornes. Pedem para você, coordenador, ajudar.",
-        "Não: com mais de 3 executantes o coordenador fica só coordenando.",
-        ["Ajudar, mantendo o rádio na cintura.", "Ajudar e pedir ao CCP para avisar se vier trem."],
-        { explica: "PGS item 8: em atividades com mais de 3 executantes o coordenador não pode fazer outras atividades nem intervir em ativos." })
-    };
-    const imp = embaralhar(Object.keys(imprevistos)).slice(0, 2).map(k => ({ decisao: imprevistos[k] }));
-    return [
-      { decisao: escolha("Quem pede a LDL", `Ordem de manutenção programada em D-1: preventiva da MCH CTS-2 do ${amv}, ${lin} do pátio. Quem chama o CCP para pedir a LDL?`,
-          "Você, coordenador mestre: treinado no PGS de LDL, na lista de autorizados e indicado na programação.",
-          ["Qualquer executante da equipe que chegar primeiro ao local.", "O técnico mais experiente, mesmo fora da lista de autorizados."],
-          { explica: "PGS itens 6 e 8: a LDL é concedida ao coordenador mestre, que é o solicitante e dono da LDL. O CCP confere a lista de autorizados e a programação." }) },
-      { alvo: "placaPT", titulo: "Instale a placa \"Pessoas Trabalhando\"", corpo: "Passo 1 do PGS: ao chegar, afixe a placa na parte externa da via, sem ocupar o gabarito de circulação (2,12 m do eixo). Toque no local certo entre as placas marcadas.",
-        prep: () => estadoLdlObjetos("ghost", true, "off"), errado: { placaDentro: "Placa instalada dentro do gabarito, sem LDL: a equipe ocupou a via." },
-        feito: () => { estadoLdlObjetos("on", false, "off"); som.encaixe(); } },
-      { decisao: escolha("Chamada ao CCP", "Passo 2: apresente-se ao CCP. Qual chamada fazer?",
-          `"CCP, aqui é ${pref}, coordenador mestre, no pátio, ${lin}, ${amv}. Solicito LDL para a preventiva da MCH CTS-2, programada para hoje."`,
-          ["\"CCP, aqui é a equipe da via. Vamos entrar na linha para mexer na chave.\"", `Instalar o jumper na ${lin} e só depois chamar o CCP.`],
-          { explica: "Passo 2 do PGS: o coordenador mestre se apresenta chamando com seu prefixo e local de trabalho. A ocupação forçada (jumper) só pode ser feita após contato com o centro de controle.",
-            critico: { e1: "Instalou o jumper antes de falar com o CCP." }, apos: () => {
-              coordenadorFala(`CCP, aqui é ${pref}, coordenador mestre, no pátio, ${lin}, ${amv}. Solicito LDL para a preventiva da máquina de chave, programada para hoje.`, false, "Coordenador mestre");
-              coordenadorFala(`${pref}, aqui é o CCP. Atividade conferida na programação e na lista de autorizados. Vamos ao check-list.`, false, "CCP");
-            } }) },
-      { decisao: escolha("Check-list do CCP", "O CCP pergunta: o solicitante e a equipe são treinados em LDL e ROF? A equipe tem as placas conforme o ROF?",
-          "Sim para os dois: todos treinados e a placa Pessoas Trabalhando instalada.",
-          ["Sim, só um executante novo não fez o treinamento; ele fica apenas olhando.", "Não temos placa, mas o serviço é rápido."],
-          { explica: "Anexo 01, check-list de liberação: equipe treinada em LDL e ROF e placas conforme o ROF. A preventiva da MCH passa de 30 minutos, então a placa não é dispensada.", apos: () => {
-              coordenadorFala(`${pref}, ${lin} e ${amv} bloqueados no painel. Retirem a indicação da máquina de chave e instalem o jumper. Autorizado.`, false, "CCP");
-            } }) },
-      { alvo: "caixa", titulo: "Retire a indicação da máquina de chave", corpo: "Pátio sinalizado com trabalho no AMV: o CCP pede para retirar a indicação da máquina de chave. Toque na caixa de junção.",
-        prep: () => estadoLdlObjetos("on", false, "off"), anim: (f, done) => { som.tampa(); tween(0.8, k => { tampaCx.rotation.z = -ease(k) * 1.45; }, () => done()); } },
-      { decisao: escolha("Instalação do jumper", "Antes de encaixar o jumper fixo no trilho, o que fazer?",
-          "Limpar as laterais dos boletos com escova de aço, encaixar a garra faceando o passeio do trilho e apertar as tarraxas.",
-          ["Encaixar sobre a graxa mesmo: se não ocupar, o CCP avisa.", "Prender o jumper enrolando o cabo no trilho."],
-          { explica: "Anexo 06: definir local com boa visibilidade, limpar e lixar os boletos, encaixar a garra faceando o passeio do trilho e apertar e reapertar as tarraxas." }) },
-      { alvo: "jumper", titulo: "Instale o jumper", corpo: "Toque no jumper marcado entre os trilhos para instalá-lo. Depois peça ao CCP a confirmação da ocupação.",
-        prep: () => estadoLdlObjetos("on", false, "ghost"), feito: () => {
-          estadoLdlObjetos("on", false, "on"); som.rosca();
-          coordenadorFala(`CCP, ${pref}. Jumper instalado na ${lin}, junto ao ${amv}. Confirma a ocupação?`, false, "Coordenador mestre");
-          coordenadorFala(f.shuntFalha ? `${pref}, negativo. Não temos ocupação no painel.` : `${pref}, ocupação confirmada no painel.`, false, "CCP");
-        } },
-      ...(f.shuntFalha ? [{ decisao: escolha("Shunt não confirmado", "O CCP não vê a ocupação do jumper no painel. O que fazer?",
-          "Instalar em outro local; se ainda não confirmar, trocar o jumper por outro e repetir.",
-          ["Pedir ao CCP para liberar a LDL assim mesmo.", "Seguir o trabalho sem o jumper: a linha já está bloqueada."],
-          { explica: "Anexo 06: se o Controlador não confirma o shunt, instalar em outro local; se ainda não confirmar, substituir o dispositivo e voltar ao passo de instalação.",
-            critico: { e0: "Pediu a LDL sem a ocupação confirmada.", e1: "Trabalhou sem jumper confirmado." }, apos: () => {
-              coordenadorFala(`CCP, ${pref}. Jumper trocado e reinstalado. Confirma a ocupação?`, false, "Coordenador mestre");
-              coordenadorFala(`${pref}, ocupação confirmada no painel.`, false, "CCP");
-            } }) }] : []),
-      { decisao: escolha("Cotejar a licença", `O CCP licencia: "${pref}, ${licencaTxt}." Como responder?`,
-          `"CCP, ${pref} repete: ${licencaTxt}."`,
-          [`"CCP, ${pref} repete: LDL número ${f.numErrado}, ${lin} e ${amv}, das ${f.ini} às ${f.fim}, rota de fuga pela linha 03."`, "\"Entendido, CCP.\""],
-          { repetir: true, explica: "Passo 3 do PGS: o coordenador mestre repete a sentença completa do licenciamento, com número da LDL, tempo da licença e rota de fuga. Anexo 01: a mensagem é repetida na íntegra e cotejada pelo CCP.",
-            antes: () => coordenadorFala(`${pref}, ${licencaTxt}.`, false, "CCP"),
-            senao: () => coordenadorFala(`${pref}, negativo. Repita a licença na íntegra.`, false, "CCP"),
-            apos: () => {
-              coordenadorFala(`CCP, ${pref} repete: ${licencaTxt}.`, false, "Coordenador mestre");
-              coordenadorFala(`${pref}, correto. LDL ${f.num} aberta às ${horaTxt(new Date())}.`, false, "CCP");
-              licenca.ativa = true; licenca.desde = performance.now(); licenca.pedido = false;
-              licenca.eventos.push(`LDL ${f.num} aberta pelo CCP`); ldl.aberta = true;
-            } }) },
-      { decisao: escolha("Informar a equipe", `LDL ${f.num} aberta. O que passar para os executantes antes de começar?`,
-          `Número da LDL (${f.num}), horário das ${f.ini} às ${f.fim} e rota de fuga pela linha 03.`,
-          ["Só que a linha está liberada; o número da LDL fica comigo.", "Número e horário; a rota de fuga cada um vê na hora."],
-          { explica: "Passo 4 do PGS: informar a equipe o número da LDL, o horário liberado e a rota de fuga. Nenhum executante começa sem saber o número, o início e o término." }) },
-      { decisao: escolha("Placa Linha Impedida", "Manutenção eletroeletrônica no circuito de chave, com jumper instalado e AMV bloqueado pelo CCP. Precisa da placa Linha Impedida entre os trilhos?",
-          "Não é necessária nesta atividade.",
-          ["Sim, entre os trilhos, sempre que houver LDL.", "Só se o CCP pedir."],
-          { explica: "Quadro 03 do PGS: a Linha Impedida vai entre os trilhos quando não há bloqueio físico ou shunt; em manutenção de eletroeletrônica no circuito de chave ela não é necessária." }) },
-      { alvo: "motor", titulo: "Execute a manutenção", corpo: "LDL aberta, equipe informada. Toque na máquina para executar a preventiva (os passos 2 a 17 da CTS-2 ficam no outro treinamento).",
-        anim: (f, done) => { som.chave(); setTimeout(done, 900); } },
-      ...imp,
-      f.restricao
-        ? { decisao: escolha("Restrição na via", "Terminada a preventiva, ficou uma restrição: o AMV 03 só pode ser passado a 10 km/h até nova regulagem. O que fazer?",
-            "Informar ao CCP antes de encerrar e manter o jumper até ele inserir a restrição no SGF.",
-            ["Retirar o jumper e informar a restrição depois de encerrar a LDL.", "Não informar: a máquina está funcionando."],
-            { explica: "PGS item 11: para condições que gerem restrição, chamar o centro de controle antes de encerrar a LDL e manter a ocupação forçada com jumper até a restrição entrar no SGF.",
-              critico: { e1: "Deixou restrição na via sem informar o CCP." }, apos: () => {
-                coordenadorFala(`CCP, ${pref}. Restrição de 10 quilômetros por hora no ${amv} até nova regulagem. Jumper mantido.`, false, "Coordenador mestre");
-                coordenadorFala(`${pref}, restrição registrada no SGF.`, false, "CCP");
-              } }) }
-        : null,
-      { alvo: "caixa", titulo: "Devolva a indicação da máquina", corpo: "Terminado o serviço, recoloque a indicação da máquina de chave e feche a caixa de junção.",
-        anim: (f, done) => { som.tampa(); tween(0.8, k => { tampaCx.rotation.z = -(1 - ease(k)) * 1.45; }, () => done()); } },
-      { decisao: escolha("Retirada do jumper", "Qual a sequência para retirar o jumper?",
-          "Tirar equipe e ferramentas do gabarito, comunicar a conclusão ao CCP, receber autorização, retirar o jumper e confirmar a retirada.",
-          ["Retirar o jumper primeiro e depois recolher a equipe e as ferramentas.", "Retirar o jumper e avisar o CCP só na devolução da LDL."],
-          { explica: "Anexo 06 e PGS item 11: a desocupação do circuito só pode ser feita após contato com o centro de controle, com a equipe e o ferramental já fora do gabarito.",
-            critico: { e0: "Retirou o jumper sem autorização do CCP.", e1: "Retirou o jumper sem autorização do CCP." }, apos: () => {
-              coordenadorFala(`CCP, ${pref}. Equipe e ferramentas fora do gabarito. Solicito retirar o jumper.`, false, "Coordenador mestre");
-              coordenadorFala(`${pref}, autorizado retirar o jumper.`, false, "CCP");
-            } }) },
-      { alvo: "jumper", titulo: "Retire o jumper", corpo: "Toque no jumper para retirá-lo, folgando as tarraxas. Depois confirme a retirada com o CCP.",
-        feito: () => { estadoLdlObjetos("on", false, "off"); som.rosca(); coordenadorFala(`CCP, ${pref}. Jumper retirado.`, false, "Coordenador mestre"); coordenadorFala(`${pref}, desocupação confirmada.`, false, "CCP"); } },
-      { alvo: "placaPT", titulo: "Recolha a sinalização", corpo: "Recolha a placa Pessoas Trabalhando: ferramentas, materiais e sinalização saem junto com a equipe.",
-        feito: () => { estadoLdlObjetos("off", false, "off"); som.encaixe(); } },
-      { decisao: escolha("Devolver a LDL", "Passo 5: devolva a LDL ao CCP. Qual a devolução correta?",
-          `"CCP, ${pref}. Preventiva concluída na ${lin}, ${amv}. Equipes fora da via, ferramentas, materiais e sinalização recolhidos, jumper retirado. ${f.restricao ? "Restrição de 10 km/h no AMV 03" : "Circulação normal"}. Devolvo a LDL ${f.num}."`,
-          ["\"CCP, terminamos aqui. Pode liberar.\"", `"CCP, ${pref}. Devolvo a LDL ${f.num}; a placa e o jumper ficam para a próxima equipe."`],
-          { explica: "Passo 5 e Anexo 01 (check-list de devolução): manutenção concluída, equipes fora, ferramentas, materiais e sinalização recolhidos, posição de equipamentos e restrições informadas.",
-            critico: { e1: "Devolveu a linha deixando material e jumper na via." }, apos: () => {
-              coordenadorFala(`CCP, ${pref}. Preventiva concluída. Equipes fora da via, material e sinalização recolhidos, jumper retirado. ${f.restricao ? "Restrição de 10 quilômetros por hora no AMV 03" : "Circulação normal"}. Devolvo a LDL ${f.num}.`, false, "Coordenador mestre");
-              coordenadorFala(`${pref}, LDL ${f.num} encerrada às ${horaTxt(new Date())}. ${lin} liberada para circulação. Fiquem fora da via.`, false, "CCP");
-              devolverLinha(`LDL ${f.num} devolvida e encerrada`); ldl.aberta = false;
-              trem.prox = performance.now() + 25000;   // um trem passa logo depois: a equipe tem de estar fora da via
-            } }) }
-    ].filter(Boolean);
+  // ---------- Papéis: coordenador ou executante ----------
+  // Ao iniciar o conteúdo de um treinamento o participante escolhe a figura que vai fazer. As etapas do outro papel
+  // são feitas pelo avatar (e mostradas no quadro); as decisões técnicas do executante viram conferência para o coordenador.
+  const NOME_PAPEL = { coordenador: "Coordenador", executante: "Executante" };
+  let papelCb = null;
+  function telaPapel(titulo, papeis, ok, voltar) {
+    mode = "papel"; pulseIds = []; papelCb = { ok, voltar };
+    drawPanel("Escolha seu papel", titulo, "Coordenador: " + papeis.coordenador + "\nExecutante: " + papeis.executante, "#3ea0e4");
+    setButtons([["papel:coordenador", "Coordenador"], ["papel:executante", "Executante"], ["papel:voltar", "Voltar"]]);
+  }
+  function escolherPapel(p) {
+    const cb = papelCb; papelCb = null;
+    if (!cb) return showMenu();
+    if (p === "voltar") return cb.voltar();
+    cb.ok(p);
   }
 
+  // ---------- Motor de etapas (LDL e todos os treinamentos carregados dos PROs) ----------
+  // Etapa = decisão (múltipla escolha), toque na peça marcada ou informação. Cada etapa tem um papel; com papel escolhido,
+  // as do outro papel são automáticas.
   let ldl = null;
-  function menuLdl() {
-    fecharDemo();
-    mode = "menuLdl"; pulseIds = []; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar(); estadoLdlObjetos("off", false, "off"); mostrarCepo(false);
-    drawPanel("PGS-003781 · LDL EFC", "Liberação e Devolução de Linha",
-      "Participante: " + quem() + ".\nLDL no pátio: você é o coordenador mestre de uma LDL com o CCP para a preventiva da CTS-2, da chamada ao encerramento.\nPrecisa de LDL?: perguntas rápidas do Anexo 04.");
-    setButtons([["ldl:mt", "LDL no\npátio"], ["ldl:quiz", "Precisa\nde LDL?"], ["menu", "Menu\nCTS-2"]]);
-  }
-  function startLdl() {
-    menuLdl();
-    if (licenca.ativa) devolverLinha("Linha devolvida ao iniciar o treino de LDL");
-    const ini = new Date(), fim = new Date(ini.getTime() + 2 * 3600000), num = 100 + Math.floor(Math.random() * 900);
-    const f = { num, numErrado: num + (Math.random() < 0.5 ? 10 : -10), ini: horaTxt(ini), fim: horaTxt(fim), prefixo: "EE-" + (10 + Math.floor(Math.random() * 80)),
-      shuntFalha: Math.random() < 0.35, restricao: Math.random() < 0.4 };
-    mode = "ldl";
-    ldl = { tipo: "mt", f, etapas: etapasLdl(f), i: -1, achados: [], criticos: [], errosPeca: 0, t0: performance.now(), d: null, ev0: licenca.eventos.length, aberta: false, tentou: false };
-    coordenadorFala("Equipe, vamos abrir uma LDL no pátio para a preventiva da máquina de chave. Até a LDL estar aberta, ninguém entra na via.");
-    avancarLdl();
-  }
-  function startQuizLdl() {
-    menuLdl();
-    const S = "Precisa de LDL", N = "Não precisa de LDL";
-    const itens = [
-      ["Preventiva da MCH CTS-2 no AMV do pátio, com intervenção na máquina.", "s", "Toda atividade que ocupa o gabarito da via para manutenção exige LDL (PGS item 8)."],
-      ["Atravessar a via férrea sem caminhar ao longo dela e sem carregar material.", "n", "Anexo 04, item 22: cumprir o item 10.37 do ROF, olhando para os dois lados antes de atravessar."],
-      ["Deslocar-se até o local de trabalho sem ocupar o gabarito da via.", "n", "Anexo 04, item 7: basta informar o centro de controle."],
-      ["Instalar placas na linha tronco antes da manutenção, sem ocupar o gabarito.", "n", "Anexo 04, item 5: informar o centro de controle e instalar a placa Pessoas Trabalhando."],
-      ["Equipe de manutenção vai consertar um ponto de descarga elevado.", "s", "Anexo 04, item 17: para manutenção desses locais a LDL é obrigatória."],
-      ["Manutenção na cabine ou no passadiço da locomotiva, sem mexer na parte de baixo.", "n", "Anexo 04, item 14: só com conhecimento do centro de controle e sem intervenção na parte inferior."],
-      ["Bombeiros e ambulância atendendo uma emergência ferroviária.", "n", "Anexo 04, item 24: usar a chamada em emergência do ROF; o centro de controle paralisa a circulação."],
-      ["Trocar dormentes na linha 02 do pátio.", "s", "Serviço de via que ocupa o gabarito: exige LDL (PGS item 8)."],
-      ["Verificação rápida (até 30 s) no gabarito, sem andar ao longo da via, com dois empregados.", "n", "Anexo 04, item 21: dois empregados atentos à aproximação de trem."],
-      ["Instalar o jumper para testar o circuito de via no meio do pátio.", "s", "A ocupação forçada só é feita dentro do processo de LDL e após contato com o centro de controle (PGS item 11)."]
-    ];
-    mode = "ldl";
-    ldl = { tipo: "quiz", f: {}, i: -1, achados: [], criticos: [], errosPeca: 0, t0: performance.now(), d: null, ev0: licenca.eventos.length,
-      etapas: embaralhar(itens).slice(0, 6).map(([t, r, ex]) => ({ decisao: { titulo: "Precisa de LDL?", visto: t, opcoes: r === "s" ? [["c", S], ["e0", N]] : [["c", N], ["e0", S]], explica: ex, fixas: true, nome: t } })) };
-    avancarLdl();
-  }
   function avancarLdl() { ldl.i++; mostrarLdl(); }
-  function etiquetaLdl() { if (ldl.cfg) return ldl.cfg.etiqueta + (ldl.aberta ? ` · LDL ${ldl.f.num} aberta` : "") + ` · etapa ${ldl.i + 1} de ${ldl.etapas.length}`; return (ldl.tipo === "quiz" ? "Precisa de LDL? · " : (ldl.aberta ? `LDL ${ldl.f.num} aberta · ` : "LDL no pátio · ")) + `etapa ${ldl.i + 1} de ${ldl.etapas.length}`; }
+  function etiquetaLdl() {
+    return ldl.cfg.etiqueta + (ldl.papel ? " · " + ldl.papel : "") + (ldl.aberta ? ` · LDL ${ldl.f.num} aberta` : "") + ` · etapa ${ldl.i + 1} de ${ldl.etapas.length}`;
+  }
+  const ehAuto = e => ldl.papel && e.papel && e.papel !== "ambos" && e.papel !== ldl.papel;
+  const botoesSeguir = () => setButtons([["ldl:seguir", "Continuar"], ["ldl:sair", "Sair"]]);
   function mostrarLdl() {
     const e = ldl.etapas[ldl.i];
     if (!e) return fimLdl();
-    pulseIds = []; ldl.d = null;
+    pulseIds = []; ldl.d = null; ldl.conf = null;
     if (e.prep) e.prep();
+    if (ehAuto(e)) {
+      if (e.decisao && e.conferencia && ldl.papel === "coordenador") return conferirLdl(e);
+      return autoLdl(e);
+    }
+    if (e.info) {
+      drawPanel(etiquetaLdl(), e.titulo, e.corpo);
+      if (e.apos && !e.feitoInfo) { e.apos(); e.feitoInfo = true; }
+      return botoesSeguir();
+    }
     if (e.decisao) {
       const d = e.decisao;
       if (d.antes && !d.jaFalou) { d.antes(); d.jaFalou = true; }
@@ -2409,15 +2460,58 @@ body.vr #stick { display: none; }
       ldl.d = d;
       const L = "ABCD";
       drawPanel(etiquetaLdl(), d.titulo, d.visto + "\n" + d.ordem.map((o, k) => `${L[k]}) ${o[1]}`).join("\n"));
-      return setButtons(d.ordem.map((o, k) => ["ldl:o:" + o[0], d.botoes ? d.botoes[o[0]] : d.fixas ? o[1].replace("Não precisa", "Não\nprecisa").replace("Precisa de", "Precisa\nde") : L[k]]).concat([["ldl:sair", "Sair"]]));
+      return setButtons(d.ordem.map((o, k) => ["ldl:o:" + o[0], d.botoes ? d.botoes[o[0]] : L[k]]).concat([["ldl:sair", "Sair"]]));
     }
     drawPanel(etiquetaLdl(), e.titulo, e.corpo);
     setButtons([["ldl:sair", "Sair"]]);
     pulseIds = [e.alvo].concat(Object.keys(e.errado || {}));
   }
+  // Etapa do outro papel: o avatar faz (toque) ou a decisão aparece pronta, para o participante acompanhar.
+  function autoLdl(e) {
+    const quemFaz = NOME_PAPEL[e.papel];
+    if (e.decisao) {
+      const d = e.decisao;
+      if (d.antes && !d.jaFalou) { d.antes(); d.jaFalou = true; }
+      if (d.apos && !d.feitoAuto) { d.apos(); d.feitoAuto = true; }
+      drawPanel(etiquetaLdl(), `${quemFaz} decide: ${d.titulo}`, d.visto + "\nDecisão: " + d.opcoes.find(o => o[0] === "c")[1] + "\n" + d.explica, "#3ea0e4");
+      return botoesSeguir();
+    }
+    if (e.info) { drawPanel(etiquetaLdl(), `${quemFaz}: ${e.titulo}`, e.corpo, "#3ea0e4"); if (e.apos && !e.feitoInfo) { e.apos(); e.feitoInfo = true; } return botoesSeguir(); }
+    drawPanel(etiquetaLdl(), `${quemFaz}: ${e.titulo}`, `Acompanhe: quem faz esta etapa é o ${quemFaz.toLowerCase()}.\n` + e.corpo.replace(/\s*Toque [^.]*\./g, ""), "#3ea0e4");
+    setButtons([]);
+    busy = true;
+    if (e.papel === "executante" && PARTS[e.alvo]) mantenedorAgir(centroPeca(e.alvo), GIRAM_NA_MAO.has(e.alvo));
+    setTimeout(() => {
+      if (!ldl || ldl.etapas[ldl.i] !== e) { busy = false; return; }
+      const fim = () => { busy = false; drawPanel(etiquetaLdl(), `${quemFaz} fez: ${e.titulo}`, "Etapa concluída pelo " + quemFaz.toLowerCase() + ".", "#3ea0e4"); botoesSeguir(); };
+      if (e.anim) e.anim(ldl.f, fim); else fim();
+    }, 1400);
+  }
+  // Coordenador confere a decisão técnica do executante: ele propõe uma ação (às vezes errada) e o coordenador diz se confere.
+  function conferirLdl(e) {
+    const d = e.decisao;
+    if (d.antes && !d.jaFalou) { d.antes(); d.jaFalou = true; }
+    if (!d.proposta) { const erradas = d.opcoes.filter(o => o[0] !== "c"); d.proposta = Math.random() < 0.6 || !erradas.length ? "c" : umDe(erradas)[0]; }
+    ldl.conf = d;
+    drawPanel(etiquetaLdl(), "Confira o executante: " + d.titulo, d.visto + "\nO executante vai fazer: " + d.opcoes.find(o => o[0] === d.proposta)[1] + "\nEstá certo?", "#f2a400");
+    setButtons([["ldl:cf:sim", "Confere"], ["ldl:cf:nao", "Não confere:\ncorrigir"], ["ldl:sair", "Sair"]]);
+  }
+  function respConferencia(sim) {
+    const d = ldl.conf; if (!d) return;
+    const lab = k => d.opcoes.find(o => o[0] === k)[1];
+    const propostaCerta = d.proposta === "c", certo = sim === propostaCerta;
+    const risco = !certo && sim && d.critico && d.critico[d.proposta];
+    ldl.achados.push({ titulo: "Conferência: " + (d.nome || d.titulo), escolha: sim ? "confere" : "não confere", correto: propostaCerta ? "confere" : "não confere", certo, critico: !!risco });
+    if (risco) { ldl.criticos.push(risco + " (o coordenador conferiu e liberou)"); alertaRisco(risco); } else if (!certo) som.erro(); else som.selecionar();
+    if (d.apos) d.apos();
+    ldl.conf = null;
+    drawPanel(etiquetaLdl(), (certo ? "Certo: " : "Atenção: ") + d.titulo,
+      (propostaCerta ? "O executante estava certo: " : "O executante estava errado. O correto: ") + lab("c") + "\n" + d.explica, certo ? "#23c552" : "#e5533d");
+    botoesSeguir();
+  }
   function tocarLdl(id) {
     const e = ldl.etapas[ldl.i];
-    if (!e || !e.alvo) return;
+    if (!e || !e.alvo || ehAuto(e)) return;
     if ((id === "cepo" || id === "encosto") && e.alvo === "agulhas") id = "agulhas";   // o cepo vai entre a agulha e o trilho de encosto
     if (e.errado && e.errado[id]) { ldl.criticos.push(e.errado[id]); alertaRisco(e.errado[id]); return; }
     if (id !== e.alvo) {
@@ -2452,40 +2546,35 @@ body.vr #stick { display: none; }
   }
   function fimLdl() {
     mode = "fim"; pulseIds = []; mantenedorVoltar();
-    const quiz = ldl.tipo === "quiz", cfg = ldl.cfg;
+    const cfgR = ldl.cfg, quiz = ldl.tipo === "quiz";
     if (ldl.aberta) { devolverLinha(`LDL ${ldl.f.num} interrompida (treino encerrado)`); ldl.aberta = false; }
-    if (cfg) { estadoLdlObjetos("off", false, "off"); mostrarCepo(false); }
+    estadoLdlObjetos("off", false, "off"); mostrarCepo(false);
     const seg = Math.round((performance.now() - ldl.t0) / 1000), tot = ldl.achados.length, certas = ldl.achados.filter(a => a.certo).length;
     const crit = [...new Set(ldl.criticos)], ok = certas === tot && !ldl.errosPeca && !crit.length;
     const extra = crit.map(c => "ERRO CRÍTICO: " + c).concat(licenca.eventos.slice(ldl.ev0).map(t => "CCP: " + t));
-    const modulo = cfg ? cfg.modulo : quiz ? "LDL · Precisa de LDL? (PGS-003781 Anexo 04)" : "LDL · LDL no pátio com o CCP (PGS-003781)";
-    registrarResultado({ modulo, segundos: seg, avaliacoesCertas: certas, avaliacoes: tot, errosPeca: ldl.errosPeca, bloqueios: crit.length,
+    registrarResultado({ modulo: cfgR.modulo, segundos: seg, avaliacoesCertas: certas, avaliacoes: tot, errosPeca: ldl.errosPeca, bloqueios: crit.length,
       detalhes: ldl.achados.map(a => `${a.titulo}: ${a.certo ? "certo" : "errado"}` + (a.critico ? " [crítico]" : "")).concat(extra).join("; ") });
     const linhas = ldl.achados.map(a => `${a.certo ? "✓" : "✗"} ${a.titulo}`).concat(crit.map(c => "✗ Crítico: " + c));
     const resumo = `${certas} de ${tot} decisões certas · ${tempoTxt(seg)}`;
-    drawPanel(cfg ? cfg.etiqueta + " · resultado" : quiz ? "Precisa de LDL? · resultado" : "LDL no pátio · resultado", crit.length ? "Erro crítico: reprovado" : ok ? "Sem erros" : resumo,
+    drawPanel(cfgR.etiqueta + (ldl.papel ? " · " + ldl.papel : "") + " · resultado", crit.length ? "Erro crítico: reprovado" : ok ? "Sem erros" : resumo,
       quem() + "\n" + (ok || crit.length ? resumo + "\n" : "") + linhas.join("\n"), ok ? "#23c552" : "#e5533d");
-    if (cfg) { if (cfg.falaFim) coordenadorFala(crit.length ? "Treino reprovado por erro crítico. Vamos revisar antes de seguir." : ok ? cfg.falaFim : "Treino encerrado. Revisem os pontos marcados no quadro."); }
-    else if (!quiz) coordenadorFala(crit.length ? "LDL reprovada por erro crítico. Vamos revisar antes de seguir." : ok ? "LDL encerrada sem desvios. Bom trabalho, equipe." : "LDL encerrada. Revisem os pontos marcados no quadro.");
-    if (cfg) setButtons([["rt:go:" + cfg.id, "Refazer"], ["rt:menu:" + cfg.grupo, "Voltar ao\ntreino"], ["menu", "Menu\nCTS-2"]]);
-    else setButtons([[quiz ? "ldl:quiz" : "ldl:mt", "Refazer"], ["ldl:menu", "Treino\nde LDL"], ["menu", "Menu\nCTS-2"]]);
-    ldl = null;
+    if (!quiz) instrucao(crit.length ? "Treino reprovado por erro crítico. Vamos revisar antes de seguir." : ok ? (cfgR.falaFim || "Treino concluído sem desvios.") : "Treino encerrado. Revisem os pontos marcados no quadro.", "Coordenador");
+    setButtons([["rt:go:" + cfgR.id + (ldl.papel ? ":" + ldl.papel : ""), "Refazer"]].concat(ldl.papel ? [["rt:go:" + cfgR.id, "Trocar\npapel"]] : [])
+      .concat([["rt:menu:" + cfgR.grupo, "Voltar ao\ntreino"], ["menu", "Menu\nCTS-2"]]));
+    ldl = null; papel = null;
   }
   function acaoLdl(b) {
-    if (b === "ldl:menu") return menuLdl();
-    if (b === "ldl:mt") return startLdl();
-    if (b === "ldl:quiz") return startQuizLdl();
-    if (!ldl) return menuLdl();
+    if (b === "ldl:menu") return menuRoteiro("ldl");
+    if (!ldl) return showMenu();
     if (b === "ldl:sair") { ldl.achados.push({ titulo: "Treino interrompido antes do fim", escolha: "", correto: "", certo: false }); ldl.i = ldl.etapas.length; return fimLdl(); }
     if (b === "ldl:seguir") return avancarLdl();
     if (b === "ldl:de-novo") return mostrarLdl();
+    if (b.startsWith("ldl:cf:")) return respConferencia(b === "ldl:cf:sim");
     if (b.startsWith("ldl:o:")) return decidirLdl(b.slice(6));
   }
 
-
-  // ---------- Treinamentos dos PROs aplicáveis ao VR (zip de 13/10/2026) ----------
-  // Usam o mesmo motor do treino de LDL (etapas de decisão ou de toque na peça). Mapeamento: vr-cts2/pros-vr/mapeamento-pros-vr.md
-  const ccpFala = t => coordenadorFala(t, false, "CCP");
+  // LDL aberta pelo CCP dentro de um treinamento (efeito "ldl:abrir") e devolvida no fim ("ldl:devolver")
+  const ccpFala = t => radioFala(t, "CCP");
   function abrirLdlRoteiro(oQue) {
     if (trem.ativo) { trem.ativo = false; tremGrupo.visible = false; }
     licenca.ativa = true; licenca.desde = performance.now(); licenca.pedido = false;
@@ -2495,420 +2584,227 @@ body.vr #stick { display: none; }
   }
   function devolverLdlRoteiro(resumo) {
     if (!ldl.aberta) return;
-    coordenadorFala(`CCP, ${ldl.f.prefixo}. ${resumo} Equipe fora da via, material recolhido, jumper retirado. Devolvo a LDL ${ldl.f.num}.`, false, "Técnico");
+    radioFala(`CCP, ${ldl.f.prefixo}. ${resumo} Equipe fora da via, material recolhido, jumper retirado. Devolvo a LDL ${ldl.f.num}.`, "Coordenador");
     ccpFala(`${ldl.f.prefixo}, LDL ${ldl.f.num} encerrada às ${horaTxt(new Date())}. Fiquem fora da via.`);
     devolverLinha(`LDL ${ldl.f.num} devolvida e encerrada`); ldl.aberta = false; estadoLdlObjetos("off", false, "off");
   }
-  const tocar = (alvo, titulo, corpo, extra) => Object.assign({ alvo, titulo, corpo }, extra);
-  // medição sorteada: ok = [min, max] dentro da faixa; foras = faixas fora
-  function leitura(ok, foras, d) { const m = medir(ok, foras, d); return { v: m.v, ok: m.ok, txt: num(m.v, d) }; }
 
-  // ---- PRO-022721: Inspeção e manutenção preventiva em AMV (EFC) ----
-  const ANOMALIAS_AMV = [
-    ["Parafuso curto comprimindo a mola do rolete do jacaré: mola comprimida, sem função.", "P0 com restrição programada", ["P1", "P0 com interdição"]],
-    ["Bandeja do jacaré descentralizada no vão.", "P0 com restrição programada", ["P2", "P0 com interdição"]],
-    ["RCF e amassamento na transição da pata de lebre para a ponta principal do jacaré.", "P0 com restrição programada", ["P2", "P1"]],
-    ["Toque severo do friso na ponta da agulha, com risco de fratura.", "P0 com restrição programada", ["P1", "P2"]],
-    ["Punhos das barras de detecção e atuação descentralizados em relação aos parafusos.", "P1F", ["P0 com interdição", "P2"]],
-    ["Escoras ajustáveis soltas na região da agulha.", "P0 com restrição programada", ["P2", "P1"]],
-    ["Trinca transversal na ponta do jacaré de ponta fixa (JPF), sem impedir a circulação restrita.", "P0 com restrição", ["P1F", "P0 com interdição"]],
-    ["Fratura na ponta principal do jacaré de ponta móvel (JPM).", "P0 com interdição", ["P0 com restrição programada", "P1F"]],
-    ["Vedação da agulha do JPM aberta 4 mm.", "P0 com interdição", ["P0 com restrição programada", "P1"]],
-    ["Vedação da agulha do JPM aberta 3 mm.", "P0 com restrição programada", ["P0 com interdição", "P2"]]
-  ];
-  const classificarAmv = ([visto, certa, erradas]) => ({ decisao: escolha("Classifique a anomalia", visto + "\nQual a prioridade pelo PGS-006334?", certa, erradas,
-    { nome: "Prioridade: " + visto, explica: "PGS-006334, tabela de itens do AMV na inspeção sensitiva: " + visto.replace(/\.$/, "") + " → " + certa + "." }) });
-
-  function etapasAmv(f) {
-    const folga = leitura([12, 13], [[8, 10], [15, 17]]), desq = leitura([32, 58], [[64, 75], [14, 26]]);
-    return [
-      { decisao: escolha("Inspeção prévia", "A OM de inspeção prévia saiu 4 dias antes da OM do preventivo do AMV. O que levantar no campo?",
-          "Superestrutura (fixação, dormentes, juntas, geometria, lastro) e infra (recalque, drenagem, vegetação, rede elétrica, acesso, área de vivência).",
-          ["Só a máquina de chave: o resto fica para a inspeção sensitiva.", "Só conferir se o material está no caminhão."],
-          { explica: "PRO-022721 9.1 e 9.2: a inspeção prévia avalia recursos e condições do AMV e da via. Registro no ValeForms/PowerApp; o Anexo 09 impresso só se o sistema estiver fora." }) },
-      { decisao: escolha("Área de vivência", "A zona segura ficou entre o acesso rodoviário e a via férrea. O que fazer?",
-          "Sinalizar o acesso com placas de 20 km/h e de trânsito de pedestres a 100 m.",
-          ["Nada: a área de vivência já é a zona segura.", "Colocar só uma fita zebrada na beira da via."],
-          { explica: "PRO-022721 9.3: placa de redução para 20 km/h e de pedestres a 100 m, padrão DNIT." }) },
-      { decisao: escolha("Pedir a LDL", "Você vai chamar o CCP para abrir a LDL, mas o rádio portátil não pega neste ponto.",
-          "Procurar um ponto com bom sinal ou usar o rádio veicular, e só entrar na via com a LDL aberta.",
-          ["Entrar na via e tentar de novo lá de dentro.", "Pedir a um colega para avisar o CCP pelo celular."],
-          { explica: "PRO-022721 9.4: procurar boa recepção e tentar o rádio veicular. 5.7 item 12: celular proibido durante a atividade.",
-            critico: { e0: "Entrou na via sem LDL aberta." }, apos: () => abrirLdlRoteiro("preventiva do AMV") }) },
-      tocar("agulhas", "Bloqueie as partes móveis", "Antes de medir ou manter, aplique o cepo de madeira com alça entre a agulha aberta e o trilho de encosto. Toque nas agulhas.",
-        { feito: () => { mostrarCepo(true); som.encaixe(); } }),
-      { decisao: escolha("Zona de risco", "Um auxiliar entra na agulhagem (dormentes 01 a 28) para buscar uma chave enquanto o cepo do jacaré JPM ainda não foi aplicado.",
-          "Interromper a atividade imediatamente.", ["Continuar: a LDL está aberta.", "Pedir para ele sair quando a medição terminar."],
-          { explica: "PRO-022721 7.2.2 e 12.13: zona de risco da agulhagem do dormente 01 ao 28 e do JPM do 85 ao 98. Alguém dentro sem o bloqueio das partes móveis: parar na hora.",
-            critico: { e0: "Manteve a atividade com pessoa na zona de risco sem bloqueio.", e1: "Manteve a atividade com pessoa na zona de risco sem bloqueio." } }) },
-      { decisao: escolha("Trabalho junto com a EE", "Hoje a eletroeletrônica trabalha junto com a equipe de AMV. Como ficam os compartimentos das manivelas das MCH?",
-          "Abertos, para evitar movimentação involuntária das partes móveis.", ["Fechados e com cadeado.", "Tanto faz: quem comanda a máquina é a EE."],
-          { explica: "PRO-022721 8.6: nas manutenções com a EE é obrigatório manter abertos os compartimentos das manivelas das MCH." }) },
-      tocar("barra", "Meça a folga das barras", "Meça a folga entre as porcas e os punhos das barras de conjugação. Toque nas barras.",
-        { feito: () => mostrarFerramenta("regua", centroPeca("barra"), folga.txt + " mm") }),
-      { decisao: escolha("Folga porca/punho", `Leitura: ${folga.txt} mm entre a porca e o punho da barra.`,
-          folga.ok ? "Dentro do padrão (12 a 13 mm)." : "Fora do padrão (12 a 13 mm): registrar e corrigir.",
-          [folga.ok ? "Fora do padrão: registrar e corrigir." : "Dentro do padrão."],
-          { explica: "PRO-022721 10.11: em condição normal a folga é de 12 a 13 mm. Sem essa folga as peças podem encostar e fechar curto.", apos: guardarFerramentas }) },
-      classificarAmv(umDe(ANOMALIAS_AMV)),
-      tocar("dormente", "Desquadramento do dormente oco", "Meça o quadramento do dormente oco em relação à ponta da agulha e à face da placa de apoio da MCH. Toque no dormente oco.",
-        { feito: () => mostrarFerramenta("trena", centroPeca("dormente"), desq.txt + " mm") }),
-      { decisao: escolha("Dormente oco", `Leitura: ${desq.txt} mm. Referência para os AMV elétricos do TFPM: 45 ± 15 mm.`,
-          desq.ok ? "Dentro da referência." : "Fora da referência: registrar a anomalia.", [desq.ok ? "Fora da referência: registrar a anomalia." : "Dentro da referência."],
-          { explica: "PRO-022721 10.12: valor de referência 45 mm ± 15 mm (30 a 60 mm).", apos: guardarFerramentas }) },
-      { decisao: escolha("Trinca na ponta da agulha", "Na ponta da agulha há uma trinca exposta. A altura medida em relação ao boleto está dentro do limite de segurança (13 a 22 mm).",
-          "Aplicar restrição de velocidade e acompanhar até esmerilhar a trinca.", ["Interditar até trocar a meia chave.", "Nada: dentro do limite não precisa fazer nada."],
-          { explica: "PRO-022721 10.3: dentro do limite, restrição de velocidade e acompanhamento até o esmerilhamento. Fora do limite, interdição até substituir ou recuperar." }) },
-      { decisao: escolha("Bandeirola", "A bandeirola do AMV está com a película verde virada para a posição reversa.",
-          "Corrigir: verde indica reta e amarela indica reversa.", ["Está certa: verde indica reversa.", "Não é item da preventiva."],
-          { explica: "PRO-022721 11.6: verde para reta, amarelo para reversa; preferencialmente oval, 30 × 50 cm, refletiva." }) },
-      tocar("cepo", "Libere as partes móveis", "O ajuste terminou e a equipe vai mover as agulhas. Retire o cepo pela alça. Toque no cepo.", { feito: () => { mostrarCepo(false); som.encaixe(); } }),
-      { decisao: escolha("Antes de mover as agulhas", "A agulha vai para a reversa. O que você faz antes do comando?",
-          "Fora da zona crítica, de frente para o AMV: apontar, falar \"comando para Reversa\" e confirmar \"OK\" sem ninguém no raio de ação.",
-          ["Mover direto: o cepo já saiu.", "Dar o comando de dentro da agulhagem para ver a vedação de perto."],
-          { explica: "PRO-022721 12.12 a 12.15: técnica Yoshi Yoshi (apontar e falar) antes de mover agulhas e JPM, com todos fora do raio de prensamento.",
-            critico: { e1: "Ficou dentro da zona crítica durante a movimentação." }, apos: () => moverAmv("reverso", true) }) },
-      { decisao: escolha("Socaria sem a EE", "A socaria manual na região das agulhas terminou e a eletroeletrônica não estava no local.",
-          "Avisar o centro de controle, deixar velocidade progressiva de 50 km/h e pedir o teste de movimentação do AMV.",
-          ["Liberar normal: socaria não mexe na máquina.", "Esperar a EE voltar outro dia para avisar o centro de controle."],
-          { explica: "PRO-022721 13.2, nota: socaria sem a EE é comunicada ao centro de controle, o local fica em velocidade progressiva de 50 km/h e depois se pede o teste de movimentação." }) },
-      { decisao: escolha("Pendência na região crítica", "Falta um grampo na região do jacaré. O material está no caminhão e ainda há tempo na MI.",
-          "Corrigir agora: não pode haver encerramento técnico com pendência corrigível em região crítica.",
-          ["Encerrar a OM e abrir uma nota para depois.", "Encerrar: um grampo não é item de segurança."],
-          { explica: "PRO-022721 8.1 e 8.5: regiões críticas são JIC, agulhas e jacaré. É proibido o encerramento técnico com pendência dessas regiões que possa ser corrigida." }) },
-      { decisao: escolha("Encerramento", "Ainda dentro do tempo da MI. Qual é o encerramento correto?",
-          "Retirar os cepos, testar no mínimo 3 movimentos para reta e reversa e fazer o reset da MCH (Anexo 10).",
-          ["Devolver a LDL; o centro de controle testa o AMV depois.", "Testar uma vez para cada lado e deixar o cepo para a próxima equipe."],
-          { explica: "PRO-022721 14.1: retirar os cepos, no mínimo 3 movimentos reta e reversa (pode ser pelo centro de controle) e reset conforme o Anexo 10.",
-            critico: { e1: "Deixou o cepo nas agulhas depois de encerrar." }, apos: () => moverAmv("normal", false) }) },
-      { decisao: escolha("Primeiro trem", "Houve socaria de travessão do AMV. Ao devolver a LDL, o que informar ao controlador?",
-          "Restrição de 30 km/h para o primeiro trem de carga ou locomotiva; não pode ser de passageiros nem de produtos perigosos.",
-          ["Nada: a velocidade progressiva já está na via.", "Restrição de 30 km/h só se o primeiro trem for de passageiros."],
-          { explica: "ROF (PGS-002722) 14.28: 30 km/h para o primeiro trem após substituição de componente de AMV ou socaria de travessão." }) },
-      { decisao: escolha("Registro", "Onde registrar as anomalias e os serviços feitos?",
-          "No ValeForms/PowerApp; o formulário impresso vai anexado à OM só se o sistema estiver fora.",
-          ["Só no caderno da equipe.", "Não precisa: a OM já diz o que foi feito."],
-          { explica: "PRO-022721 15: registro no ValeForms/PowerApp pelo técnico VP responsável; impresso anexado à OM se o sistema estiver inoperante.",
-            apos: () => devolverLdlRoteiro("Preventiva do AMV 03 concluída. Restrição de 30 quilômetros por hora para o primeiro trem.") }) }
-    ];
+  // ---------- Carregador de PROs (formato "treino-pro-vr/1") ----------
+  // Cada PRO é um arquivo JSON em pros/ (lista em pros/indice.json; guia de conversão em pros/COMO-CRIAR-UM-PRO.md).
+  // O carregador sorteia as variáveis, troca os {campos} dos textos e transforma as etapas no formato do motor acima.
+  // Um PRO novo também pode ser carregado no celular pela biblioteca ("Carregar PRO"), sem publicar o site.
+  const VERSAO = "13-10-papeis";
+  const PROS = {}, ordemPros = [], EXTRAS_KEY = "cts2-vr-pros-carregados";
+  let prosErro = "";
+  const valorVar = (f, c) => c.split(".").reduce((o, k) => o == null ? undefined : o[k], f);
+  const cond = (c, f) => c.startsWith("!") ? !valorVar(f, c.slice(1)) : !!valorVar(f, c);
+  // {campo} vira o valor; {campo?texto se sim|texto se não} escolhe pelo valor
+  function tpl(s, f) {
+    if (typeof s !== "string") return s;
+    s = s.replace(/\{([\w.]+)\}/g, (m, c) => { const v = valorVar(f, c); return v == null ? m : typeof v === "object" ? (v.txt != null ? v.txt : m) : String(v); });
+    return s.replace(/\{(!?[\w.]+)\?([^{}|]*)\|([^{}]*)\}/g, (m, c, a, b) => cond(c, f) ? a : b);
   }
-
-  // ---- PRO-022721 Anexo 10 (IT-SIN-N001-2024): manivela e reset da MCH sem a EE ----
-  function etapasReset(f) {
-    const contatosOk = Math.random() < 0.7, ledsOk = Math.random() < 0.7;
-    return [
-      { decisao: escolha("Antes de começar", "A EE trabalhou no housing de manhã. Antes de aplicar a IT de manivela e reset sem a EE, o que confirmar?",
-          "Com o CCO/CCP, que não há controle local estabelecido.", ["Nada: controle local é assunto da EE.", "Colocar a máquina em controle local para ficar mais seguro."],
-          { explica: "IT etapa 1: a IT não pode ser aplicada com controle local; ter controle local antes ou durante a preventiva pode gerar comando elétrico indevido.",
-            critico: { e1: "Aplicou a IT com controle local estabelecido." }, apos: () => abrirLdlRoteiro("preventiva do AMV com manivela") }) },
-      { decisao: escolha("CDV de chave", "LDL aberta. O que confirmar pelo rádio antes de abrir o compartimento da manivela?",
-          "Que o circuito de via (CDV) de chave dos AMVs da atividade está interditado.", ["Só o número da LDL.", "Nada: com a LDL aberta já pode abrir."],
-          { explica: "IT etapa 2: a interdição do CDV de chave é a única barreira que garante a rota na linha adjacente (proteção de flanco) e evita movimentos indevidos da MCH.",
-            critico: { e1: "Abriu o compartimento da manivela sem o CDV de chave interditado." },
-            apos: () => { coordenadorFala(`CCP, ${f.prefixo}. Confirme a interdição do CDV de chave do AMV 03.`, false, "Técnico"); ccpFala(`${f.prefixo}, confirmo CDV de chave do AMV 03 interditado.`); } }) },
-      tocar("agulhas", "Instale o cepo", "Instale o cepo entre a agulha aberta e o trilho de encosto, no limite de movimentação da agulha. Toque nas agulhas.",
-        { feito: () => { mostrarCepo(true); som.encaixe(); } }),
-      tocar("manivela", "Abra o compartimento da manivela", "Abra o cadeado com a chave de punho e depois a portinhola da manivela. Ao abrir, o contato corta o motor e sobe a indicação de manivela para o centro de controle. Toque no bloco da manivela.",
-        { feito: () => som.chave() }),
-      { decisao: escolha("Contatos de manivela", `Com a chave allen de 6 mm você abre a tampa do compartimento de reset. Os contatos de manivela ${contatosOk ? "estão abertos" : "continuam fechados"}.`,
-          contatosOk ? "Fechar a tampa sem o cadeado jabuti e seguir com a manutenção." : "Parar e acionar a EE: não seguir com a IT até a correção.",
-          contatosOk ? ["Parar e acionar a EE."] : ["Seguir: os contatos fecham sozinhos depois.", "Abrir os contatos com a mão, tocando na lâmina."],
-          { explica: "IT etapa 7: se os contatos de manivela não abrem, não prosseguir; informar a EE. Com contatos fechados pode haver movimentação indevida da MCH.",
-            critico: contatosOk ? {} : { e0: "Seguiu com os contatos de manivela fechados.", e1: "Mexeu na lâmina do contato com a mão." } }) },
-      { decisao: escolha("Testar a movimentação", "Fim da manutenção, etapa de devolução. Na ponta de agulha há duas máquinas de chave. Como testar a livre movimentação?",
-          "Tirar o cepo e movimentar pela manivela para os dois lados, uma máquina por vez.", ["Movimentar as duas máquinas ao mesmo tempo.", "Movimentar com o cepo no lugar."],
-          { explica: "IT etapa 8: remover o cepo, movimentar pela manivela para os dois lados; nas MCH da ponta de agulha, uma por vez.",
-            apos: () => { mostrarCepo(false); moverAmv("reverso", true, () => moverAmv("normal", true)); } }) },
-      { decisao: escolha("Posição para entregar", "Em que posição deixar o AMV antes de entregar a LDL?",
-          "NORMAL/RETA, conferindo ponta de agulha, intermediária e JPM.", ["Na posição em que a equipe terminou.", "REVERSA, para proteger a linha de desvio."],
-          { explica: "IT etapa 9: posição favorável de rotas nas duas linhas depois da entrega da LDL." }) },
-      tocar("agulhas", "Cepo de novo", "Antes de mexer na manivela e no reset, instale o cepo de novo. Toque nas agulhas.", { feito: () => { mostrarCepo(true); som.encaixe(); } }),
-      tocar("manivela", "Feche o compartimento", "Retire a manivela, feche a portinhola travando no suporte e instale o cadeado com a chave de punho. Toque no bloco da manivela.", { feito: () => som.chave() }),
-      tocar("manivela", "Resete a MCH", "Abra o compartimento de reset e empurre o dispositivo de reset para baixo até ouvir o clique. Toque no bloco da manivela.",
-        { feito: () => { som.clique(); setTimeout(() => som.rele(), 250); } }),
-      { decisao: escolha("Indicação no ECC", `No ECC, os 4 LEDs da posição NORMAL estão ${ledsOk ? "acesos em verde" : "apagados"}.`,
-          ledsOk ? "MCH travada em NORMAL: fechar a tampa do reset com o cadeado jabuti." : "Refazer cepo, cadeado, portinhola e reset; sem sucesso, acionar a EE.",
-          ledsOk ? ["Refazer o reset por garantia."] : ["Seguir: o CCO resolve a indicação.", "Abrir a portinhola e deixar a manivela inserida."],
-          { explica: "IT etapas 15 e 16: os 4 LEDs da NORMAL em verde confirmam a MCH movimentada e travada e permitem o reconhecimento da manivela pelo centro de controle.",
-            apos: () => { if (ledsOk) { lampMat.color.set(0x23c552); lampMat.emissive.set(0x18a540); } } }) },
-      tocar("cepo", "Retire o cepo", "Retire o cepo pela alça, deixando as agulhas livres. Toque no cepo.", { feito: () => { mostrarCepo(false); som.encaixe(); } }),
-      tocar("jumper", "Retire o shunt", "Retire o shunt (jumper) do CDV de chave para o centro de controle poder testar a máquina. Toque no jumper.",
-        { feito: () => { estadoLdlObjetos("on", false, "off"); som.encaixe(); } }),
-      { decisao: escolha("Teste com o centro de controle", "CDV livre, AMV em NORMAL, máquinas sem manivela e resetadas. O que pedir ao centro de controle?",
-          "Reconhecer as manivelas e comandar os dois lados, com todos fora do raio de ação, conferindo a correspondência campo e centro.",
-          ["Devolver a LDL direto: o reset já foi feito.", "Comandar com um colega perto da agulha para conferir a vedação."],
-          { explica: "IT etapas 20 e 21: reconhecimento das manivelas e teste de movimentação e correspondência antes de entregar a LDL. Ninguém no raio de ação das partes móveis.",
-            critico: { e1: "Pessoa no raio de ação durante o comando do centro de controle." },
-            apos: () => { coordenadorFala(`CCP, ${f.prefixo}. AMV 03 em normal, sem manivela e resetado, pessoas fora do raio de ação. Peço reconhecer a manivela e testar os dois lados.`, false, "Técnico");
-              ccpFala(`${f.prefixo}, manivela reconhecida. Comando para reversa e para normal com correspondência.`);
-              moverAmv("reverso", false, () => moverAmv("normal", false, () => devolverLdlRoteiro("Reset concluído e AMV 03 com correspondência."))); } }) }
-    ];
+  function sortearVars(def) {
+    const ini = new Date(), n = 100 + Math.floor(Math.random() * 900);
+    const f = { num: n, numErrado: n + (Math.random() < 0.5 ? 10 : -10), ini: horaTxt(ini), fim: horaTxt(new Date(ini.getTime() + 2 * 3600000)),
+      prefixo: (def.prefixo || "VP") + "-" + (10 + Math.floor(Math.random() * 80)) };
+    Object.defineProperty(f, "hora", { get: () => horaTxt(new Date()) });
+    const textos = [];
+    for (const [k, v] of Object.entries(def.sorteio || {})) {
+      if (v.tipo === "chance") f[k] = Math.random() < (v.p == null ? 0.5 : v.p);
+      else if (v.tipo === "faixa") { const m = medir(v.ok, v.fora, v.casas || 0); f[k] = { v: m.v, ok: m.ok, txt: num(m.v, v.casas || 0) }; }
+      else if (v.tipo === "numero") { const x = sorte(v.min, v.max, v.casas || 0); f[k] = { v: x, txt: num(x, v.casas || 0) }; }
+      else if (v.tipo === "um") f[k] = umDe(v.de);
+      else if (v.tipo === "texto") textos.push([k, v.valor]);
+    }
+    for (const [k, t] of textos) f[k] = tpl(t, f);
+    return f;
   }
-
-  // ---- ROF (PGS-002722): comunicação via rádio ----
-  function etapasRadio(f) {
-    const p = f.prefixo;
-    return [
-      { decisao: escolha("Antes de transmitir", "Você vai chamar o CCP pelo rádio. O que fazer antes de apertar o botão?",
-          "Ouvir e confirmar que o canal não está sendo usado.", ["Apertar e falar alto para passar por cima.", "Usar o botão de emergência para ser atendido mais rápido."],
-          { explica: "ROF 20.2: certificar-se de que o meio não está em uso. 23.8: o botão de emergência só em situação crítica, porque interrompe todas as comunicações do canal." }) },
-      { decisao: escolha("Qual rede", "Na EFC, você está no pátio e precisa falar com o CCP.",
-          "Rede OPERAÇÃO, no canal de MANOBRA do pátio.", ["Rede FERROVIA, canal TRÁFEGO.", "Rede MANUTENÇÃO, canal VP."],
-          { explica: "ROF 23.7: TRÁFEGO é com o CCO; CCMi com o MCM; a rede OPERAÇÃO (MANOBRA) liga o CCP aos trens e equipes nos pátios; a rede MANUTENÇÃO é entre equipes." }) },
-      { decisao: escolha("Contato inicial", "Como abrir a chamada?",
-          `"CCP, aqui é ${p}, equipe de manutenção, no pátio, linha 02, AMV 03."`, ["\"CCP, CCP, tá na escuta?\"", "\"Fala, CCP, beleza? Preciso de uma ajuda aqui.\""],
-          { explica: "ROF 21.1: o contato inicial tem identificação e localização. 20.1: clara, objetiva e breve, sem conversa informal ou gíria.",
-            apos: () => { coordenadorFala(`CCP, aqui é ${p}, equipe de manutenção, no pátio, linha 02, AMV 03.`, false, "Você"); ccpFala(`${p}, CCP na escuta. Prossiga.`); } }) },
-      { decisao: escolha("Fim da transmissão", "Como encerrar cada mensagem?",
-          "Com a palavra CÂMBIO.", ["Com \"valeu\".", "Não precisa: o CCP sabe quando você parou."],
-          { explica: "ROF 21.4: toda comunicação é encerrada com CÂMBIO. A exceção (21.5) é só para o operador de trem a 10 vagões ou menos da parada ou do engate." }) },
-      { decisao: escolha("Cotejamento", "O CCP diz: \"Autorizado a movimentar manualmente o AMV 03 para a linha 02.\" O que responder?",
-          `"${p} repete: autorizado a movimentar manualmente o AMV 03 para a linha 02."`, ["\"Ok, entendido.\"", `"${p} repete: autorizado a movimentar o AMV 05 para a linha 02."`],
-          { repetir: true, explica: "ROF 20.4: quem recebe repete a mensagem na íntegra (cotejamento) e quem emite responde \"entendido\" ou \"confere\". É proibido supor ou interpretar.",
-            antes: () => ccpFala(`${p}, autorizado a movimentar manualmente o AMV 03 para a linha 02.`),
-            apos: () => { coordenadorFala(`${p} repete: autorizado a movimentar manualmente o AMV 03 para a linha 02.`, false, "Você"); ccpFala(`${p}, confere.`); } }) },
-      { decisao: escolha("Errou no cotejamento", "Você percebe que acabou de cotejar \"linha 03\" no lugar de \"linha 02\". Como corrigir?",
-          `"Correção: ${p} repete, AMV 03 para a linha 02."`, ["Ficar quieto: o CCP vai perceber.", `"Não, não, é a outra linha, a 02."`],
-          { explica: "ROF 20.5: para corrigir uma ordem ou um cotejamento, usar a palavra CORREÇÃO antes da nova mensagem." }) },
-      { decisao: escolha("Operação manual do AMV", "Você movimentou o AMV na manivela para a linha 02 e o trem está aguardando. O que passar para o operador do trem?",
-          "\"Agulha vedada, AMV travado e posicionado para a linha 02, câmbio.\"", ["\"AMV virado, pode vir.\"", "\"Tudo certo com a chave, pode passar.\""],
-          { explica: "ROF 44.8: a confirmação é \"agulha vedada, AMV travado e posicionado para a linha tal, câmbio\". 44.11: com JPM, primeiro o jacaré e depois a agulha, e informar o controlador.",
-            apos: () => coordenadorFala("Agulha vedada, AMV travado e posicionado para a linha 02, câmbio.", false, "Você") }) },
-      { decisao: escolha("Colega não responde", "Um colega na ponta do pátio não responde. Foram 5 chamadas seguidas e ele não avisou que ia sair do local.",
-          "Acionar a cadeia de ajuda imediatamente.", ["Esperar mais 15 minutos.", "Seguir o serviço: deve ser bateria."],
-          { explica: "ROF 22.5: cinco chamadas sem resposta, sem aviso de ausência, obrigam o acionamento imediato da cadeia de ajuda." }) },
-      { decisao: escolha("Emergência", "Um colega se machuca e, ao mesmo tempo, outro avisa um vazamento de óleo.",
-          "Chamada em emergência, repetida até ter resposta; o acidente pessoal tem prioridade.", ["Chamar normal e esperar o canal liberar.", "Comunicar primeiro o vazamento, para evitar dano ambiental."],
-          { explica: "ROF 22.1 a 22.3: a emergência é prioritária, interrompe as outras comunicações, é repetida até a resposta e o acidente pessoal vem primeiro.",
-            apos: () => coordenadorFala(`Emergência, emergência, emergência. CCP, aqui é ${p}, no pátio, AMV 03. Acidente pessoal com um empregado.`, true, "Você") }) },
-      { decisao: escolha("Sair do local", "Você precisa ir até o caminhão, fora da área de trabalho, por alguns minutos.",
-          "Avisar o controlador antes de sair.", ["Ir rápido sem avisar.", "Avisar só a equipe."],
-          { explica: "ROF 20.7: é proibido às equipes em área do centro de controle sair do local de trabalho sem comunicar o controlador." }) }
-    ];
+  // Falas: rádio com o CCP (bip + câmbio) por padrão; "instrucao": true é fala ao participante, sem bip e sem câmbio.
+  function falar(lista, f, instrucaoPadrao) {
+    for (const x of lista || []) {
+      const t = tpl(x.texto, f);
+      if (x.instrucao || (instrucaoPadrao && !x.radio)) instrucao(t, x.quem, x.urgente);
+      else radioFala(t, x.quem, x.urgente, x.semCambio);
+    }
   }
-  const ROF_MANUT = [
-    ["Deixar ferramentas e materiais na entrevia, dentro do gabarito da linha adjacente.", "n", "ROF 14.6: materiais às margens, fora do gabarito, sem atingir o gabarito da linha adjacente."],
-    ["Começar um serviço de manutenção na via sem autorização do controlador.", "n", "ROF 14.7: proibido; para ocupar o gabarito vale o procedimento de LDL."],
-    ["Esmerilhar trilho com o trem de passageiros se aproximando.", "n", "ROF 14.15 e 14.16: paralisar esmerilhamento e serviços com fagulha antes da passagem do trem de passageiros e de produtos perigosos."],
-    ["Intervenção de até 30 minutos sem a placa Pessoas Trabalhando, com LDL e dois empregados.", "s", "ROF 14.17: até 30 minutos dispensa a placa, mas exige LDL e no mínimo dois empregados."],
-    ["Ficar na entrevia, dentro do gabarito, enquanto passa trem na linha liberada.", "n", "ROF 14.4: ficar fora do gabarito de circulação e da entrevia na passagem do trem."],
-    ["Movimentar AMV na manivela com o comando elétrico ligado (LCB aberta).", "n", "ROF 44.10: manter a LCB fechada ou o comando elétrico isolado."],
-    ["Operar manualmente um AMV com máquina de chave sem autorização do controlador.", "n", "ROF 44.3: só após autorização do controlador da área."],
-    ["Em AMV com JPM, mover primeiro a ponta do jacaré e depois a agulha.", "s", "ROF 44.11: primeiro o JPM, conferir travamento e vedação, depois a agulha."],
-    ["Liberar um trem de passageiros como primeiro trem depois da troca de um componente de AMV.", "n", "ROF 14.28: o primeiro trem passa a 30 km/h e não pode ser de passageiros nem de produtos perigosos."],
-    ["Descarregar trilhos e dormentes enquanto passa trem na via adjacente.", "n", "ROF 14.27: paralisar durante a passagem de trens na via adjacente."],
-    ["Usar o botão de emergência do rádio para falar mais rápido com o CCO.", "n", "ROF 23.8: só em situação crítica; ele interrompe todas as comunicações do canal."],
-    ["Conversa informal e gíria no rádio quando o canal está calmo.", "n", "ROF 20.1: proibida conversa informal, gíria e brincadeira."]
-  ];
-
-  // ---- PRO-001164 + PGS-006334: inspeção sensitiva e classificação de defeitos ----
-  const CLASSIF = [
-    ["Desgaste do boleto medido com o vampiro: 33%.", "P0 com restrição imediata", ["P0 com restrição programada", "P1F"]],
-    ["Desgaste do boleto medido com o vampiro: 32%.", "P0 com restrição programada", ["P0 com restrição imediata", "P1"]],
-    ["Desgaste do boleto medido com o vampiro: 31%.", "P1F", ["P1", "P0 com restrição programada"]],
-    ["Desgaste do boleto medido com o vampiro: 30%.", "P1", ["P1F", "P2"]],
-    ["Placa de apoio na ponta da agulha se movendo 9 mm com a passagem do trem (dormente de madeira).", "Dormente inservível (I)", ["Dormente bom: o limite é 12 mm", "Dormente ausente (A)"]],
-    ["Dormente queimado, sem resistência vertical nem lateral.", "Dormente ausente (A)", ["Dormente inservível (I)", "Dormente bom"]],
-    ["Dormente de concreto com abrasão de 22 mm na região do trilho.", "Dormente inservível (I)", ["Dormente bom", "Dormente ausente (A)"]],
-    ["Placa de apoio em linha de pátio se movendo 10 mm, fora da região da agulha.", "Dormente ainda dentro do limite (12 mm)", ["Dormente inservível (I)", "Dormente ausente (A)"]]
-  ].concat(ANOMALIAS_AMV);
-  function etapasSensitiva(f) {
-    const classif = embaralhar(CLASSIF).slice(0, 5).map(([visto, certa, erradas]) => ({ decisao: escolha("Classifique", visto + "\nComo classificar?", certa, erradas,
-      { nome: "Classificação: " + visto, explica: "PGS-006334: " + visto.replace(/\.$/, "") + " → " + certa + "." }) }));
-    return [
-      { decisao: escolha("Equipe da inspeção", "Quantas pessoas, no mínimo, fazem a inspeção sensitiva de via?",
-          "Duas.", ["Uma, com rádio.", "Três: inspetor, auxiliar e coordenador."], { explica: "PRO-001164 8.2.1: no mínimo duas pessoas." }) },
-      { decisao: escolha("Inspeção sobre a via", "A rota inclui o AMV 03 do pátio, inspecionado sobre a via.",
-          "Só com LDL aberta e usando o EAT o tempo todo.", ["Pode ir sem LDL: inspeção visual não precisa.", "Basta avisar o CCP que vai entrar."],
-          { explica: "PRO-001164 8.2.5 e 10.1: inspeção sobre a via em pátio, terminal, AMV e TU só com LDL aberta, com EAT durante toda a inspeção.",
-            critico: { e0: "Inspecionou sobre a via sem LDL.", e1: "Inspecionou sobre a via sem LDL." }, apos: () => abrirLdlRoteiro("inspeção sensitiva") }) },
-      tocar("encosto", "Meça o desgaste", "Com o vampiro, meça o desgaste do trilho de encosto. Toque no trilho de encosto, o trilho fixo do lado de fora da agulha.",
-        { feito: () => mostrarFerramenta("regua", centroPeca("encosto"), "F e C") }),
-      { decisao: escolha("Uso do vampiro", "Como posicionar o medidor de desgaste (vampiro)?",
-          "Trilho limpo, agulha C para o lado de dentro da bitola, ler F e C e converter pela tabela de desgaste.",
-          ["Agulha C para fora da bitola e ler só a F.", "Medir sem limpar: a sujeira não altera a leitura."],
-          { explica: "PRO-001164 10.5: limpar o local, agulha C para a parte interna da bitola, registrar F e C e conferir na tabela do Anexo 01.", apos: guardarFerramentas }) },
-      { decisao: escolha("Trilho fraturado na rota", "Mais à frente você encontra um trilho fraturado.",
-          "Chamar o centro de controle em emergência e depois comunicar o MCM.", ["Registrar no ValeForms no fim do dia.", "Marcar com tinta e seguir a rota."],
-          { explica: "PRO-001164 10.1 e 8.3.3: anomalia com risco à circulação (fratura de trilho, solda, tala) é comunicada em emergência ao centro de controle; depois ao MCM." }) },
-      { decisao: escolha("Prazo do P0 programado", "Um defeito foi classificado como P0 com restrição programada numa linha de pátio. Qual o prazo para retirá-lo antes de a velocidade ser reduzida?",
-          "30 dias (na linha tronco são 15 dias).", ["15 dias.", "7 dias."],
-          { explica: "PGS-006334: P0 com restrição programada tem prazo de 30 dias em pátios e terminais e de 15 dias nas linhas 01 e 02 da linha tronco." }) }
-    ].concat(classif).concat([
-      { decisao: escolha("Fim da inspeção", "A inspeção terminou. O que fazer com os registros?",
-          "Registrar todas as anomalias com dados de localização e evidências no ValeForms/PowerApp, dentro do prazo de cada prioridade.",
-          ["Passar por rádio ao CCP e não registrar.", "Registrar só os P0."],
-          { explica: "PRO-001164 8.4 e PGS-006334: cadastro com localização, evidências e prazos por prioridade (P0, P1F, P1, P2).",
-            apos: () => devolverLdlRoteiro("Inspeção sensitiva concluída.") }) }
-    ]);
-  }
-
-  // ---- PRO-016249: lubrificação manual em AMV ----
-  function etapasLubrif(f) {
-    const chuva = Math.random() < 0.4, semIndicacao = Math.random() < 0.35;
-    const e = [
-      { decisao: escolha("Acesso à via", "A lubrificação das placas do AMV 03 está programada. Como entrar na via?",
-          "Pedir a LDL ao CCP (PGS-003781) e entrar só com a linha jumpeada ou ocupada.", ["Entrar rápido entre dois trens.", "Avisar o CCP e entrar sem LDL: é serviço curto."],
-          { explica: "PRO-016249, atividades preliminares: solicitar a LDL conforme o PGS-003781; parâmetro: linha jumpeada ou ocupada com EVP.",
-            critico: { e0: "Entrou na via sem LDL.", e1: "Entrou na via sem LDL." }, apos: () => abrirLdlRoteiro("lubrificação do AMV") }) },
-      tocar("agulhas", "Bloqueie o AMV", "Coloque o cepo (mão amiga) entre a agulha e o trilho de encosto, sempre segurando pela alça. Toque nas agulhas.",
-        { feito: () => { mostrarCepo(true); som.encaixe(); } }),
-      { decisao: escolha("Limpeza das placas", "Como limpar as placas de deslizamento?",
-          "Raspar com espátula (escova de aço e pano se preciso) e coletar o resíduo num recipiente.", ["Jogar desengripante e deixar escorrer na brita.", "Não limpar: a graxa nova empurra a velha."],
-          { explica: "PRO-016249 9: raspar graxa e sujeira com espátula, escova de aço e pano; recolher o resíduo, sem deixar graxa na brita ou nos dormentes." }) }
-    ];
-    if (chuva) e.push({ decisao: escolha("Começou a chover", "Começa a chover forte durante a limpeza das placas.",
-      "Parar a atividade e aguardar o tempo normalizar.", ["Acelerar para terminar antes de molhar.", "Passar a graxa assim mesmo: ela protege da água."],
-      { explica: "PRO-016249 9: com chuva, parar e aguardar o tempo normalizar." }) });
-    e.push(
-      tocar("agulhas", "Lubrifique a posição reta", "Com o pincel de 2\", passe uma camada fina e uniforme de graxa grafitada nas placas da posição reta. Toque nas agulhas.", { feito: () => som.clique() }),
-      { decisao: escolha("Onde passar graxa", "Quais placas recebem graxa?",
-          "Só as placas com movimento efetivo das agulhas: primeiro na reta, depois na reversa.", ["Todas as placas do AMV, inclusive as fixas.", "Também o boleto do trilho de encosto, para a agulha deslizar."],
-          { explica: "PRO-016249 9: graxa só nas placas com ação efetiva de movimentação; lubrificar a reta e depois a reversa. Na lateral da ponta da agulha, só se houver desgaste por contato do friso." }) },
-      { decisao: escolha("Mover para a reversa", "É uma máquina de chave elétrica sem controle local. Como levar as agulhas para a reversa?",
-          "Retirar o cepo e pedir ao centro de controle; com a autorização e após retirar o jumper, a MCH é movimentada.",
-          ["Abrir a portinhola e mover na manivela sem avisar ninguém.", "Pedir o comando com o cepo instalado."],
-          { explica: "PRO-016249 9: o AMV elétrico sem controle local só é movimentado com autorização do centro de controle, após a retirada do jumper da via.",
-            critico: { e0: "Movimentou a MCH sem autorização do centro de controle." },
-            apos: () => { mostrarCepo(false); estadoLdlObjetos("on", false, "off"); coordenadorFala(`CCP, ${f.prefixo}. Cepo retirado, pessoal fora das agulhas. Peço comando do AMV 03 para reversa.`, false, "Técnico");
-              ccpFala(`${f.prefixo}, comando para reversa.`); moverAmv("reverso", false); } }) }
-    );
-    if (semIndicacao) e.push({ decisao: escolha("Perdeu a indicação", "Depois do comando, o AMV ficou sem indicação.",
-      "Acionar o MCM e seguir o fluxo do processo.", ["Forçar na manivela até indicar.", "Devolver a LDL e deixar a falha para a EE achar."],
-      { explica: "PRO-016249 9, desvios: perda de indicação do AMV → acionar o MCM e seguir o fluxo." }) });
-    e.push(
-      tocar("agulhas", "Lubrifique a reversa", "Recoloque o jumper e o cepo e passe a graxa nas placas da posição reversa. Toque nas agulhas.",
-        { feito: () => { estadoLdlObjetos("on", false, "on"); mostrarCepo(true); som.clique(); } }),
-      { decisao: escolha("Roletes das agulhas", "O AMV tangencial tem roletes nas agulhas com pino graxeiro. Como lubrificar?",
-          "Encaixar o bico da bomba no pino graxeiro, bombear até encher o rolete e limpar o excesso.", ["Passar graxa com o pincel por fora do rolete.", "Roletes não se lubrificam."],
-          { explica: "PRO-016249 9: bomba de graxa no pino graxeiro até o completo enchimento e retirada das sobras." }) },
-      tocar("cepo", "Encerre", "Retire o cepo pela alça e recolha os resíduos de graxa. Toque no cepo.",
-        { feito: () => { mostrarCepo(false); som.encaixe(); devolverLdlRoteiro("Lubrificação do AMV 03 concluída."); moverAmv("normal", false); } })
-    );
-    return e;
-  }
-
-  // ---- PRO-020971: substituição de componentes de AMV ----
-  function etapasComponentes(f) {
-    const temp = sorte(28, 50), naFtn = temp >= 34 && temp <= 44, esc = umDe([0.8, 1.2, 2.0, 2.5]);
-    return [
-      { decisao: escolha("Acesso à via", "Programada a troca da meia chave do AMV nº 20 VAE. O primeiro passo no campo?",
-          "Abrir a LDL com o CCO/CCP e bloquear a linha com jumper antes de ocupar o gabarito.", ["Descarregar a meia chave na via e depois pedir a LDL.", "Começar a soltar a fixação enquanto o CCP responde."],
-          { explica: "PRO-020971, Anexo 6 passo 1 e atividades preliminares: só acessar a via com LDL concedida e bloqueio físico do circuito.",
-            critico: { e0: "Ocupou o gabarito antes da LDL.", e1: "Ocupou o gabarito antes da LDL." }, apos: () => abrirLdlRoteiro("substituição da meia chave") }) },
-      { decisao: escolha("Temperatura do trilho", `Termômetro na alma do trilho, do lado contrário ao sol, depois de 5 a 10 minutos: ${temp} °C.`,
-          naFtn ? "Dentro da Faixa de Temperatura Neutra (34 a 44 °C): seguir." : "Fora da Faixa de Temperatura Neutra (34 a 44 °C): não seguir com a troca.",
-          [naFtn ? "Fora da faixa: não seguir." : "Seguir: a temperatura não importa para a meia chave."],
-          { explica: "PRO-020971 8, passo 1: a troca do JPM e dos trilhos complementares é feita com a temperatura monitorada na FTN, 34 a 44 °C." }) },
-      tocar("agulhas", "Bloqueie as partes móveis", "Com a via liberada pelo centro de controle, aplique o cepo nas agulhas. Toque nas agulhas.", { feito: () => { mostrarCepo(true); som.encaixe(); } }),
-      { decisao: escolha("Marcação do corte", "Como marcar o corte para a meia chave nova?",
-          "Medir a peça com trena milimetrada e marcar no boleto ou patim com tolerância de ± 3 mm, indicando o corte com duas setas.",
-          ["Marcar a olho pela peça velha.", "Tolerância de ± 10 mm: a junta compensa."],
-          { explica: "PRO-020971 8, marcação do corte: comprimento da meia chave com ± 3 mm (abertura da junta) e duas setas na posição do corte." }) },
-      { decisao: escolha("Qualidade do corte", `Corte feito com policorte. A esconsidade entre boleto e patim ficou em ${num(esc, 1)} mm.`,
-          esc <= 1.5 ? "Aceitável: até 1,5 mm." : "Fora do padrão (máx. 1,5 mm): refazer o corte.", [esc <= 1.5 ? "Refazer: precisa ser zero." : "Aceitar: o oxicorte acerta depois."],
-          { explica: "PRO-020971 8, corte: perpendicular ao eixo vertical, esconsidade admissível até 1,5 mm. Corte com oxicorte não serve para assentamento definitivo." }) },
-      { decisao: escolha("Retirar a meia chave", "A meia chave nº 20 VAE vai ser içada para fora da via.",
-          "Seguir o plano de rigging específico e manter as pessoas na zona segura.", ["Içar com o guindauto sem plano: a peça é conhecida.", "Arrastar com a alavanca, com a equipe em volta guiando."],
-          { explica: "PRO-020971 7 e 8: plano de rigging obrigatório para meia chave nº 20 VAE e JPM; pessoas fora da zona crítica.",
-            critico: { e0: "Içamento sem plano de rigging.", e1: "Equipe na zona de risco durante a movimentação da peça." } }) },
-      { decisao: escolha("Zona crítica", "Durante a movimentação dos trilhos, qual a distância mínima da zona crítica até a área de circulação segura?",
-          "20 m.", ["5 m.", "2 m, a largura da entrevia."], { explica: "PRO-020971 7.2: zona crítica delimitada a no mínimo 20 m das áreas de circulação segura." }) },
-      { decisao: escolha("EVP no perímetro", "Qual a velocidade máxima do EVP dentro do perímetro da atividade?",
-          "3 km/h.", ["10 km/h.", "5 km/h."], { explica: "PRO-020971 7.14: no máximo 3 km/h no deslocamento do EVP dentro do perímetro." }) },
-      { decisao: escolha("Junta metálica", "Vai ficar uma junta metálica até a solda. Como ela deve estar?",
-          "4 parafusos (2 de cada lado) e no mínimo 3 dormentes bons de cada lado, com grampos fixados.", ["2 parafusos bastam até a solda.", "4 parafusos; dormentes não importam."],
-          { explica: "PRO-020971 7.5 e 7.11: junta metálica com 4 parafusos e 3 dormentes com resistência mecânica de cada lado. Furos biselados, a 100 mm do início da solda." }) },
-      { decisao: escolha("Diferença de perfil", "Na junta, a diferença de altura entre os boletos é de 2 mm.",
-          "Esmerilhar 2 m para cada lado, a partir do início da junta (1 m por mm).", ["Esmerilhar 20 cm.", "Deixar: o trem assenta o degrau."],
-          { explica: "PRO-020971 7.4 (ABNT NBR 16387): para cada 1 mm de diferença de perfil, esmerilhar 1 m." }) },
-      { decisao: escolha("Bondeamento provisório", "O cabo de bondeamento definitivo não chegou.",
-          "Não usar arame: aguardar o material correto.", ["Amarrar com arame até o cabo chegar.", "Deixar sem bondeamento."],
-          { explica: "PRO-020971 7.7: proibido arame para bondeamento, mesmo provisório." }) },
-      tocar("cepo", "Libere as agulhas", "Componente assentado e fixado. Retire o cepo pela alça. Toque no cepo.", { feito: () => { mostrarCepo(false); som.encaixe(); } }),
-      { decisao: escolha("Encerramento", "Componente assentado e fixado. O que fazer antes de devolver a LDL?",
-          "Registrar a data de instalação, recolher sucata em bags fora do gabarito e deixar o caminho seguro livre.", ["Deixar a sucata na entrevia para o próximo recolhimento.", "Só recolher as ferramentas."],
-          { explica: "PRO-020971 7.16, 7.17 e 11: data de instalação registrada; sucata em bags fora do gabarito, sem obstruir drenagem nem o caminho seguro." }) },
-      { decisao: escolha("Primeiro trem", "Ao devolver a LDL depois da troca da meia chave, o que informar?",
-          "Restrição de 30 km/h para o primeiro trem de carga ou locomotiva, que não pode ser de passageiros nem de produtos perigosos.", ["Circulação normal.", "Restrição de 30 km/h por 24 horas para todos os trens."],
-          { explica: "ROF 14.28: após substituição de componentes de AMV, 30 km/h para o primeiro trem.",
-            apos: () => devolverLdlRoteiro("Troca da meia chave do AMV 03 concluída. Restrição de 30 quilômetros por hora para o primeiro trem.") }) }
-    ];
-  }
-
-  // ---- Catálogo dos roteiros e menu de cada treinamento ----
-  const ROTEIROS = {
-    amv:     { grupo: "amv", etiqueta: "Preventiva de AMV", modulo: "AMV · Preventiva de AMV (PRO-022721)", etapas: etapasAmv, pref: "VP",
-               falaIni: "Equipe, preventiva do AMV 03. Ninguém entra na via antes da LDL aberta.", falaFim: "Preventiva do AMV encerrada sem desvios. Bom trabalho." },
-    reset:   { grupo: "reset", etiqueta: "Manivela e reset sem a EE", modulo: "AMV · Manivela e reset da MCH sem a EE (PRO-022721 Anexo 10)", etapas: etapasReset, pref: "VP",
-               falaIni: "Equipe, vamos operar a máquina na manivela e fazer o reset sem a eletroeletrônica. Sigam a IT etapa por etapa.", falaFim: "Reset concluído e AMV com correspondência. Bom trabalho." },
-    radio:   { grupo: "radio", etiqueta: "Rádio · padrão do ROF", modulo: "Rádio · Padrão de comunicação (ROF PGS-002722)", etapas: etapasRadio, pref: "VP",
-               falaIni: "Treino de rádio. Lembrem: identificação, localização, cotejamento e câmbio.", falaFim: "Comunicação dentro do padrão do ROF." },
-    rof:     { grupo: "radio", etiqueta: "ROF na manutenção", modulo: "Rádio · ROF na manutenção (PGS-002722)", quiz: ROF_MANUT, pref: "VP" },
-    sens:    { grupo: "sens", etiqueta: "Inspeção sensitiva", modulo: "Via · Inspeção sensitiva e classificação (PRO-001164 / PGS-006334)", etapas: etapasSensitiva, pref: "VP",
-               falaIni: "Equipe, inspeção sensitiva da linha 02 e do AMV 03. Duas pessoas, EAT ligado.", falaFim: "Inspeção registrada e classificada corretamente." },
-    lub:     { grupo: "lub", etiqueta: "Lubrificação do AMV", modulo: "AMV · Lubrificação manual (PRO-016249)", etapas: etapasLubrif, pref: "VP",
-               falaIni: "Equipe, lubrificação das placas do AMV 03. Cepo sempre pela alça.", falaFim: "Lubrificação concluída sem desvios." },
-    comp:    { grupo: "comp", etiqueta: "Troca de componente", modulo: "AMV · Substituição de componentes (PRO-020971)", etapas: etapasComponentes, pref: "VP",
-               falaIni: "Equipe, troca da meia chave do AMV 03. Plano de rigging na mão e zona crítica isolada.", falaFim: "Troca concluída dentro do padrão." }
+  const esperar = ms => new Promise(r => setTimeout(r, ms));
+  // Efeitos na cena, escritos como texto "nome:arg:arg" (lista completa no guia)
+  const EFEITOS = {
+    cepo: a => mostrarCepo(a[0] === "on"),
+    objetos: a => estadoLdlObjetos(a[0], a[1] === "1", a[2]),
+    som: a => { if (typeof som[a[0]] === "function") som[a[0]](); },
+    espera: a => esperar(+a[0] || 500),
+    caixa: a => new Promise(r => { som.tampa(); const z0 = tampaCx.rotation.z, z1 = a[0] === "abrir" ? -1.45 : 0; tween(0.8, k => { tampaCx.rotation.z = z0 + (z1 - z0) * ease(k); }, r); }),
+    ferramenta: a => { if (PARTS[a[1]]) mostrarFerramenta(a[0], centroPeca(a[1]), a.slice(2).join(":")); },
+    ferramentas: () => guardarFerramentas(),
+    amv: a => new Promise(r => moverAmv(a[0] === "reverso" ? "reverso" : "normal", a[1] === "manual", r)),
+    lampada: a => { if (a[0] === "verde") { lampMat.color.set(0x23c552); lampMat.emissive.set(0x18a540); } else { lampMat.color.set(0x333333); lampMat.emissive.set(0x000000); } },
+    evento: a => { licenca.eventos.push(a.join(":")); },
+    trem: a => { trem.prox = performance.now() + (+a[0] || 25) * 1000; },
+    ldl: a => {
+      if (!ldl) return;
+      if (a[0] === "abrir") return abrirLdlRoteiro(a.slice(1).join(":"));
+      if (a[0] === "aberta") { if (trem.ativo) { trem.ativo = false; tremGrupo.visible = false; } licenca.ativa = true; licenca.desde = performance.now(); licenca.pedido = false; ldl.aberta = true; return; }
+      if (a[0] === "devolver") return devolverLdlRoteiro(a.slice(1).join(":"));
+      if (a[0] === "encerrar") { devolverLinha(a.slice(1).join(":")); ldl.aberta = false; }
+    }
   };
-  const MENUS_RT = {
-    amv:   { tag: "PRO-022721 rev. 13 · EFC", titulo: "Inspeção e manutenção preventiva em AMV", txt: "Você é o técnico VP: inspeção prévia, LDL, cepo, zona de risco, medições, classificação de anomalias, Yoshi Yoshi, socaria sem a EE e encerramento.", botoes: [["rt:go:amv", "Começar"]] },
-    reset: { tag: "PRO-022721 Anexo 10 · IT-SIN-N001-2024", titulo: "Manivela e reset da MCH sem a EE", txt: "As 21 etapas da IT: controle local, CDV de chave interditado, cepo, portinhola, contatos de manivela, posição NORMAL, reset, LEDs do ECC e teste com o centro de controle.", botoes: [["rt:go:reset", "Começar"]] },
-    radio: { tag: "PGS-002722 rev. 10 · ROF", titulo: "Comunicação via rádio", txt: "Padrão de rádio: canal livre, rede certa, identificação e localização, cotejamento, correção, câmbio, emergência.\nROF na manutenção: pode ou não pode? Regras dos itens 14, 23 e 44.", botoes: [["rt:go:radio", "Padrão de\nrádio"], ["rt:go:rof", "ROF na\nmanutenção"]] },
-    sens:  { tag: "PRO-001164 rev. 11 · PGS-006334 rev. 03", titulo: "Inspeção sensitiva e classificação de defeitos", txt: "Regras da inspeção, uso do vampiro, fratura na rota e 5 defeitos sorteados para classificar (P0, P1F, P1, P2, dormentes A e I).", botoes: [["rt:go:sens", "Começar"]] },
-    lub:   { tag: "PRO-016249 rev. 08 · EFC", titulo: "Lubrificação manual do AMV", txt: "LDL, cepo, limpeza das placas, graxa grafitada na reta e na reversa, comando com autorização do centro de controle e roletes. Chuva e perda de indicação podem ser sorteadas.", botoes: [["rt:go:lub", "Começar"]] },
-    comp:  { tag: "PRO-020971 rev. 10 · EFC", titulo: "Substituição de componentes de AMV", txt: "Troca da meia chave nº 20 VAE em decisões: temperatura neutra, marcação e corte, rigging, zona crítica, junta metálica, bondeamento e primeiro trem.\nAinda sem os modelos 3D da meia chave e do jacaré.", botoes: [["rt:go:comp", "Começar"]] }
-  };
-  function menuRoteiro(g) {
+  async function rodarEfeitos(lista, f) {
+    for (const s of lista || []) {
+      const p = tpl(s, f).split(":"), fn = EFEITOS[p[0]];
+      if (fn) { try { await fn(p.slice(1)); } catch (e) { console.warn("efeito", s, e); } }
+    }
+  }
+  const PAPEL_PADRAO = { tocar: "executante", decisao: "ambos", info: "ambos" };
+  function compilarEtapas(lista, f, def) {
+    const out = [];
+    for (const x of lista || []) {
+      if (x.se && !cond(x.se, f)) continue;
+      if (x.tipo === "sorteio") { out.push(...compilarEtapas(embaralhar(x.de || []).slice(0, x.n || 1), f, def)); continue; }
+      if (x.tipo === "lista") {
+        for (const it of embaralhar((def.listas || {})[x.lista] || []).slice(0, x.n || 1)) {
+          const [visto, certa, erradas] = Array.isArray(it) ? it : [it.visto, it.certa, it.erradas];
+          const g = Object.assign(Object.create(f), { visto, certa });
+          out.push(compilarUma({ tipo: "decisao", papel: x.papel, conferencia: x.conferencia, titulo: x.titulo, visto: visto + (x.pergunta ? "\n" + x.pergunta : ""),
+            certa, erradas, explica: x.explica, nome: x.nome, critico: x.critico }, g));
+        }
+        continue;
+      }
+      out.push(compilarUma(x, f));
+    }
+    return out;
+  }
+  function compilarUma(x, f) {
+    const T = s => tpl(s, f), papelE = x.papel || PAPEL_PADRAO[x.tipo] || "ambos";
+    const depois = () => { falar(x.falas, f, true); falar(x.radio, f); rodarEfeitos(x.efeitos, f); };
+    if (x.tipo === "decisao") {
+      const critico = {};
+      for (const [k, v] of Object.entries(x.critico || {})) critico["e" + (+k - 1)] = T(v);
+      const d = escolha(T(x.titulo), T(x.visto), T(x.certa), (x.erradas || []).map(T), {
+        explica: T(x.explica || ""), critico, repetir: !!x.repetir, nome: x.nome ? T(x.nome) : undefined,
+        antes: x.radioAntes ? () => falar(x.radioAntes, f) : undefined, senao: x.radioSeErrar ? () => falar(x.radioSeErrar, f) : undefined, apos: depois });
+      return { decisao: d, papel: papelE, conferencia: papelE === "executante" && x.conferencia !== false };
+    }
+    if (x.tipo === "tocar" && PARTS[x.alvo]) {
+      const errado = {}; for (const [k, v] of Object.entries(x.errado || {})) errado[k] = T(v);
+      return { alvo: x.alvo, titulo: T(x.titulo), corpo: T(x.corpo || ""), papel: papelE, errado,
+        prep: x.prep ? () => rodarEfeitos(x.prep, f) : undefined,
+        anim: (ff, done) => rodarEfeitos(x.efeitos, f).then(() => { falar(x.falas, f, true); falar(x.radio, f); done(); }) };
+    }
+    // informação, ou toque numa peça que ainda não existe na cena: vira etapa de confirmação
+    return { info: true, titulo: T(x.titulo || "Etapa"), corpo: T(x.corpo || x.visto || "") + (x.tipo === "tocar" ? "\n(A peça \"" + x.alvo + "\" ainda não existe na cena 3D: toque em Continuar.)" : ""),
+      papel: papelE, apos: depois };
+  }
+  function compilarQuiz(r) {
+    const S = r.respostas.s, N = r.respostas.n;
+    return embaralhar(r.itens).slice(0, r.quantas || 6).map(([t, s, ex]) => ({ decisao: { titulo: r.pergunta, visto: t, explica: ex, fixas: true, nome: t,
+      opcoes: s === "s" ? [["c", S], ["e0", N]] : [["e0", S], ["c", N]], botoes: s === "s" ? { c: duasLinhas(S), e0: duasLinhas(N) } : { c: duasLinhas(N), e0: duasLinhas(S) } } }));
+  }
+  // Validação: erros impedem o carregamento; avisos só informam (ex.: peça que não existe na cena)
+  function validarPro(def) {
+    const erros = [], avisos = [];
+    if (!def || typeof def !== "object") return { erros: ["O arquivo não é um objeto JSON."], avisos };
+    if (def.formato !== "treino-pro-vr/1") erros.push('Campo "formato" deve ser "treino-pro-vr/1".');
+    if (!/^[a-z0-9_-]+$/.test(def.id || "")) erros.push('Campo "id" deve ter só letras minúsculas, números, - ou _.');
+    for (const c of ["titulo", "pro"]) if (!def[c]) erros.push(`Falta o campo "${c}".`);
+    if (def.papeis && (!def.papeis.coordenador || !def.papeis.executante)) erros.push('"papeis" precisa de "coordenador" e "executante".');
+    if (!Array.isArray(def.roteiros) || !def.roteiros.length) erros.push('Falta "roteiros" (lista com pelo menos um roteiro).');
+    const vEtapa = (x, onde) => {
+      const t = x && x.tipo;
+      if (!["decisao", "tocar", "lista", "sorteio", "info"].includes(t)) return erros.push(`${onde}: tipo "${t}" desconhecido.`);
+      if (x.papel && !["coordenador", "executante", "ambos"].includes(x.papel)) erros.push(`${onde}: papel "${x.papel}" inválido.`);
+      if (t === "decisao") { if (!x.titulo || !x.visto || !x.certa) erros.push(`${onde}: decisão precisa de titulo, visto e certa.`); if (!Array.isArray(x.erradas) || !x.erradas.length) erros.push(`${onde}: decisão precisa de pelo menos uma resposta errada.`); }
+      if (t === "tocar") { if (!x.alvo || !x.titulo) erros.push(`${onde}: toque precisa de alvo e titulo.`); else if (!PARTS[x.alvo]) avisos.push(`${onde}: a peça "${x.alvo}" não existe na cena; vira etapa de confirmação.`); }
+      if (t === "lista" && !(def.listas && def.listas[x.lista])) erros.push(`${onde}: lista "${x.lista}" não existe em "listas".`);
+      if (t === "sorteio") (x.de || []).forEach((y, k) => vEtapa(y, `${onde}.de[${k}]`));
+      for (const c of ["efeitos", "prep"]) for (const s of x[c] || []) if (!EFEITOS[String(s).split(":")[0]]) erros.push(`${onde}: efeito "${s}" desconhecido.`);
+    };
+    (def.roteiros || []).forEach((r, i) => {
+      const onde = `roteiro ${r.id || i + 1}`;
+      if (!r.id || !r.botao) erros.push(`${onde}: precisa de id e botao.`);
+      if (r.tipo === "quiz") { if (!r.pergunta || !r.respostas || !Array.isArray(r.itens) || !r.itens.length) erros.push(`${onde}: quiz precisa de pergunta, respostas e itens.`); }
+      else if (!Array.isArray(r.etapas) || !r.etapas.length) erros.push(`${onde}: sem etapas.`);
+      else r.etapas.forEach((x, k) => vEtapa(x, `${onde}, etapa ${k + 1}`));
+    });
+    const dz = def.desafios || [];
+    if (dz.length === 1) avisos.push("Só um desafio: o diagnóstico precisa de pelo menos dois para ter opções.");
+    dz.forEach((d, i) => {
+      if (!d.id || !d.nome || !d.curto || !d.correcao || !Array.isArray(d.relato)) erros.push(`desafio ${d.id || i + 1}: precisa de id, nome, curto, relato e correcao.`);
+      for (const k of Object.keys(d.pistas || {})) if (!PARTS[k]) avisos.push(`desafio ${d.id}: a peça "${k}" não existe na cena.`);
+      for (const s of d.prep || []) if (!EFEITOS[String(s).split(":")[0]]) erros.push(`desafio ${d.id}: efeito "${s}" desconhecido.`);
+    });
+    return { erros, avisos };
+  }
+  function registrarPro(def, extra) {
+    const v = validarPro(def);
+    if (v.erros.length) return v;
+    def._extra = !!extra;
+    if (!PROS[def.id]) ordemPros.push(def.id);
+    PROS[def.id] = def;
+    return v;
+  }
+  async function carregarPros() {
+    try {
+      const ind = await (await fetch("pros/indice.json?v=" + VERSAO)).json();
+      for (const arq of ind.pros) {
+        try { const v = registrarPro(await (await fetch("pros/" + arq + "?v=" + VERSAO)).json()); if (v.erros.length) console.warn("PRO com erro:", arq, v.erros); }
+        catch (e) { console.warn("PRO não carregou:", arq, e); }
+      }
+    } catch (e) { prosErro = "Não foi possível ler a pasta pros/ do site. Abra pelo link do GitHub Pages."; }
+    try { for (const def of JSON.parse(localStorage.getItem(EXTRAS_KEY) || "[]")) registrarPro(def, true); } catch (e) {}
+    if (!bibEl.hidden) abrirBib();
+  }
+
+  // ---------- Menu e início de cada treinamento carregado ----------
+  function menuRoteiro(id) {
+    const def = PROS[id];
+    if (!def) return showMenu();
     fecharDemo();
-    mode = "menuRt"; pulseIds = []; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar();
+    mode = "menuRt"; pulseIds = []; papel = null; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar();
     estadoLdlObjetos("off", false, "off"); mostrarCepo(false);
     if (posicao !== "normal") moverAmv("normal", false);
-    const m = MENUS_RT[g];
-    drawPanel(m.tag, m.titulo, "Participante: " + quem() + ".\n" + m.txt);
-    setButtons(m.botoes.concat([["menu", "Menu\nCTS-2"]]));
+    drawPanel(def.pro, def.titulo, "Participante: " + quem() + ".\n" + def.roteiros.map(r => r.botao.replace(/\n/g, " ") + ": " + (r.descricao || "")).join("\n") +
+      (def.papeis ? "\nAo começar, escolha o papel: coordenador ou executante." : ""));
+    setButtons(def.roteiros.map(r => ["rt:go:" + id + ":" + r.id, r.botao])
+      .concat(def.desafios && def.desafios.length > 1 ? [["dzc:" + id, "Desafios"]] : []).concat([["menu", "Menu\nCTS-2"]]));
   }
-  function startRoteiro(id) {
-    const r = ROTEIROS[id];
-    menuRoteiro(r.grupo);
+  function startRoteiro(id, rid, p) {
+    const def = PROS[id];
+    const r = def && (def.roteiros.find(x => x.id === rid) || def.roteiros[0]);
+    if (!r) return showMenu();
+    const comPapel = r.tipo !== "quiz" && !!def.papeis;
+    if (comPapel && !NOME_PAPEL[p]) return telaPapel(def.titulo, def.papeis, pp => startRoteiro(id, r.id, pp), () => menuRoteiro(id));
+    menuRoteiro(id);
     if (licenca.ativa) devolverLinha("Linha devolvida ao iniciar outro treino");
-    const f = { num: 100 + Math.floor(Math.random() * 900), prefixo: r.pref + "-" + (10 + Math.floor(Math.random() * 80)) };
-    const cfg = Object.assign({ id }, r);
-    let etapas;
-    if (r.quiz) {
-      const P = "Pode", N = "Não pode";
-      etapas = embaralhar(r.quiz).slice(0, 6).map(([t, s, ex]) => ({ decisao: { titulo: "Pode ou não pode?", visto: t, opcoes: s === "s" ? [["c", P], ["e0", N]] : [["e0", P], ["c", N]], explica: ex, fixas: true, nome: t,
-        botoes: s === "s" ? { c: P, e0: N } : { c: N, e0: P } } }));
-    } else etapas = r.etapas(f);
+    papel = comPapel ? p : null;
+    const f = sortearVars(def);
+    const cfgR = { id: id + ":" + r.id, grupo: id, etiqueta: r.etiqueta || (r.tipo === "quiz" ? r.pergunta : def.etiqueta || def.titulo),
+      modulo: (def.grupo ? def.grupo + " · " : "") + (r.modulo || def.titulo), falaFim: def.falaFim };
+    const etapas = r.tipo === "quiz" ? compilarQuiz(r) : compilarEtapas(r.etapas, f, def);
     mode = "ldl";
-    ldl = { tipo: "rt", cfg, f, etapas, i: -1, achados: [], criticos: [], errosPeca: 0, t0: performance.now(), d: null, ev0: licenca.eventos.length, aberta: false };
-    if (r.falaIni) coordenadorFala(r.falaIni);
+    ldl = { tipo: r.tipo === "quiz" ? "quiz" : "rt", cfg: cfgR, f, etapas, i: -1, achados: [], criticos: [], errosPeca: 0, t0: performance.now(), d: null, ev0: licenca.eventos.length, aberta: false, papel };
+    if (r.tipo !== "quiz" && def.falaInicio) instrucao(tpl(def.falaInicio, f), "Coordenador");
     avancarLdl();
   }
   function acaoRoteiro(b) {
     if (b.startsWith("rt:menu:")) return menuRoteiro(b.slice(8));
-    if (b.startsWith("rt:go:")) return startRoteiro(b.slice(6));
+    if (b.startsWith("rt:go:")) { const [id, rid, p] = b.slice(6).split(":"); return startRoteiro(id, rid, p); }
   }
 
   // ---------- Biblioteca de treinamentos ----------
-  const TREINAMENTOS = [
-    { id: "cts2", titulo: "Manutenção preventiva da máquina de chave CTS-2", pro: "PRO-001122 · Anexo 5", txt: "Tour, passo 1, passos 2 a 17, máquina funcionando e explorar por dentro.", abrir: () => showMenu() },
-    { id: "desafios", titulo: "Desafios de defeitos em máquinas de chave", pro: "Baseado no PRO-001122", txt: "Um defeito é sorteado: ouça o sintoma, inspecione, meça e diagnostique a causa.", abrir: () => menuDesafios() },
-    { id: "ldl", titulo: "Liberação e Devolução de Linha (LDL)", pro: "PGS-003781 rev. 06 · EFC", txt: "Seja o coordenador mestre de uma LDL com o CCP: placa, chamada, jumper, cotejamento, imprevistos, devolução. E o quiz Precisa de LDL?", abrir: () => menuLdl() },
-    { id: "radio", titulo: "Comunicação via rádio", pro: "PGS-002722 rev. 10 · ROF", txt: "Padrão de rádio do ROF (canal, identificação, cotejamento, correção, câmbio, emergência) e o quiz ROF na manutenção.", abrir: () => menuRoteiro("radio") },
-    { id: "amv", titulo: "Inspeção e manutenção preventiva em AMV", pro: "PRO-022721 rev. 13 · EFC", txt: "Técnico VP: inspeção prévia, LDL, cepo, zona de risco, medições, classificação de anomalias, Yoshi Yoshi e encerramento.", abrir: () => menuRoteiro("amv") },
-    { id: "reset", titulo: "Manivela e reset da MCH sem a EE", pro: "PRO-022721 Anexo 10 · IT-SIN-N001-2024", txt: "As 21 etapas da IT, do controle local e do CDV de chave interditado ao reset e ao teste de correspondência.", abrir: () => menuRoteiro("reset") },
-    { id: "sens", titulo: "Inspeção sensitiva e classificação de defeitos", pro: "PRO-001164 rev. 11 · PGS-006334 rev. 03", txt: "Regras da inspeção sensitiva e defeitos sorteados para classificar em P0, P1F, P1 e P2.", abrir: () => menuRoteiro("sens") },
-    { id: "lub", titulo: "Lubrificação manual do AMV", pro: "PRO-016249 rev. 08 · EFC", txt: "Cepo, limpeza das placas, graxa grafitada na reta e na reversa, comando com autorização e roletes.", abrir: () => menuRoteiro("lub") },
-    { id: "comp", titulo: "Substituição de componentes de AMV", pro: "PRO-020971 rev. 10 · EFC", txt: "Troca da meia chave nº 20 VAE em decisões: temperatura, corte, rigging, zona crítica, junta e primeiro trem.", abrir: () => menuRoteiro("comp") }
+  const TREINAMENTOS_FIXOS = [
+    { id: "cts2", titulo: "Manutenção preventiva da máquina de chave CTS-2", pro: "PRO-001122 · Anexo 5", txt: "Tour, passos 1 a 17 (como coordenador ou executante), máquina funcionando e explorar por dentro.", abrir: () => showMenu() },
+    { id: "desafios", titulo: "Desafios de defeitos e não conformidades", pro: "Todos os treinamentos", txt: "Um problema é sorteado na CTS-2 ou em qualquer treinamento da biblioteca: ouça o relato, inspecione e diagnostique a causa.", abrir: () => menuDesafios() }
   ];
+  const listaTreinamentos = () => TREINAMENTOS_FIXOS.concat(ordemPros.map(id => { const d = PROS[id];
+    return { id, titulo: d.titulo, pro: d.pro, txt: d.resumo || "", extra: d._extra, abrir: () => menuRoteiro(id) }; }));
   const bibEl = document.getElementById("bib");
   function abrirBib() {
     const l = document.getElementById("bibLista"); l.innerHTML = "";
-    for (const t of TREINAMENTOS) {
+    for (const t of listaTreinamentos()) {
       const b = document.createElement("button"); b.type = "button"; b.disabled = !t.abrir;
-      b.innerHTML = `<small>${esc(t.pro)}</small><b>${esc(t.titulo)}</b><span>${esc(t.txt)}</span><i>${t.abrir ? "Disponível" : "Em preparação"}</i>`;
+      b.innerHTML = `<small>${esc(t.pro)}</small><b>${esc(t.titulo)}</b><span>${esc(t.txt)}</span><i>${t.extra ? "Carregado neste aparelho" : t.abrir ? "Disponível" : "Em preparação"}</i>`;
       if (t.abrir) b.onclick = () => {
         bibEl.hidden = true;
         if (ldl) { if (ldl.aberta) devolverLinha(`LDL ${ldl.f.num} interrompida (saiu pela biblioteca)`); ldl = null; }
@@ -2917,10 +2813,39 @@ body.vr #stick { display: none; }
       };
       l.appendChild(b);
     }
+    const ex = document.getElementById("bibExtras"); ex.innerHTML = "";
+    if (prosErro) ex.insertAdjacentHTML("beforeend", `<p class="bibAviso">${esc(prosErro)}</p>`);
+    for (const id of ordemPros.filter(id => PROS[id]._extra)) {
+      const p = document.createElement("p");
+      p.innerHTML = `<span>${esc(PROS[id].titulo)} · carregado neste aparelho</span> `;
+      const r = document.createElement("button"); r.type = "button"; r.textContent = "Remover";
+      r.onclick = () => { removerExtra(id); abrirBib(); };
+      p.appendChild(r); ex.appendChild(p);
+    }
     bibEl.hidden = false;
   }
+  function lerExtras() { try { return JSON.parse(localStorage.getItem(EXTRAS_KEY) || "[]"); } catch (e) { return []; } }
+  function removerExtra(id) {
+    try { localStorage.setItem(EXTRAS_KEY, JSON.stringify(lerExtras().filter(d => d.id !== id))); } catch (e) {}
+    delete PROS[id]; ordemPros.splice(ordemPros.indexOf(id), 1);
+    carregarPros();   // se havia a versão oficial do mesmo PRO, ela volta
+  }
+  document.getElementById("bibArquivo").addEventListener("change", async ev => {
+    const arq = ev.target.files && ev.target.files[0]; ev.target.value = "";
+    if (!arq) return;
+    let def;
+    try { def = JSON.parse(await arq.text()); } catch (e) { return alert("O arquivo não é um JSON válido:\n" + e.message); }
+    const v = validarPro(def);
+    if (v.erros.length) return alert("O PRO não foi carregado. Corrija:\n• " + v.erros.join("\n• ") + (v.avisos.length ? "\n\nAvisos:\n• " + v.avisos.join("\n• ") : ""));
+    try { localStorage.setItem(EXTRAS_KEY, JSON.stringify(lerExtras().filter(d => d.id !== def.id).concat([def]))); } catch (e) {}
+    if (PROS[def.id]) { PROS[def.id] = null; ordemPros.splice(ordemPros.indexOf(def.id), 1); delete PROS[def.id]; }
+    registrarPro(def, true);
+    abrirBib();
+    alert(`"${def.titulo}" carregado neste aparelho.` + (v.avisos.length ? "\n\nAvisos:\n• " + v.avisos.join("\n• ") : ""));
+  });
   document.getElementById("btnBib").addEventListener("click", abrirBib);
   document.getElementById("bibFechar").addEventListener("click", () => { bibEl.hidden = true; });
+  carregarPros();
 
   // ---------- Explorar por dentro (drill-down do Gêmeo digital) ----------
   // Selecionar cada peça, tirar parafusos e tampas, ocultar, isolar, raio-X das carcaças e vista explodida.
@@ -3058,11 +2983,20 @@ body.vr #stick { display: none; }
       if (b.startsWith("linha:")) return acaoLinha(b);
       if (b.startsWith("ldl:")) return acaoLdl(b);
       if (b.startsWith("rt:")) return acaoRoteiro(b);
+      if (b.startsWith("papel:")) return escolherPapel(b.slice(6));
+      if (b === "passosInicio") return telaPapel("Passos 1 a 17 da CTS-2 (PRO-001122 Anexo 5)", PAPEIS_CTS2, p => { papelCts2 = p; menuPassos(0); }, showMenu);
+      if (mode === "pro" && pro && pro.conf && b.startsWith("pc:")) return conferirPro(b === "pc:sim");
+      if (mode === "pro" && pro && b === "pseg:repetir") return mostrarPro();
+      if (mode === "pro" && pro && b === "pseg") return avancarPro();
+      if (mode === "passo1" && b.startsWith("c1:")) return conferirPasso1(b === "c1:sim");
+      if (b.startsWith("dzc:")) return menuDesafios(b.slice(4));
+      if (b.startsWith("dzl:")) return menuTemaDesafio(b.slice(4), true);
+      if (b.startsWith("dv:") && dz) return verificacaoDesafio(b.slice(3));
       if (b === "licenca") return pedirLicenca(() => { if (mode === "pro" && pro && pro.i < 0) telaInicioPro(); else if (mode === "menu") showMenu(); else if (mode === "desafio" && dz) telaDesafio("Licença concedida. Pode investigar a máquina."); });
-      if (b === "devolver") { devolverLinha("Devolveu a linha ao CCP ao terminar"); coordenadorFala("CCP, a equipe terminou e devolve a linha. Via livre para circulação.", false, "Mantenedor"); return showMenu(); }
+      if (b === "devolver") { devolverLinha("Devolveu a linha ao CCP ao terminar"); radioFala("CCP, aqui é o coordenador da equipe da via. A equipe terminou e devolve a linha. Via livre para circulação.", "Coordenador"); return showMenu(); }
       if (mode === "pro" && pro && pro.d) return decidirPro(b);
       if (b === "desafios") return menuDesafios();
-      if (b === "dzlista") return menuDesafios(true);
+      if (b === "dzlista") return menuTemaDesafio("cts2", true);
       if (b.startsWith("dz:")) return startDesafio(b.slice(3));
       if (b.startsWith("dt:")) return testeDesafio(b.slice(3));
       if (b.startsWith("dd:")) return diagnosticar(b.slice(3));
@@ -3174,7 +3108,7 @@ body.vr #stick { display: none; }
   const btnTx = document.getElementById("btnTx"), txEl = document.getElementById("tx"), txMsg = document.getElementById("txMsg");
   const dicaEl = document.getElementById("dicaAval");
   aval = { peer: null, conns: [], log: [], codigo: null, tentativas: 0 };
-  function avalEstado() { return { modo: mode === "pro" && pro ? `Passo ${pro.n} · ${pro.def.titulo}` : mode, posicao, comutador, nome: pessoa.nome || "", mat: pessoa.mat || "", oculos: vr }; }
+  function avalEstado() { return { modo: (mode === "pro" && pro ? `Passo ${pro.n} · ${pro.def.titulo}` : mode === "ldl" && ldl ? ldl.cfg.etiqueta : mode) + (papel ? " · " + papel : ""), posicao, comutador, nome: pessoa.nome || "", mat: pessoa.mat || "", oculos: vr }; }
   function avalEnviar(tipo, texto, detalhe) {
     if (!aval) return;
     const ev = { t: Date.now(), tipo, texto, detalhe: detalhe || "" };
@@ -3389,7 +3323,7 @@ body.vr #stick { display: none; }
   }
   const vrGear = document.getElementById("vrGear"), vrDivider = document.getElementById("vrDivider"), vrCfg = document.getElementById("vrCfg");
   // Calibração do óculos (estilo Cardboard): distância entre lentes, correção de lente e tamanho da tela
-  const cfg = { sep: 62, dist: 0.35, tela: 6.5, qual: 1.45, executor: "avatar", voz: true, trem: 10 };
+  const cfg = { sep: 62, dist: 0.35, tela: 6.5, qual: 1.45, executor: "avatar", voz: true, trem: 10, lerQuadro: false };
   try { Object.assign(cfg, JSON.parse(localStorage.getItem("cts2-vr-cfg") || "{}")); } catch (e) {}
   function saveCfg() { try { localStorage.setItem("cts2-vr-cfg", JSON.stringify(cfg)); } catch (e) {} showCfg(); }
   function showCfg() {
@@ -3399,6 +3333,7 @@ body.vr #stick { display: none; }
     document.getElementById("qualVal").textContent = Math.round(cfg.qual * 100) + "%";
     document.getElementById("btnExecutor").textContent = cfg.executor === "mao" ? "Mão virtual" : "Avatar";
     document.getElementById("btnVoz").textContent = cfg.voz ? "Ligada" : "Desligada";
+    document.getElementById("btnLerAuto").textContent = cfg.lerQuadro ? "A cada quadro" : "Só no botão";
     document.getElementById("tremVal").textContent = cfg.trem + " min";
   }
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -3412,6 +3347,8 @@ body.vr #stick { display: none; }
   document.getElementById("qualMais").onclick = () => { cfg.qual = clamp(Math.round((cfg.qual + 0.15) * 100) / 100, 0.7, 1.75); saveCfg(); };
   document.getElementById("btnExecutor").onclick = () => { cfg.executor = cfg.executor === "mao" ? "avatar" : "mao"; saveCfg(); };
   document.getElementById("btnVoz").onclick = () => { cfg.voz = !cfg.voz; if (!cfg.voz && window.speechSynthesis) speechSynthesis.cancel(); saveCfg(); };
+  document.getElementById("btnLerAuto").onclick = () => { cfg.lerQuadro = !cfg.lerQuadro; saveCfg(); if (cfg.lerQuadro) lerQuadro(true); };
+  document.getElementById("btnLer").onclick = () => lerQuadro(true);
   document.getElementById("tremMenos").onclick = () => { cfg.trem = clamp(cfg.trem - 1, 2, 30); trem.prox = 0; saveCfg(); };
   document.getElementById("tremMais").onclick = () => { cfg.trem = clamp(cfg.trem + 1, 2, 30); trem.prox = 0; saveCfg(); };
   document.getElementById("btnAjustes").onclick = () => { vrCfg.hidden = !vrCfg.hidden; };
