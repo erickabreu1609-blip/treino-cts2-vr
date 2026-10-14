@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 dormentes inteiriços</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 KGT e equipe</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -881,6 +881,39 @@ body.vr #stick { display: none; }
     aux.traverse(m => { if (m.isMesh) { m.castShadow = true; m.userData.avatar = true; } });
     aux.position.set(5.2, alturaLastro(2.6), 2.6); aux.rotation.y = Math.atan2(0 - 5.2, 1.5 - 2.6);
     scene.add(aux);
+    // Tons de pele e cabelo variados, refletindo a diversidade do Brasil (auto_12 = pele, auto_13 = cabelo no modelo do SketchUp).
+    // As cores são as vistas na tela (sRGB); o material guarda em linear.
+    const pele = (o, tom, cabelo) => o.traverse(m => {
+      if (!m.isMesh) return;
+      if (/auto_12/.test(m.name)) { m.material = m.material.clone(); m.material.color.setHex(tom).convertSRGBToLinear(); }
+      if (/auto_13/.test(m.name)) { m.material = m.material.clone(); m.material.color.setHex(cabelo).convertSRGBToLinear(); }
+    });
+    pele(mantenedor.userData.corpo, 0xb37a52, 0x1b1512);   // pardo
+    pele(coordenador.userData.corpo, 0x6a4430, 0x17110d);  // preto
+    pele(aux, 0xe6b693, 0x5a3e28);                         // branco
+    // Equipe da KGT, parada ao lado da máquina, fora do lastro
+    [["funcionario", 9.4, 4.6, 0xb98457, 0x100c0a, 0xf4f4f2],   // indígena
+     ["funcionario_maleta", 10.6, 9.0, 0x4f3222, 0x140f0c],     // preto retinto
+     ["funcionario", 19.6, 5.4, 0xe0b48c, 0x1f1712, 0x2f6fd6]   // amarelo, capacete azul do encarregado
+    ].forEach(([nome, x, z, tom, cabelo, capacete]) => {
+      const f = modelo(nome);
+      f.traverse(m => {
+        if (!m.isMesh) return;
+        m.material = m.material.clone(); m.castShadow = true; m.userData.avatar = true;
+        if (capacete && /auto_11/.test(m.name)) m.material.color.setHex(capacete);
+      });
+      pele(f, tom, cabelo);
+      f.position.set(x, alturaLastro(z), z); f.rotation.y = Math.atan2(KGT_POS.x - x, KGT_POS.z - z);
+      scene.add(f);
+    });
+  }, undefined, () => {});
+  // KGT (escavadeira rodoferroviária, modelo do SketchUp do Erick) estacionada fora do lastro, do lado da caixa de junção,
+  // a 9 m da CTS-2 e paralela à via, com a caçamba virada para a máquina de chave. kgt.glb: origem no chão entre os pneus, frente em +z.
+  const KGT_POS = new THREE.Vector3(14, 0, 6.2);
+  new THREE.GLTFLoader().load("kgt.glb", g => {
+    g.scene.traverse(m => { if (m.isMesh) { m.material.side = THREE.DoubleSide; } });
+    g.scene.position.copy(KGT_POS); g.scene.rotation.y = -Math.PI / 2;
+    scene.add(g.scene);
   }, undefined, () => {});
   function mantenedorAgir(ponto, girar) {
     const u = mantenedor.userData;
