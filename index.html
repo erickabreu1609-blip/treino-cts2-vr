@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 dormentes</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 dormentes de madeira</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -450,6 +450,24 @@ body.vr #stick { display: none; }
     const root = g.scene, placa = [], novasAgulhas = [];
     root.traverse(o => { if (o.isMesh) (/^placa_via/.test(o.name) ? placa : /^agulha_/.test(o.name) ? novasAgulhas : []).push(o); });
     root.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = /Metal|material/.test(o.material.name || ""); } });
+    // dormentes de madeira no lugar dos de concreto do modelo: veio da madeira ao longo do dormente (z)
+    const madeira = mat(0xffffff, { map: texMadeira, roughness: 0.95, metalness: 0 });
+    root.traverse(o => {
+      if (!o.isMesh || o.material.name !== "Polished_Concrete_New") return;
+      const geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry, p = geo.attributes.position, uv = new Float32Array(p.count * 2);
+      const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+      for (let i = 0; i < p.count; i += 3) {
+        a.fromBufferAttribute(p, i); b.fromBufferAttribute(p, i + 1); c.fromBufferAttribute(p, i + 2);
+        const n = b.clone().sub(a).cross(c.clone().sub(a)), nx = Math.abs(n.x), ny = Math.abs(n.y), nz = Math.abs(n.z);
+        for (let k = 0; k < 3; k++) {
+          const x = p.getX(i + k), y = p.getY(i + k), z = p.getZ(i + k), sorteio = Math.floor(x / 0.6) * 0.37;
+          if (nz >= nx && nz >= ny) uv.set([x / 0.24, y / 0.12], (i + k) * 2);                       // topos
+          else uv.set([z / 2.8 + sorteio, (ny >= nx ? x / 0.24 : y / 0.12) + sorteio], (i + k) * 2);  // face de cima e laterais
+        }
+      }
+      geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2)); geo.computeVertexNormals();
+      o.geometry = geo; o.material = madeira;
+    });
     // agulhas: troca as da via antiga pelas do modelo, mantendo o grupo "agulhas" que os treinos movimentam
     const antigas = [];
     [agF, agA].forEach(a => { a.traverse(o => { if (o.isMesh) antigas.push(o); }); a.visible = false; tirarPeca(a); });
