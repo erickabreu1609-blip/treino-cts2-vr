@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 KGT e equipe</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 KGT e equipe em pé</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -861,10 +861,16 @@ body.vr #stick { display: none; }
   coordenador.userData.prancheta = true;
   posAvatar(coordenador, 3.6, 3.5); coordenador.rotation.y = Math.PI * 1.15;
   const CASA_MANT = new THREE.Vector3(-0.7, 0, 3.0);
-  // Funcionários fardados (modelo do SketchUp do Erick) no lugar dos bonecos feitos com formas simples.
-  // "funcionario" veste o mantenedor e o coordenador (capacete azul); "funcionario_maleta" é o auxiliar da equipe com a caixa de ferramentas.
-  new THREE.GLTFLoader().load("funcionarios.glb", g => {
-    const modelo = nome => { const o = new THREE.Group(); g.scene.children.filter(c => c.name.startsWith(nome + "__")).forEach(c => o.add(c.clone())); return o; };
+  // Funcionários fardados (modelo do SketchUp do Erick) em pose ereta, no lugar dos bonecos feitos com formas simples.
+  // funcionario_em_pe.glb é o fardado endireitado, usado aqui como corpo fixo (sem articular). "funcionario" veste o mantenedor
+  // e o coordenador (capacete azul); "funcionario_maleta" leva a caixa de ferramentas na mão direita.
+  new THREE.GLTFLoader().load("funcionario_em_pe.glb", g => {
+    const modelo = nome => {
+      const o = new THREE.Group(); g.scene.children.filter(c => c.name.startsWith("funcionario__")).forEach(c => o.add(c.clone()));
+      const caixaF = g.scene.getObjectByName("caixa_ferramentas");
+      if (nome === "funcionario_maleta" && caixaF) { const c = caixaF.clone(); c.position.set(-0.21, 0.6, 0); o.add(c); }
+      return o;
+    };
     function vestir(av, capacete) {
       const u = av.userData, corpo = modelo("funcionario");
       corpo.traverse(m => {
@@ -873,7 +879,7 @@ body.vr #stick { display: none; }
         if (capacete && /auto_11/.test(m.name)) m.material.color.setHex(capacete);
       });
       u.boneco.forEach(c => { if (c !== u.nome) c.visible = false; });
-      u.nome.position.set(0, 1.2, 0.36); u.nome.rotation.x = -0.35;   // crachá no peito, que fica inclinado para a frente
+      u.nome.position.set(0, 1.32, 0.21); u.nome.rotation.x = 0;   // crachá no peito
       av.add(corpo); u.corpo = corpo;
     }
     vestir(mantenedor); vestir(coordenador, 0x2f6fd6);
