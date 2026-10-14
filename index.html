@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 colisão e movimento</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 esqueleto e passada</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -806,7 +806,12 @@ body.vr #stick { display: none; }
     av.updateMatrixWorld(true);
     b.ombro.getWorldPosition(vA);
     vB.copy(ponto).sub(vA).applyQuaternion(qA.copy(av.quaternion).invert()).normalize();
-    qB.setFromUnitVectors(b.dir || BAIXO, vB);   // b.dir: direção ombro -> mão em repouso (esqueleto do trabalhador)
+    if (b.qReto) {   // esqueleto: estica o cotovelo e aponta o braço inteiro para a peça
+      qB.setFromUnitVectors(b.dirSup, vB);
+      b.ombro.quaternion.slerp(qB, Math.min(1, k)); b.cot.quaternion.slerp(b.qReto, Math.min(1, k));
+      return;
+    }
+    qB.setFromUnitVectors(BAIXO, vB);
     b.ombro.quaternion.slerp(qB, Math.min(1, k));
     b.cot.rotation.x += (0 - b.cot.rotation.x) * Math.min(1, k);
   }
@@ -819,7 +824,7 @@ body.vr #stick { display: none; }
     const d = u.dobra, quad = -0.55 * d, joel = 1.0 * d;
     if (u.estado !== "andando") {
       u.pernas.forEach(([q, j, pe]) => { q.rotation.x += (quad - q.rotation.x) * k; j.rotation.x += (joel - j.rotation.x) * k; pe.rotation.x += (-(quad + joel) - pe.rotation.x) * k; });
-      u.esq.coluna.rotation.x += (0.3 * d - u.esq.coluna.rotation.x) * k; u.esq.peito.rotation.x += (0.25 * d - u.esq.peito.rotation.x) * k;
+      u.esq.coluna.rotation.x += (0.3 * d - 0.08 - u.esq.coluna.rotation.x) * k;   // o modelo vem um pouco curvado: endireita u.esq.peito.rotation.x += (0.25 * d - u.esq.peito.rotation.x) * k;
       u.esq.peito.rotation.y *= 1 - k; u.esq.cabeca.rotation.x += (0.15 * d - u.esq.cabeca.rotation.x) * k;
     }
     // coxa 0,44 m e canela 0,36 m: o corpo desce o quanto as pernas dobram
@@ -849,12 +854,21 @@ body.vr #stick { display: none; }
       else posAvatar(av, av.position.x + hx / dh * passo, av.position.z + hz / dh * passo);
       const sw = Math.sin(u.fase * 9) * 0.5;
       if (u.esq) {   // passada com joelho, pé e tronco acompanhando
-        u.pernas[0][0].rotation.x = sw; u.pernas[1][0].rotation.x = -sw;
-        u.pernas[0][1].rotation.x = Math.max(0, -Math.sin(u.fase * 9 - 0.9)) * 0.9; u.pernas[1][1].rotation.x = Math.max(0, Math.sin(u.fase * 9 - 0.9)) * 0.9;
-        u.pernas[0][2].rotation.x = -sw * 0.4; u.pernas[1][2].rotation.x = sw * 0.4;
-        u.esq.peito.rotation.y = sw * 0.25; u.esq.coluna.rotation.x = 0.06; u.esq.peito.rotation.x = 0;
-        bE.ombro.quaternion.setFromEuler(new THREE.Euler(sw * 0.7, 0, 0)); bD.ombro.quaternion.setFromEuler(new THREE.Euler(-sw * 0.7, 0, 0));
-        bE.cot.rotation.x = -0.15 - Math.max(0, sw) * 0.4; bD.cot.rotation.x = -0.15 - Math.max(0, -sw) * 0.4;
+        // passada: rotação x positiva leva a coxa para trás. O joelho só dobra bem na fase em que a perna vem para a frente
+        // (pico com a coxa já um pouco à frente, como no andar de verdade); no apoio fica quase reto e o pé fica no chão.
+        [0, Math.PI].forEach((desl, l) => {
+          const f = u.fase * 9 + desl, quad = Math.sin(f) * 0.28;
+          let dj = Math.atan2(Math.sin(f - Math.PI - 0.3), Math.cos(f - Math.PI - 0.3));
+          const joel = 0.08 + (Math.abs(dj) < 1.3 ? Math.cos(dj / 1.3 * Math.PI / 2) * 0.8 : 0);
+          const [q, j, pe] = u.pernas[l];
+          q.rotation.x = quad; j.rotation.x = joel; pe.rotation.x = -(quad + joel) * (joel > 0.3 ? 0.7 : 1);
+        });
+        u.esq.peito.rotation.y = -sw * 0.2; u.esq.coluna.rotation.x = -0.08; u.esq.peito.rotation.x = -0.05; u.esq.cabeca.rotation.x = -0.05;
+        // braço oposto à perna: perna 0 (lado -x) vai à frente junto com o braço do lado +x
+        bE.ombro.quaternion.copy(qA.setFromEuler(new THREE.Euler(-sw * 0.7, 0, 0))).multiply(bE.qBraco);
+        bD.ombro.quaternion.copy(qA.setFromEuler(new THREE.Euler(sw * 0.7, 0, 0))).multiply(bD.qBraco);
+        bE.cot.quaternion.slerp(bE.qCot, Math.min(1, dt * 8)); bD.cot.quaternion.slerp(bD.qCot, Math.min(1, dt * 8));
+        bE.mao.quaternion.identity(); bD.mao.quaternion.identity();
         return;
       }
       u.pernas[0][0].rotation.x = sw; u.pernas[1][0].rotation.x = -sw;
@@ -879,6 +893,13 @@ body.vr #stick { display: none; }
     }
     // parado: respiração leve; o coordenador ergue o rádio quando fala
     const respira = Math.sin(u.fase * 1.6) * 0.02;
+    if (u.esq) {   // braços soltos ao lado do corpo; ao falar no rádio, ergue o braço como no modelo original
+      const k = Math.min(1, dt * 4), kf = Math.min(1, dt * 6);
+      bD.ombro.quaternion.slerp(qA.setFromEuler(new THREE.Euler(respira, 0, 0)).multiply(bD.qBraco), k); bD.cot.quaternion.slerp(bD.qCot, k);
+      if (u.falando > 0) { u.falando -= dt; bE.ombro.quaternion.slerp(qA.identity(), kf); bE.cot.quaternion.slerp(qA.identity(), kf); }
+      else { bE.ombro.quaternion.slerp(qA.setFromEuler(new THREE.Euler(-respira, 0, 0)).multiply(bE.qBraco), k); bE.cot.quaternion.slerp(bE.qCot, k); }
+      return;
+    }
     bD.ombro.quaternion.slerp(qB.setFromEuler(new THREE.Euler(0.05 + respira, 0, 0.06)), Math.min(1, dt * 4));
     bD.cot.rotation.x += (-(u.prancheta ? 1.2 : 0.15) - bD.cot.rotation.x) * Math.min(1, dt * 4);
     if (u.falando > 0) {
@@ -1003,16 +1024,17 @@ body.vr #stick { display: none; }
       });
       return o;
     }
-    // Trabalhador "a" articulado: as malhas trazem os pesos de cada osso (_joints/_weights, ver trabalhadores_app.py).
-    // Contrato dos bonecos: pernas [quadril, joelho, pé], braços { ombro, cot, mao, dir, eixoMao } e esq (coluna, peito, cabeça).
+    // Trabalhador "acenando" articulado (braços soltos do corpo): as malhas trazem os pesos de cada osso (_joints/_weights,
+    // ver trabalhadores_app.py), cada parte do corpo segue um osso só, como corpo sólido.
+    // Contrato dos bonecos: pernas [quadril, joelho, pé], braços { ombro, cot, mao, dir, eixoMao, qBraco, qCot, qReto } e esq (coluna, peito, cabeça).
     const OSSOS = [
-      ["raiz", -1, [0, 0.95, 0]], ["coluna", 0, [0, 1.08, 0]], ["peito", 1, [0, 1.25, 0.03]], ["pescoco", 2, [0, 1.4, 0.08]], ["cabeca", 3, [0, 1.47, 0.13]],
-      ["ombro_D", 2, [-0.19, 1.33, 0.06]], ["cotovelo_D", 5, [-0.25, 1, 0.04]], ["mao_D", 6, [-0.17, 0.84, 0.27]],
-      ["ombro_E", 2, [0.19, 1.33, 0.06]], ["cotovelo_E", 8, [0.25, 1, 0.04]], ["mao_E", 9, [0.17, 0.84, 0.27]],
-      ["quadril_D", 0, [-0.09, 0.92, 0]], ["joelho_D", 11, [-0.16, 0.48, 0]], ["pe_D", 12, [-0.21, 0.12, -0.04]],
-      ["quadril_E", 0, [0.09, 0.92, 0]], ["joelho_E", 14, [0.16, 0.48, 0]], ["pe_E", 15, [0.21, 0.12, -0.04]]
+      ["raiz", -1, [0, 0.93, -0.03]], ["coluna", 0, [0, 1.08, 0]], ["peito", 1, [-0.02, 1.25, 0.08]], ["pescoco", 2, [-0.05, 1.42, 0.13]], ["cabeca", 3, [-0.07, 1.48, 0.15]],
+      ["ombro_D", 2, [-0.19, 1.39, 0.07]], ["cotovelo_D", 5, [-0.25, 1.33, 0.32]], ["mao_D", 6, [-0.22, 1.5, 0.55]],
+      ["ombro_E", 2, [0.18, 1.38, 0.05]], ["cotovelo_E", 8, [0.4, 1.29, 0.14]], ["mao_E", 9, [0.22, 1.2, 0.33]],
+      ["quadril_D", 0, [-0.08, 0.9, -0.08]], ["joelho_D", 11, [-0.07, 0.48, -0.1]], ["pe_D", 12, [-0.06, 0.12, -0.12]],
+      ["quadril_E", 0, [0.09, 0.9, -0.01]], ["joelho_E", 14, [0.08, 0.48, 0]], ["pe_E", 15, [0.08, 0.12, -0.03]]
     ];
-    function vestirArticulado(av, tom, cracha) {
+    function vestirArticulado(av, tom, cracha, capacete) {
       const u = av.userData, f = new THREE.Color(tom).convertSRGBToLinear();
       const ossos = OSSOS.map(([n]) => { const b = new THREE.Bone(); b.name = n; return b; });
       OSSOS.forEach(([, pai, p], i) => { const q = pai >= 0 ? OSSOS[pai][2] : [0, 0, 0]; ossos[i].position.set(p[0] - q[0], p[1] - q[1], p[2] - q[2]); if (pai >= 0) ossos[pai].add(ossos[i]); });
@@ -1025,6 +1047,7 @@ body.vr #stick { display: none; }
         geo.setAttribute("skinWeight", new THREE.Float32BufferAttribute(geo.attributes._weights.array, 4));
         const mt = m.material.clone(); mt.skinning = true;
         if (/__pele/.test(m.name + (m.parent ? m.parent.name : ""))) mt.color.setRGB(Math.min(1, mt.color.r * f.r / PELE_REF[0]), Math.min(1, mt.color.g * f.g / PELE_REF[1]), Math.min(1, mt.color.b * f.b / PELE_REF[2]));
+        else if (capacete && AMARELO(mt.color)) mt.color.setHex(capacete).convertSRGBToLinear();
         const sm = new THREE.SkinnedMesh(geo, mt); sm.castShadow = true; sm.frustumCulled = false; sm.userData.avatar = true;
         corpo.add(sm); malhas.push(sm);
       });
@@ -1033,7 +1056,15 @@ body.vr #stick { display: none; }
       const B = n => ossos[OSSOS.findIndex(o => o[0] === n)];
       const braco = l => {
         const b = { ombro: B("ombro_" + l), cot: B("cotovelo_" + l), mao: B("mao_" + l) };
-        b.dir = b.cot.position.clone().add(b.mao.position).normalize(); b.eixoMao = b.mao.position.clone().normalize(); return b;
+        b.dir = b.cot.position.clone().add(b.mao.position).normalize(); b.eixoMao = b.mao.position.clone().normalize();
+        b.dirSup = b.cot.position.clone().normalize();
+        // pose solta: braço para baixo, um pouco afastado do corpo, cotovelo levemente dobrado para a frente
+        const lado = Math.sign(b.ombro.position.x);
+        b.qBraco = new THREE.Quaternion().setFromUnitVectors(b.dirSup, new THREE.Vector3(lado * 0.2, -1, 0.02).normalize());
+        const ante = new THREE.Vector3(lado * 0.08, -0.85, 0.5).normalize().applyQuaternion(b.qBraco.clone().invert());
+        b.qCot = new THREE.Quaternion().setFromUnitVectors(b.eixoMao, ante);
+        b.qReto = new THREE.Quaternion().setFromUnitVectors(b.eixoMao, b.dirSup);   // braço esticado para alcançar a peça
+        return b;
       };
       u.boneco.forEach(c => { if (c !== u.nome) c.visible = false; });
       u.pernas = ["D", "E"].map(l => [B("quadril_" + l), B("joelho_" + l), B("pe_" + l)]);
@@ -1042,15 +1073,9 @@ body.vr #stick { display: none; }
       u.nome.position.set(...cracha); u.nome.rotation.set(0, 0, 0); u.esq.peito.add(u.nome);   // crachá no peito, acompanha o tronco
       av.add(corpo); u.corpo = corpo;
     }
-    function vestir(av, nome, tom, capacete, cracha) {
-      const u = av.userData, corpo = modelo(nome, tom, capacete);
-      u.boneco.forEach(c => { if (c !== u.nome) c.visible = false; });
-      u.nome.position.set(...cracha); u.nome.rotation.x = 0;   // crachá no peito
-      av.add(corpo); u.corpo = corpo;
-    }
     // Tons de pele variados, refletindo a diversidade do Brasil
-    vestirArticulado(mantenedor, 0xb37a52, [0, 0.05, 0.18]);               // pardo, articulado: anda, agacha e gira o punho
-    vestir(coordenador, "acenando", 0x6a4430, 0x2f6fd6, [0, 1.28, 0.3]);   // preto, capacete azul
+    vestirArticulado(mantenedor, 0xb37a52, [0.02, 0.06, 0.16]);              // pardo: anda, agacha e gira o punho
+    vestirArticulado(coordenador, 0x6a4430, [0.02, 0.06, 0.16], 0x2f6fd6);  // preto, capacete azul; ergue o braço ao falar no rádio
     const aux = modelo("c", 0xe6b693);                                     // branco
     aux.position.set(5.2, alturaLastro(2.6), 2.6); aux.rotation.y = Math.atan2(0 - 5.2, 1.5 - 2.6);
     scene.add(aux); figurasFixas.push(aux);
