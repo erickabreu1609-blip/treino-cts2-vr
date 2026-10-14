@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 KGT e trabalhadores</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 colisão e movimento</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -795,7 +795,7 @@ body.vr #stick { display: none; }
     scene.add(g);
     return g;
   }
-  const qA = new THREE.Quaternion(), qB = new THREE.Quaternion(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), BAIXO = new THREE.Vector3(0, -1, 0);
+  const qA = new THREE.Quaternion(), qB = new THREE.Quaternion(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3(), BAIXO = new THREE.Vector3(0, -1, 0);
   function posAvatar(av, x, z) { av.position.set(x, alturaLastro(z), z); }
   function virarPara(av, x, z, k) {
     const alvo = Math.atan2(x - av.position.x, z - av.position.z);
@@ -806,14 +806,32 @@ body.vr #stick { display: none; }
     av.updateMatrixWorld(true);
     b.ombro.getWorldPosition(vA);
     vB.copy(ponto).sub(vA).applyQuaternion(qA.copy(av.quaternion).invert()).normalize();
-    qB.setFromUnitVectors(BAIXO, vB);
+    qB.setFromUnitVectors(b.dir || BAIXO, vB);   // b.dir: direção ombro -> mão em repouso (esqueleto do trabalhador)
     b.ombro.quaternion.slerp(qB, Math.min(1, k));
     b.cot.rotation.x += (0 - b.cot.rotation.x) * Math.min(1, k);
+  }
+  // Postura do trabalhador articulado: agacha e curva o tronco conforme a altura da peça; volta a ficar ereto ao terminar.
+  function postura(av, dt) {
+    const u = av.userData, k = Math.min(1, dt * 5);
+    let dobra = 0;
+    if (u.estado === "agindo" && u.alvo) dobra = THREE.MathUtils.clamp((1.15 - (u.alvo.y - av.position.y)) / 0.8, 0, 1);
+    u.dobra = (u.dobra || 0) + (dobra - (u.dobra || 0)) * k;
+    const d = u.dobra, quad = -0.55 * d, joel = 1.0 * d;
+    if (u.estado !== "andando") {
+      u.pernas.forEach(([q, j, pe]) => { q.rotation.x += (quad - q.rotation.x) * k; j.rotation.x += (joel - j.rotation.x) * k; pe.rotation.x += (-(quad + joel) - pe.rotation.x) * k; });
+      u.esq.coluna.rotation.x += (0.3 * d - u.esq.coluna.rotation.x) * k; u.esq.peito.rotation.x += (0.25 * d - u.esq.peito.rotation.x) * k;
+      u.esq.peito.rotation.y *= 1 - k; u.esq.cabeca.rotation.x += (0.15 * d - u.esq.cabeca.rotation.x) * k;
+    }
+    // coxa 0,44 m e canela 0,36 m: o corpo desce o quanto as pernas dobram
+    const q = u.pernas[0][0].rotation.x, j = u.pernas[0][1].rotation.x;
+    const desce = u.estado === "andando" ? 0 : 0.80 - (0.44 * Math.cos(q) + 0.36 * Math.cos(q + j));
+    u.corpo.position.y = u.estado === "andando" ? Math.abs(Math.sin(u.fase * 9)) * 0.02 : -desce;
   }
   function atualizarAvatar(av, dt) {
     const u = av.userData;
     u.fase += dt;
-    if (u.corpo) {   // funcionário do modelo: balança ao andar e se inclina para a peça ao agir
+    if (u.esq) postura(av, dt);
+    else if (u.corpo) {   // funcionário do modelo: balança ao andar e se inclina para a peça ao agir
       const anda = u.estado === "andando";
       u.corpo.position.y = anda ? Math.abs(Math.sin(u.fase * 9)) * 0.03 : 0;
       u.corpo.rotation.z = anda ? Math.sin(u.fase * 9) * 0.035 : 0;
@@ -821,25 +839,42 @@ body.vr #stick { display: none; }
     }
     const [bE, bD] = u.bracos;
     if (u.estado === "andando" && u.destino) {
-      const dx = u.destino.x - av.position.x, dz = u.destino.z - av.position.z, d = Math.hypot(dx, dz);
-      virarPara(av, u.destino.x, u.destino.z, dt * 8);
+      const d = Math.hypot(u.destino.x - av.position.x, u.destino.z - av.position.z);
+      const h = rumo(av.position, u.destino, R_PESSOA), hx = h.x - av.position.x, hz = h.z - av.position.z, dh = Math.hypot(hx, hz) || 1;   // contorna objetos no caminho
+      virarPara(av, h.x, h.z, dt * 8);
       const passo = 1.25 * dt;
-      if (d <= passo) { posAvatar(av, u.destino.x, u.destino.z); u.estado = u.alvo ? "agindo" : "parado"; u.tAcao = 0; }
-      else posAvatar(av, av.position.x + dx / d * passo, av.position.z + dz / d * passo);
+      u.tAndando = (u.tAndando || 0) + dt;
+      // chegou, ou não consegue chegar mais perto (alguém no caminho): age dali mesmo
+      if (d <= passo || u.tAndando > 8) { if (d <= passo) posAvatar(av, u.destino.x, u.destino.z); u.estado = u.alvo ? "agindo" : "parado"; u.tAcao = 0; u.tAndando = 0; }
+      else posAvatar(av, av.position.x + hx / dh * passo, av.position.z + hz / dh * passo);
       const sw = Math.sin(u.fase * 9) * 0.5;
+      if (u.esq) {   // passada com joelho, pé e tronco acompanhando
+        u.pernas[0][0].rotation.x = sw; u.pernas[1][0].rotation.x = -sw;
+        u.pernas[0][1].rotation.x = Math.max(0, -Math.sin(u.fase * 9 - 0.9)) * 0.9; u.pernas[1][1].rotation.x = Math.max(0, Math.sin(u.fase * 9 - 0.9)) * 0.9;
+        u.pernas[0][2].rotation.x = -sw * 0.4; u.pernas[1][2].rotation.x = sw * 0.4;
+        u.esq.peito.rotation.y = sw * 0.25; u.esq.coluna.rotation.x = 0.06; u.esq.peito.rotation.x = 0;
+        bE.ombro.quaternion.setFromEuler(new THREE.Euler(sw * 0.7, 0, 0)); bD.ombro.quaternion.setFromEuler(new THREE.Euler(-sw * 0.7, 0, 0));
+        bE.cot.rotation.x = -0.15 - Math.max(0, sw) * 0.4; bD.cot.rotation.x = -0.15 - Math.max(0, -sw) * 0.4;
+        return;
+      }
       u.pernas[0][0].rotation.x = sw; u.pernas[1][0].rotation.x = -sw;
       u.pernas[0][1].rotation.x = Math.max(0, -sw) * 0.8; u.pernas[1][1].rotation.x = Math.max(0, sw) * 0.8;
       bE.ombro.quaternion.setFromEuler(new THREE.Euler(-sw * 0.6, 0, 0)); bD.ombro.quaternion.setFromEuler(new THREE.Euler(sw * 0.6, 0, 0));
       return;
     }
-    for (const [q, j] of u.pernas) { q.rotation.x *= 0.8; j.rotation.x *= 0.8; }
+    if (!u.esq) for (const [q, j] of u.pernas) { q.rotation.x *= 0.8; j.rotation.x *= 0.8; }
     if (u.estado === "agindo" && u.alvo) {
       u.tAcao += dt;
       virarPara(av, u.alvo.x, u.alvo.z, dt * 6);
-      if (u.tAcao < 1.3) {
+      const dur = u.esq && u.girar ? 2.2 : 1.3;
+      if (u.tAcao < dur) {
         apontarBraco(av, bD, u.alvo, dt * 7);
-        if (u.girar && u.tAcao > 0.5) bD.mao.rotation.y = Math.sin((u.tAcao - 0.5) * 10) * 0.9;
-      } else { u.estado = "parado"; u.alvo = null; bD.mao.rotation.y = 0; }
+        if (u.esq) {   // a outra mão apoia perto da peça; ao girar, o punho gira em torno do antebraço
+          apontarBraco(av, bE, vC.set(u.alvo.x, u.alvo.y + 0.08, u.alvo.z), dt * 4);
+          const ang = u.girar && u.tAcao > 0.5 ? Math.sin((u.tAcao - 0.5) * 7) * 1.3 : 0;
+          bD.mao.quaternion.setFromAxisAngle(bD.eixoMao, ang);
+        } else if (u.girar && u.tAcao > 0.5) bD.mao.rotation.y = Math.sin((u.tAcao - 0.5) * 10) * 0.9;
+      } else { u.estado = "parado"; u.alvo = null; bD.mao.rotation.set(0, 0, 0); if (u.esq) bE.mao.rotation.set(0, 0, 0); }
       return;
     }
     // parado: respiração leve; o coordenador ergue o rádio quando fala
@@ -861,6 +896,94 @@ body.vr #stick { display: none; }
   coordenador.userData.prancheta = true;
   posAvatar(coordenador, 3.6, 3.5); coordenador.rotation.y = Math.PI * 1.15;
   const CASA_MANT = new THREE.Vector3(-0.7, 0, 3.0);
+
+  // ---------- Colisão: bonecos e câmera não atravessam a máquina, a caixa de junção, o quadro, a KGT nem as pessoas ----------
+  // Tudo no plano do chão (x, z): objetos são retângulos, pessoas são círculos. Quem anda é empurrado para fora e,
+  // se o caminho reto até o destino cruza um objeto, contorna pelo canto mais curto.
+  const R_PESSOA = 0.25, R_CAMERA = 0.3;
+  const figurasFixas = [];   // trabalhadores parados da cena (preenchido quando trabalhadores.glb carrega)
+  let obstaculos = [], tObstaculos = 0;
+  const bxTmp = new THREE.Box3(), bxMalha = new THREE.Box3();
+  function caixaVisivel(obj) {   // só o que está à vista conta (peças retiradas no "Explorar por dentro" deixam passar)
+    bxTmp.makeEmpty();
+    let vis = true; for (let p = obj; p; p = p.parent) if (!p.visible) vis = false;
+    if (!vis) return null;
+    obj.traverseVisible(m => { if (m.isMesh) { if (!m.geometry.boundingBox) m.geometry.computeBoundingBox(); bxMalha.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld); bxTmp.union(bxMalha); } });
+    return bxTmp.isEmpty() ? null : { x0: bxTmp.min.x, x1: bxTmp.max.x, z0: bxTmp.min.z, z1: bxTmp.max.z };
+  }
+  function atualizarObstaculos() {
+    const l = [];
+    const unidades = ["unidade_motor", "unidade_bloqueio_deteccao"].map(n => scene.getObjectByName(n)).filter(Boolean);
+    if (unidades.length) unidades.forEach(o => { const c = caixaVisivel(o); if (c) l.push(c); });
+    else ["motor", "trava"].forEach(id => (partGroups[id] || []).forEach(m => { const c = caixaVisivel(m); if (c) l.push(c); }));
+    l.push({ x0: 0.55, x1: 0.95, z0: 1.78, z1: 2.15 });   // caixa de junção com o poste
+    l.push({ x0: 1.02, x1: 1.28, z0: 2.46, z1: 2.64 });   // DAM
+    const meia = 0.7 * PAINEL_ESC + 0.1;                  // quadro de instruções e seus postes
+    l.push({ x0: 0.6 - meia, x1: 0.6 + meia, z0: PAINEL_Z - 0.11, z1: PAINEL_Z + 0.02 });
+    l.push({ x0: KGT_POS.x - 2.7, x1: KGT_POS.x + 4.6, z0: KGT_POS.z - 2.05, z1: KGT_POS.z + 2.05 });   // KGT
+    l.push({ x0: 9.4, x1: 10.6, z0: 5.6, z1: 6.8 });      // caçamba da KGT apoiada no chão
+    obstaculos = l;
+  }
+  function pessoas(ignorar) {   // círculos das pessoas, menos quem está andando
+    const l = figurasFixas.map(f => f.position);
+    if (ignorar !== mantenedor) l.push(mantenedor.position);
+    l.push(coordenador.position);
+    if (ignorar !== rig) l.push(rig.position);
+    return l;
+  }
+  // tira o ponto p (x, z) de dentro dos objetos e das pessoas, mantendo a distância r
+  function empurrar(p, r, ignorar) {
+    const ps = pessoas(ignorar);
+    for (let it = 0; it < 3; it++) {
+      for (const c of obstaculos) {
+        const qx = THREE.MathUtils.clamp(p.x, c.x0, c.x1), qz = THREE.MathUtils.clamp(p.z, c.z0, c.z1);
+        const dx = p.x - qx, dz = p.z - qz, d = Math.hypot(dx, dz);
+        if (d >= r) continue;
+        if (d > 1e-6) { p.x = qx + dx / d * r; p.z = qz + dz / d * r; continue; }
+        // dentro do retângulo: sai pela borda mais próxima
+        const s = [p.x - c.x0, c.x1 - p.x, p.z - c.z0, c.z1 - p.z], m = Math.min(...s);
+        if (m === s[0]) p.x = c.x0 - r; else if (m === s[1]) p.x = c.x1 + r; else if (m === s[2]) p.z = c.z0 - r; else p.z = c.z1 + r;
+      }
+      for (const q of ps) {
+        const dx = p.x - q.x, dz = p.z - q.z, d = Math.hypot(dx, dz), min = r + R_PESSOA;
+        if (d >= min) continue;
+        if (d < 1e-6) { p.x = q.x + min; continue; }
+        p.x = q.x + dx / d * min; p.z = q.z + dz / d * min;
+      }
+    }
+    return p;
+  }
+  function cruza(a, b, c) {   // o segmento a-b passa pelo retângulo c?
+    let t0 = 0, t1 = 1;
+    for (const [p, d, lo, hi] of [[a.x, b.x - a.x, c.x0, c.x1], [a.z, b.z - a.z, c.z0, c.z1]]) {
+      if (Math.abs(d) < 1e-9) { if (p <= lo || p >= hi) return false; continue; }
+      let u0 = (lo - p) / d, u1 = (hi - p) / d; if (u0 > u1) [u0, u1] = [u1, u0];
+      t0 = Math.max(t0, u0); t1 = Math.min(t1, u1); if (t0 >= t1) return false;
+    }
+    return true;
+  }
+  // próximo ponto para onde andar: o destino, ou o canto de um objeto que está no caminho
+  const pRumo = new THREE.Vector3();
+  function rumo(p, dest, r) {
+    const folga = r + 0.08, inflar = c => ({ x0: c.x0 - r + 0.01, x1: c.x1 + r - 0.01, z0: c.z0 - r + 0.01, z1: c.z1 + r - 0.01 });
+    let melhor = null, dMelhor = Infinity;
+    for (const c of obstaculos) {
+      const ci = inflar(c);
+      if (!cruza(p, dest, ci)) continue;
+      const d = Math.hypot(p.x - (ci.x0 + ci.x1) / 2, p.z - (ci.z0 + ci.z1) / 2);
+      if (d < dMelhor) { dMelhor = d; melhor = c; }
+    }
+    if (!melhor) return pRumo.set(dest.x, 0, dest.z);
+    let canto = null, custo = Infinity;
+    for (const [x, z] of [[melhor.x0 - folga, melhor.z0 - folga], [melhor.x0 - folga, melhor.z1 + folga], [melhor.x1 + folga, melhor.z0 - folga], [melhor.x1 + folga, melhor.z1 + folga]]) {
+      const v = { x, z };
+      if (obstaculos.some(c => x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r)) continue;   // canto dentro de outro objeto
+      if (Math.hypot(p.x - x, p.z - z) < 0.12) continue;   // já está neste canto: segue para o próximo
+      const k = (cruza(p, v, inflar(melhor)) ? 50 : 0) + (cruza(v, dest, inflar(melhor)) ? 1 : 0) + Math.hypot(p.x - x, p.z - z) + Math.hypot(dest.x - x, dest.z - z);
+      if (k < custo) { custo = k; canto = v; }
+    }
+    return canto ? pRumo.set(canto.x, 0, canto.z) : pRumo.set(dest.x, 0, dest.z);
+  }
   // Trabalhadores em pose ereta (TRABALHADORES do SketchUp do Erick) no lugar dos bonecos feitos com formas simples.
   // trabalhadores.glb traz cinco figuras fixas (nós trab_<nome>__...): "a" em pé com as mãos à frente, "acenando", "andando",
   // "b" com o martelete e "c" com a barra; origem entre os pés, frente em +z. Os materiais "pele" recebem o tom de cada um.
@@ -880,6 +1003,45 @@ body.vr #stick { display: none; }
       });
       return o;
     }
+    // Trabalhador "a" articulado: as malhas trazem os pesos de cada osso (_joints/_weights, ver trabalhadores_app.py).
+    // Contrato dos bonecos: pernas [quadril, joelho, pé], braços { ombro, cot, mao, dir, eixoMao } e esq (coluna, peito, cabeça).
+    const OSSOS = [
+      ["raiz", -1, [0, 0.95, 0]], ["coluna", 0, [0, 1.08, 0]], ["peito", 1, [0, 1.25, 0.03]], ["pescoco", 2, [0, 1.4, 0.08]], ["cabeca", 3, [0, 1.47, 0.13]],
+      ["ombro_D", 2, [-0.19, 1.33, 0.06]], ["cotovelo_D", 5, [-0.25, 1, 0.04]], ["mao_D", 6, [-0.17, 0.84, 0.27]],
+      ["ombro_E", 2, [0.19, 1.33, 0.06]], ["cotovelo_E", 8, [0.25, 1, 0.04]], ["mao_E", 9, [0.17, 0.84, 0.27]],
+      ["quadril_D", 0, [-0.09, 0.92, 0]], ["joelho_D", 11, [-0.16, 0.48, 0]], ["pe_D", 12, [-0.21, 0.12, -0.04]],
+      ["quadril_E", 0, [0.09, 0.92, 0]], ["joelho_E", 14, [0.16, 0.48, 0]], ["pe_E", 15, [0.21, 0.12, -0.04]]
+    ];
+    function vestirArticulado(av, tom, cracha) {
+      const u = av.userData, f = new THREE.Color(tom).convertSRGBToLinear();
+      const ossos = OSSOS.map(([n]) => { const b = new THREE.Bone(); b.name = n; return b; });
+      OSSOS.forEach(([, pai, p], i) => { const q = pai >= 0 ? OSSOS[pai][2] : [0, 0, 0]; ossos[i].position.set(p[0] - q[0], p[1] - q[1], p[2] - q[2]); if (pai >= 0) ossos[pai].add(ossos[i]); });
+      const corpo = new THREE.Group(); corpo.add(ossos[0]); corpo.updateMatrixWorld(true);
+      const esq = new THREE.Skeleton(ossos), malhas = [];
+      g.scene.traverse(m => {
+        if (!m.isMesh || !m.geometry.attributes._joints) return;
+        const geo = m.geometry.clone();
+        geo.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(Array.from(geo.attributes._joints.array), 4));
+        geo.setAttribute("skinWeight", new THREE.Float32BufferAttribute(geo.attributes._weights.array, 4));
+        const mt = m.material.clone(); mt.skinning = true;
+        if (/__pele/.test(m.name + (m.parent ? m.parent.name : ""))) mt.color.setRGB(Math.min(1, mt.color.r * f.r / PELE_REF[0]), Math.min(1, mt.color.g * f.g / PELE_REF[1]), Math.min(1, mt.color.b * f.b / PELE_REF[2]));
+        const sm = new THREE.SkinnedMesh(geo, mt); sm.castShadow = true; sm.frustumCulled = false; sm.userData.avatar = true;
+        corpo.add(sm); malhas.push(sm);
+      });
+      corpo.updateMatrixWorld(true);
+      malhas.forEach(sm => sm.bind(esq, sm.matrixWorld));
+      const B = n => ossos[OSSOS.findIndex(o => o[0] === n)];
+      const braco = l => {
+        const b = { ombro: B("ombro_" + l), cot: B("cotovelo_" + l), mao: B("mao_" + l) };
+        b.dir = b.cot.position.clone().add(b.mao.position).normalize(); b.eixoMao = b.mao.position.clone().normalize(); return b;
+      };
+      u.boneco.forEach(c => { if (c !== u.nome) c.visible = false; });
+      u.pernas = ["D", "E"].map(l => [B("quadril_" + l), B("joelho_" + l), B("pe_" + l)]);
+      u.bracos = [braco("D"), braco("E")];
+      u.esq = { coluna: B("coluna"), peito: B("peito"), cabeca: B("cabeca") };
+      u.nome.position.set(...cracha); u.nome.rotation.set(0, 0, 0); u.esq.peito.add(u.nome);   // crachá no peito, acompanha o tronco
+      av.add(corpo); u.corpo = corpo;
+    }
     function vestir(av, nome, tom, capacete, cracha) {
       const u = av.userData, corpo = modelo(nome, tom, capacete);
       u.boneco.forEach(c => { if (c !== u.nome) c.visible = false; });
@@ -887,11 +1049,11 @@ body.vr #stick { display: none; }
       av.add(corpo); u.corpo = corpo;
     }
     // Tons de pele variados, refletindo a diversidade do Brasil
-    vestir(mantenedor, "a", 0xb37a52, null, [0, 1.3, 0.2]);                // pardo
+    vestirArticulado(mantenedor, 0xb37a52, [0, 0.05, 0.18]);               // pardo, articulado: anda, agacha e gira o punho
     vestir(coordenador, "acenando", 0x6a4430, 0x2f6fd6, [0, 1.28, 0.3]);   // preto, capacete azul
     const aux = modelo("c", 0xe6b693);                                     // branco
     aux.position.set(5.2, alturaLastro(2.6), 2.6); aux.rotation.y = Math.atan2(0 - 5.2, 1.5 - 2.6);
-    scene.add(aux);
+    scene.add(aux); figurasFixas.push(aux);
     // Equipe da KGT, parada ao lado da máquina, fora do lastro
     [["andando", 9.4, 4.6, 0xb98457],             // indígena
      ["b", 10.6, 9.0, 0x4f3222],                  // preto retinto
@@ -899,7 +1061,7 @@ body.vr #stick { display: none; }
     ].forEach(([nome, x, z, tom, capacete]) => {
       const f = modelo(nome, tom, capacete);
       f.position.set(x, alturaLastro(z), z); f.rotation.y = Math.atan2(KGT_POS.x - x, KGT_POS.z - z);
-      scene.add(f);
+      scene.add(f); figurasFixas.push(f);
     });
   }, undefined, () => {});
   // KGT (escavadeira rodoferroviária, modelo do SketchUp do Erick) estacionada fora do lastro, do lado da caixa de junção,
@@ -918,13 +1080,16 @@ body.vr #stick { display: none; }
     dir.normalize();
     // fica do outro lado da peça, de frente para o aluno, perto o bastante para alcançar
     const fica = new THREE.Vector3(ponto.x + dir.x * 0.42, 0, ponto.z + dir.z * 0.42);
-    u.alvo = ponto.clone(); u.girar = girar; u.tAcao = 0;
+    atualizarObstaculos(); empurrar(fica, R_PESSOA, mantenedor);   // sem pisar dentro da máquina
+    u.alvo = ponto.clone(); u.girar = girar; u.tAcao = 0; u.tAndando = 0;
     if (Math.hypot(fica.x - mantenedor.position.x, fica.z - mantenedor.position.z) < 0.15) u.estado = "agindo";
     else { u.destino = fica; u.estado = "andando"; som.passos(); }
   }
-  function mantenedorVoltar() { const u = mantenedor.userData; u.alvo = null; u.destino = CASA_MANT.clone(); u.estado = "andando"; }
+  function mantenedorVoltar() { const u = mantenedor.userData; u.alvo = null; u.destino = CASA_MANT.clone(); u.estado = "andando"; u.tAndando = 0; }
   function atualizarAvatares(dt) {
+    tObstaculos -= dt; if (tObstaculos <= 0) { atualizarObstaculos(); tObstaculos = 0.5; }
     atualizarAvatar(mantenedor, dt);
+    empurrar(mantenedor.position, R_PESSOA, mantenedor); mantenedor.position.y = alturaLastro(mantenedor.position.z);
     // coordenador fica de frente para o aluno
     const olho = new THREE.Vector3(); camera.getWorldPosition(olho);
     virarPara(coordenador, olho.x, olho.z, dt * 2);
@@ -3185,6 +3350,7 @@ body.vr #stick { display: none; }
   function teleportar(p) {
     rig.position.x = THREE.MathUtils.clamp(p.x, -14, 14);
     rig.position.z = THREE.MathUtils.clamp(p.z, -8, 9);
+    empurrar(rig.position, R_CAMERA, rig);
     rig.updateMatrixWorld(true);
     posicionarPainel(yawAtual());
   }
@@ -3624,13 +3790,17 @@ body.vr #stick { display: none; }
     if (destino) {
       if (mv.frente || mv.lado) destino = null;
       else {
-        const dx = destino.x - rig.position.x, dz = destino.z - rig.position.z, d = Math.hypot(dx, dz);
+        empurrar(destino, R_CAMERA, rig);   // o ponto tocado pode estar colado na máquina
+        const d = Math.hypot(destino.x - rig.position.x, destino.z - rig.position.z);
+        const h = rumo(rig.position, destino, R_CAMERA), hx = h.x - rig.position.x, hz = h.z - rig.position.z, dh = Math.hypot(hx, hz) || 1;
         const passo = 2.0 * dt;
         if (d <= passo) { rig.position.x = destino.x; rig.position.z = destino.z; destino = null; posicionarPainel(yawAtual()); }
-        else { rig.position.x += dx / d * passo; rig.position.z += dz / d * passo; }
+        else { rig.position.x += hx / dh * passo; rig.position.z += hz / dh * passo; }
         rig.updateMatrixWorld(true);
       }
     }
+    // a câmera não entra nos objetos nem nas pessoas
+    empurrar(rig.position, R_CAMERA, rig); rig.updateMatrixWorld(true);
     if (destino) { alvoChao.visible = true; alvoChao.position.set(destino.x, alturaLastro(destino.z) + 0.03, destino.z); }
 
     const w = stage.clientWidth, h = stage.clientHeight;
