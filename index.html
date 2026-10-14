@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 KGT e equipe em pé</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 KGT e trabalhadores</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -861,54 +861,43 @@ body.vr #stick { display: none; }
   coordenador.userData.prancheta = true;
   posAvatar(coordenador, 3.6, 3.5); coordenador.rotation.y = Math.PI * 1.15;
   const CASA_MANT = new THREE.Vector3(-0.7, 0, 3.0);
-  // Funcionários fardados (modelo do SketchUp do Erick) em pose ereta, no lugar dos bonecos feitos com formas simples.
-  // funcionario_em_pe.glb é o fardado endireitado, usado aqui como corpo fixo (sem articular). "funcionario" veste o mantenedor
-  // e o coordenador (capacete azul); "funcionario_maleta" leva a caixa de ferramentas na mão direita.
-  new THREE.GLTFLoader().load("funcionario_em_pe.glb", g => {
-    const modelo = nome => {
-      const o = new THREE.Group(); g.scene.children.filter(c => c.name.startsWith("funcionario__")).forEach(c => o.add(c.clone()));
-      const caixaF = g.scene.getObjectByName("caixa_ferramentas");
-      if (nome === "funcionario_maleta" && caixaF) { const c = caixaF.clone(); c.position.set(-0.21, 0.6, 0); o.add(c); }
-      return o;
-    };
-    function vestir(av, capacete) {
-      const u = av.userData, corpo = modelo("funcionario");
-      corpo.traverse(m => {
-        if (!m.isMesh) return;
-        m.material = m.material.clone(); m.castShadow = true; m.userData.avatar = true;
-        if (capacete && /auto_11/.test(m.name)) m.material.color.setHex(capacete);
+  // Trabalhadores em pose ereta (TRABALHADORES do SketchUp do Erick) no lugar dos bonecos feitos com formas simples.
+  // trabalhadores.glb traz cinco figuras fixas (nós trab_<nome>__...): "a" em pé com as mãos à frente, "acenando", "andando",
+  // "b" com o martelete e "c" com a barra; origem entre os pés, frente em +z. Os materiais "pele" recebem o tom de cada um.
+  new THREE.GLTFLoader().load("trabalhadores.glb", g => {
+    const AMARELO = c => c.r > 0.9 && c.g > 0.75 && c.g < 0.9 && c.b < 0.12;   // capacete
+    const PELE_REF = [239 / 255, 183 / 255, 149 / 255];
+    // tom: cor da pele vista na tela (sRGB); as sombras da pele do modelo escurecem na mesma proporção
+    function modelo(nome, tom, capacete) {
+      const o = new THREE.Group(), f = new THREE.Color(tom).convertSRGBToLinear();
+      const malhas = []; g.scene.traverse(c => { if (c.isMesh && (c.name + (c.parent ? c.parent.name : "")).includes("trab_" + nome + "__")) malhas.push(c); });
+      malhas.forEach(c => {
+        const m = c.clone(); m.position.set(0, 0, 0); m.material = c.material.clone(); m.castShadow = true; m.userData.avatar = true;
+        const cor = m.material.color;
+        if (/__pele/.test(c.name + (c.parent ? c.parent.name : ""))) cor.setRGB(Math.min(1, cor.r * f.r / PELE_REF[0]), Math.min(1, cor.g * f.g / PELE_REF[1]), Math.min(1, cor.b * f.b / PELE_REF[2]));
+        else if (capacete && AMARELO(cor)) cor.setHex(capacete);
+        o.add(m);
       });
+      return o;
+    }
+    function vestir(av, nome, tom, capacete, cracha) {
+      const u = av.userData, corpo = modelo(nome, tom, capacete);
       u.boneco.forEach(c => { if (c !== u.nome) c.visible = false; });
-      u.nome.position.set(0, 1.32, 0.21); u.nome.rotation.x = 0;   // crachá no peito
+      u.nome.position.set(...cracha); u.nome.rotation.x = 0;   // crachá no peito
       av.add(corpo); u.corpo = corpo;
     }
-    vestir(mantenedor); vestir(coordenador, 0x2f6fd6);
-    const aux = modelo("funcionario_maleta");
-    aux.traverse(m => { if (m.isMesh) { m.castShadow = true; m.userData.avatar = true; } });
+    // Tons de pele variados, refletindo a diversidade do Brasil
+    vestir(mantenedor, "a", 0xb37a52, null, [0, 1.3, 0.2]);                // pardo
+    vestir(coordenador, "acenando", 0x6a4430, 0x2f6fd6, [0, 1.28, 0.3]);   // preto, capacete azul
+    const aux = modelo("c", 0xe6b693);                                     // branco
     aux.position.set(5.2, alturaLastro(2.6), 2.6); aux.rotation.y = Math.atan2(0 - 5.2, 1.5 - 2.6);
     scene.add(aux);
-    // Tons de pele e cabelo variados, refletindo a diversidade do Brasil (auto_12 = pele, auto_13 = cabelo no modelo do SketchUp).
-    // As cores são as vistas na tela (sRGB); o material guarda em linear.
-    const pele = (o, tom, cabelo) => o.traverse(m => {
-      if (!m.isMesh) return;
-      if (/auto_12/.test(m.name)) { m.material = m.material.clone(); m.material.color.setHex(tom).convertSRGBToLinear(); }
-      if (/auto_13/.test(m.name)) { m.material = m.material.clone(); m.material.color.setHex(cabelo).convertSRGBToLinear(); }
-    });
-    pele(mantenedor.userData.corpo, 0xb37a52, 0x1b1512);   // pardo
-    pele(coordenador.userData.corpo, 0x6a4430, 0x17110d);  // preto
-    pele(aux, 0xe6b693, 0x5a3e28);                         // branco
     // Equipe da KGT, parada ao lado da máquina, fora do lastro
-    [["funcionario", 9.4, 4.6, 0xb98457, 0x100c0a, 0xf4f4f2],   // indígena
-     ["funcionario_maleta", 10.6, 9.0, 0x4f3222, 0x140f0c],     // preto retinto
-     ["funcionario", 19.6, 5.4, 0xe0b48c, 0x1f1712, 0x2f6fd6]   // amarelo, capacete azul do encarregado
-    ].forEach(([nome, x, z, tom, cabelo, capacete]) => {
-      const f = modelo(nome);
-      f.traverse(m => {
-        if (!m.isMesh) return;
-        m.material = m.material.clone(); m.castShadow = true; m.userData.avatar = true;
-        if (capacete && /auto_11/.test(m.name)) m.material.color.setHex(capacete);
-      });
-      pele(f, tom, cabelo);
+    [["andando", 9.4, 4.6, 0xb98457],             // indígena
+     ["b", 10.6, 9.0, 0x4f3222],                  // preto retinto
+     ["a", 19.6, 5.4, 0xe0b48c, 0x2f6fd6]         // amarelo, capacete azul do encarregado
+    ].forEach(([nome, x, z, tom, capacete]) => {
+      const f = modelo(nome, tom, capacete);
       f.position.set(x, alturaLastro(z), z); f.rotation.y = Math.atan2(KGT_POS.x - x, KGT_POS.z - z);
       scene.add(f);
     });
