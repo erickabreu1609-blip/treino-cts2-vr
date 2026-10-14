@@ -153,7 +153,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 dormentes de madeira</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 dormentes inteiriços</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -455,6 +455,8 @@ body.vr #stick { display: none; }
     root.traverse(o => {
       if (!o.isMesh || o.material.name !== "Polished_Concrete_New") return;
       const geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry, p = geo.attributes.position, uv = new Float32Array(p.count * 2);
+      // o dormente de concreto afinava no meio e sumia sob a brita: o de madeira é uma peça reta de um trilho ao outro
+      for (let i = 0; i < p.count; i++) if (p.getY(i) > 0.21) p.setY(i, 0.324);
       const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
       for (let i = 0; i < p.count; i += 3) {
         a.fromBufferAttribute(p, i); b.fromBufferAttribute(p, i + 1); c.fromBufferAttribute(p, i + 2);
