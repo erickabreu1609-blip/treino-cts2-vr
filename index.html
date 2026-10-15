@@ -157,7 +157,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v15/10 KGT carro e via</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v15/10 KGT carro e bonecos</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -751,185 +751,174 @@ body.vr #stick { display: none; }
     tx.t.needsUpdate = true;
     return new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.05), new THREE.MeshBasicMaterial({ map: tx.t }));
   }
+  // Boneco articulado feito com formas simples: corpo > quadris (pernas: quadril, joelho, tornozelo) e coluna > peito > (braços, cabeça).
+  // Contrato: pernas [quadril, joelho, tornozelo], braços { ombro, cot, mao, qBraco, qCot, qFala, qFalaCot } e esq { coluna, peito, cabeca }.
   function criarAvatar(o) {
-    const g = new THREE.Group();
-    const pele = mat(0xb98a66, { roughness: 0.7 }), roupa = mat(o.roupa, { roughness: 0.85 }), calca = mat(o.calca, { roughness: 0.9 });
+    const g = new THREE.Group(), corpo = new THREE.Group(); g.add(corpo);
+    const pele = mat(o.pele || 0xb98a66, { roughness: 0.7 }), roupa = mat(o.roupa, { roughness: 0.85 }), calca = mat(o.calca, { roughness: 0.9 });
+    pele.color.convertSRGBToLinear();
     const refl = mat(0xe3e9ec, { roughness: 0.25, metalness: 0.3, emissive: 0x666666 }), bota = mat(0x1b1b1b, { roughness: 0.6 });
     const luva = mat(o.luva, { roughness: 0.9 }), capacete = mat(o.capacete, { roughness: 0.3 });
     const lente = new THREE.MeshStandardMaterial({ color: 0x223040, roughness: 0.05, metalness: 0.6, transparent: true, opacity: 0.8 });
+    const colete = o.colete ? mat(o.colete, { roughness: 0.8, emissive: 0x222200 }) : null;
     const pernas = [];
     [-0.1, 0.1].forEach(x => {
-      const quadril = new THREE.Group(); quadril.position.set(x, 0.92, 0); g.add(quadril);
+      const quadril = new THREE.Group(); quadril.position.set(x, 0.92, 0); corpo.add(quadril);
       const coxa = cyl(0.078, 0.44, calca, 12); coxa.position.y = -0.22; quadril.add(coxa);
       const joelho = new THREE.Group(); joelho.position.y = -0.44; quadril.add(joelho);
       const canela = cyl(0.066, 0.42, calca, 12); canela.position.y = -0.21; joelho.add(canela);
       const faixa = cyl(0.069, 0.035, refl, 12); faixa.position.y = -0.28; joelho.add(faixa);
-      const pe = box(0.12, 0.09, 0.28, bota); pe.position.set(0, -0.445, 0.05); joelho.add(pe);
-      pernas.push([quadril, joelho]);
+      const tornozelo = new THREE.Group(); tornozelo.position.y = -0.4; joelho.add(tornozelo);
+      const pe = box(0.12, 0.09, 0.28, bota); pe.position.set(0, -0.045, 0.05); tornozelo.add(pe);
+      pernas.push([quadril, joelho, tornozelo]);
     });
-    const tronco = box(0.42, 0.58, 0.25, roupa); tronco.position.y = 1.2; g.add(tronco);
-    [1.04, 1.3].forEach(y => { const f = box(0.425, 0.04, 0.255, refl); f.position.y = y; g.add(f); });
-    if (o.colete) {
-      const c = box(0.43, 0.42, 0.26, mat(o.colete, { roughness: 0.8, emissive: 0x222200 })); c.position.y = 1.24; g.add(c);
-      const f = box(0.435, 0.04, 0.265, refl); f.position.y = 1.16; g.add(f);
+    // coluna (cintura, gira na altura do quadril) com a barriga; peito (a partir de 1,2 m) com ombros e cabeça
+    const coluna = new THREE.Group(); coluna.position.y = 0.95; corpo.add(coluna);
+    const barriga = box(0.42, 0.29, 0.25, roupa); barriga.position.y = 0.105; coluna.add(barriga);
+    const f1 = box(0.425, 0.04, 0.255, refl); f1.position.y = 0.09; coluna.add(f1);
+    const cinto = box(0.43, 0.06, 0.26, mat(0x2a2a2a)); cinto.position.y = -0.02; coluna.add(cinto);
+    const peito = new THREE.Group(); peito.position.y = 0.25; coluna.add(peito);
+    const torax = box(0.42, 0.29, 0.25, roupa); torax.position.y = 0.145; peito.add(torax);
+    const f2 = box(0.425, 0.04, 0.255, refl); f2.position.y = 0.1; peito.add(f2);
+    if (colete) {
+      const c1 = box(0.43, 0.17, 0.26, colete); c1.position.y = 0.165; coluna.add(c1);
+      const c2 = box(0.43, 0.25, 0.26, colete); c2.position.y = 0.125; peito.add(c2);
+      const f = box(0.435, 0.04, 0.265, refl); f.position.y = 0.21; coluna.add(f);
     }
-    const cinto = box(0.43, 0.06, 0.26, mat(0x2a2a2a)); cinto.position.y = 0.93; g.add(cinto);
-    const pesc = cyl(0.05, 0.08, pele, 10); pesc.position.y = 1.53; g.add(pesc);
-    const cabeca = new THREE.Mesh(new THREE.SphereGeometry(0.105, 18, 14), pele); cabeca.position.y = 1.64; cabeca.scale.set(1, 1.1, 1.05); g.add(cabeca);
-    const casco = new THREE.Mesh(new THREE.SphereGeometry(0.128, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), capacete); casco.position.y = 1.67; g.add(casco);
-    const aba = cyl(0.145, 0.012, capacete, 24); aba.position.set(0, 1.672, 0.025); aba.scale.z = 1.12; g.add(aba);
-    const crista = box(0.03, 0.03, 0.22, capacete); crista.position.y = 1.79; g.add(crista);
-    const oculos = box(0.18, 0.04, 0.03, lente); oculos.position.set(0, 1.655, 0.1); g.add(oculos);
-    [-1, 1].forEach(sx => { const p = new THREE.Mesh(new THREE.SphereGeometry(0.032, 10, 8), mat(o.capacete)); p.position.set(sx * 0.105, 1.63, 0); p.scale.x = 0.6; g.add(p); });   // protetor auricular
-    const nome = plaquinha(o.nome, o.corNome); nome.position.set(0, 1.36, 0.127); g.add(nome);
+    const pesc = cyl(0.05, 0.08, pele, 10); pesc.position.y = 0.33; peito.add(pesc);
+    const cab = new THREE.Group(); cab.position.y = 0.33; peito.add(cab);
+    const cabeca = new THREE.Mesh(new THREE.SphereGeometry(0.105, 18, 14), pele); cabeca.position.y = 0.11; cabeca.scale.set(1, 1.1, 1.05); cab.add(cabeca);
+    const casco = new THREE.Mesh(new THREE.SphereGeometry(0.128, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), capacete); casco.position.y = 0.14; cab.add(casco);
+    const aba = cyl(0.145, 0.012, capacete, 24); aba.position.set(0, 0.142, 0.025); aba.scale.z = 1.12; cab.add(aba);
+    const crista = box(0.03, 0.03, 0.22, capacete); crista.position.y = 0.26; cab.add(crista);
+    const oculos = box(0.18, 0.04, 0.03, lente); oculos.position.set(0, 0.125, 0.1); cab.add(oculos);
+    [-1, 1].forEach(sx => { const p = new THREE.Mesh(new THREE.SphereGeometry(0.032, 10, 8), mat(o.capacete)); p.position.set(sx * 0.105, 0.1, 0); p.scale.x = 0.6; cab.add(p); });   // protetor auricular
+    const nome = plaquinha(o.nome, o.corNome); nome.position.set(0, 0.16, 0.127); peito.add(nome);
     const bracos = [];
     [-1, 1].forEach(sx => {
-      const ombro = new THREE.Group(); ombro.position.set(sx * 0.255, 1.44, 0); g.add(ombro);
+      const ombro = new THREE.Group(); ombro.position.set(sx * 0.255, 0.24, 0); peito.add(ombro);
       const sup = cyl(0.056, 0.3, roupa, 10); sup.position.y = -0.15; ombro.add(sup);
       const fx = cyl(0.058, 0.035, refl, 10); fx.position.y = -0.22; ombro.add(fx);
       const cot = new THREE.Group(); cot.position.y = -0.3; ombro.add(cot);
       const ant = cyl(0.05, 0.27, roupa, 10); ant.position.y = -0.135; cot.add(ant);
-      const mao = new THREE.Mesh(new THREE.SphereGeometry(0.056, 12, 10), luva); mao.position.y = -0.3; mao.scale.set(0.9, 1.2, 0.7); cot.add(mao);
-      bracos.push({ ombro, cot, mao });
+      const mao = new THREE.Group(); mao.position.y = -0.27; cot.add(mao);   // punho: gira em torno do antebraço
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.056, 12, 10), luva); m.position.y = -0.03; m.scale.set(0.9, 1.2, 0.7); mao.add(m);
+      bracos.push({
+        ombro, cot, mao,
+        qBraco: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.05, 0, sx * 0.07)),   // solto, um pouco afastado do corpo
+        qCot: new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.2, 0, 0)),             // cotovelo levemente dobrado
+      });
     });
-    if (o.radio) {   // rádio na mão esquerda
+    if (o.radio) {   // rádio na mão esquerda; ao falar, leva o rádio à boca
       const r = new THREE.Group(); r.add(box(0.05, 0.11, 0.03, mat(0x161616)));
       const ant = cyl(0.006, 0.09, mat(0x161616), 6); ant.position.set(0.015, 0.1, 0); r.add(ant);
-      r.position.set(0, -0.33, 0.03); bracos[0].cot.add(r);
+      r.position.set(0, -0.06, 0.03); bracos[0].mao.add(r);
+      bracos[0].qFala = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.35, 0, -0.35));
+      bracos[0].qFalaCot = new THREE.Quaternion().setFromEuler(new THREE.Euler(-2.2, 0, 0));
     }
-    if (o.prancheta) { const p = box(0.22, 0.3, 0.012, mat(0x8a6a44)); const f = box(0.19, 0.25, 0.013, mat(0xf4f4f0)); f.position.z = 0.002; p.add(f); p.position.set(0, -0.3, 0.08); p.rotation.x = -0.4; bracos[1].cot.add(p); }
+    if (o.prancheta) {
+      const p = box(0.22, 0.3, 0.012, mat(0x8a6a44)); const f = box(0.19, 0.25, 0.013, mat(0xf4f4f0)); f.position.z = 0.002; p.add(f);
+      p.position.set(0, -0.03, 0.08); p.rotation.x = -0.4; bracos[1].mao.add(p);
+      bracos[1].qCot = new THREE.Quaternion().setFromEuler(new THREE.Euler(-1.2, 0, 0));   // segura a prancheta à frente
+    }
     g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.userData.avatar = true; } });
-    g.userData = { pernas, bracos, fase: 0, estado: "parado", destino: null, alvo: null, girar: false, tAcao: 0, falando: 0, nome, boneco: g.children.slice(), corpo: null };
+    g.userData = { pernas, bracos, esq: { coluna, peito, cabeca: cab }, pernaL: [0.44, 0.4], corpo, nome,
+      fase: 0, estado: "parado", destino: null, alvo: null, girar: false, tAcao: 0, falando: 0, dobra: 0 };
+    bracos.forEach(b => { b.ombro.quaternion.copy(b.qBraco); b.cot.quaternion.copy(b.qCot); });
     scene.add(g);
     return g;
   }
   const qA = new THREE.Quaternion(), qB = new THREE.Quaternion(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3(), BAIXO = new THREE.Vector3(0, -1, 0);
+  const qId = new THREE.Quaternion(), eA = new THREE.Euler();
   function posAvatar(av, x, z) { av.position.set(x, alturaLastro(z), z); }
   function virarPara(av, x, z, k) {
     const alvo = Math.atan2(x - av.position.x, z - av.position.z);
     let d = alvo - av.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
     av.rotation.y += d * Math.min(1, k);
   }
-  function apontarBraco(av, b, ponto, k) {   // estica o braço na direção do ponto (em coordenadas do avatar)
+  // estica o braço (cotovelo reto) e aponta o braço inteiro para o ponto
+  function apontarBraco(av, b, ponto, k) {
     av.updateMatrixWorld(true);
     b.ombro.getWorldPosition(vA);
-    vB.copy(ponto).sub(vA).applyQuaternion(qA.copy(av.quaternion).invert()).normalize();
-    if (b.qReto) {   // esqueleto: estica o cotovelo e aponta o braço inteiro para a peça
-      qB.setFromUnitVectors(b.dirSup, vB);
-      b.ombro.quaternion.slerp(qB, Math.min(1, k)); b.cot.quaternion.slerp(b.qReto, Math.min(1, k));
-      return;
-    }
+    b.ombro.parent.getWorldQuaternion(qA);
+    vB.copy(ponto).sub(vA).applyQuaternion(qA.invert()).normalize();
     qB.setFromUnitVectors(BAIXO, vB);
-    b.ombro.quaternion.slerp(qB, Math.min(1, k));
-    b.cot.rotation.x += (0 - b.cot.rotation.x) * Math.min(1, k);
+    b.ombro.quaternion.slerp(qB, Math.min(1, k)); b.cot.quaternion.slerp(qId, Math.min(1, k));
   }
-  // Postura do trabalhador articulado: agacha e curva o tronco conforme a altura da peça; volta a ficar ereto ao terminar.
+  // Postura: agacha (quadril, joelho e tornozelo) e curva o tronco conforme a altura da peça; volta a ficar ereto ao terminar.
   function postura(av, dt) {
     const u = av.userData, k = Math.min(1, dt * 5);
     let dobra = 0;
     if (u.estado === "agindo" && u.alvo) dobra = THREE.MathUtils.clamp((1.15 - (u.alvo.y - av.position.y)) / 0.8, 0, 1);
-    u.dobra = (u.dobra || 0) + (dobra - (u.dobra || 0)) * k;
+    u.dobra += (dobra - u.dobra) * k;
     const d = u.dobra, quad = -0.55 * d, joel = 1.0 * d;
     if (u.estado !== "andando") {
       u.pernas.forEach(([q, j, pe]) => { q.rotation.x += (quad - q.rotation.x) * k; j.rotation.x += (joel - j.rotation.x) * k; pe.rotation.x += (-(quad + joel) - pe.rotation.x) * k; });
-      u.esq.coluna.rotation.x += (0.3 * d - 0.08 - u.esq.coluna.rotation.x) * k;   // o modelo vem um pouco curvado: endireita u.esq.peito.rotation.x += (0.25 * d - u.esq.peito.rotation.x) * k;
+      u.esq.coluna.rotation.x += (0.3 * d - u.esq.coluna.rotation.x) * k;
+      u.esq.peito.rotation.x += (0.25 * d - u.esq.peito.rotation.x) * k;
       u.esq.peito.rotation.y *= 1 - k; u.esq.cabeca.rotation.x += (0.15 * d - u.esq.cabeca.rotation.x) * k;
     }
-    // coxa 0,44 m e canela 0,36 m: o corpo desce o quanto as pernas dobram
-    const q = u.pernas[0][0].rotation.x, j = u.pernas[0][1].rotation.x;
-    const desce = u.estado === "andando" ? 0 : 0.80 - (0.44 * Math.cos(q) + 0.36 * Math.cos(q + j));
-    u.corpo.position.y = u.estado === "andando" ? Math.abs(Math.sin(u.fase * 9)) * 0.02 : -desce;
+    // o corpo desce o quanto as pernas dobram (coxa e canela)
+    const [L1, L2] = u.pernaL, q = u.pernas[0][0].rotation.x, j = u.pernas[0][1].rotation.x;
+    u.corpo.position.y = u.estado === "andando" ? Math.abs(Math.sin(u.fase * 9)) * 0.02 : -(L1 + L2 - (L1 * Math.cos(q) + L2 * Math.cos(q + j)));
   }
   function atualizarAvatar(av, dt) {
     const u = av.userData;
     u.fase += dt;
-    if (u.esq) postura(av, dt);
-    else if (u.corpo) {   // funcionário do modelo: balança ao andar e se inclina para a peça ao agir
-      const anda = u.estado === "andando";
-      u.corpo.position.y = anda ? Math.abs(Math.sin(u.fase * 9)) * 0.03 : 0;
-      u.corpo.rotation.z = anda ? Math.sin(u.fase * 9) * 0.035 : 0;
-      u.corpo.rotation.x += ((u.estado === "agindo" ? 0.14 : 0) - u.corpo.rotation.x) * Math.min(1, dt * 6);
-    }
+    postura(av, dt);
     const [bE, bD] = u.bracos;
-    if (u.estado === "andando" && u.destino) {
-      const d = Math.hypot(u.destino.x - av.position.x, u.destino.z - av.position.z);
-      const h = rumo(av.position, u.destino, R_PESSOA), hx = h.x - av.position.x, hz = h.z - av.position.z, dh = Math.hypot(hx, hz) || 1;   // contorna objetos no caminho
-      virarPara(av, h.x, h.z, dt * 8);
+    if (u.estado === "andando" && u.destino) {   // anda em linha reta até o destino (bonecos sem colisão)
+      const dx = u.destino.x - av.position.x, dz = u.destino.z - av.position.z, d = Math.hypot(dx, dz);
+      virarPara(av, u.destino.x, u.destino.z, dt * 8);
       const passo = 1.25 * dt;
-      u.tAndando = (u.tAndando || 0) + dt;
-      // chegou, ou não consegue chegar mais perto (alguém no caminho): age dali mesmo
-      if (d <= passo || u.tAndando > 8) { if (d <= passo) posAvatar(av, u.destino.x, u.destino.z); u.estado = u.alvo ? "agindo" : "parado"; u.tAcao = 0; u.tAndando = 0; }
-      else posAvatar(av, av.position.x + hx / dh * passo, av.position.z + hz / dh * passo);
+      if (d <= passo) { posAvatar(av, u.destino.x, u.destino.z); u.estado = u.alvo ? "agindo" : "parado"; u.tAcao = 0; }
+      else posAvatar(av, av.position.x + dx / d * passo, av.position.z + dz / d * passo);
+      // passada: rotação x positiva leva a coxa para trás. O joelho dobra quando a perna vem para a frente
+      // (pico com a coxa já um pouco à frente, como no andar de verdade); no apoio fica quase reto e o pé fica no chão.
       const sw = Math.sin(u.fase * 9) * 0.5;
-      if (u.esq) {   // passada com joelho, pé e tronco acompanhando
-        // passada: rotação x positiva leva a coxa para trás. O joelho só dobra bem na fase em que a perna vem para a frente
-        // (pico com a coxa já um pouco à frente, como no andar de verdade); no apoio fica quase reto e o pé fica no chão.
-        [0, Math.PI].forEach((desl, l) => {
-          const f = u.fase * 9 + desl, quad = Math.sin(f) * 0.28;
-          let dj = Math.atan2(Math.sin(f - Math.PI - 0.3), Math.cos(f - Math.PI - 0.3));
-          const joel = 0.08 + (Math.abs(dj) < 1.3 ? Math.cos(dj / 1.3 * Math.PI / 2) * 0.8 : 0);
-          const [q, j, pe] = u.pernas[l];
-          q.rotation.x = quad; j.rotation.x = joel; pe.rotation.x = -(quad + joel) * (joel > 0.3 ? 0.7 : 1);
-        });
-        u.esq.peito.rotation.y = -sw * 0.2; u.esq.coluna.rotation.x = -0.08; u.esq.peito.rotation.x = -0.05; u.esq.cabeca.rotation.x = -0.05;
-        // braço oposto à perna: perna 0 (lado -x) vai à frente junto com o braço do lado +x
-        bE.ombro.quaternion.copy(qA.setFromEuler(new THREE.Euler(-sw * 0.7, 0, 0))).multiply(bE.qBraco);
-        bD.ombro.quaternion.copy(qA.setFromEuler(new THREE.Euler(sw * 0.7, 0, 0))).multiply(bD.qBraco);
-        bE.cot.quaternion.slerp(bE.qCot, Math.min(1, dt * 8)); bD.cot.quaternion.slerp(bD.qCot, Math.min(1, dt * 8));
-        bE.mao.quaternion.identity(); bD.mao.quaternion.identity();
-        return;
-      }
-      u.pernas[0][0].rotation.x = sw; u.pernas[1][0].rotation.x = -sw;
-      u.pernas[0][1].rotation.x = Math.max(0, -sw) * 0.8; u.pernas[1][1].rotation.x = Math.max(0, sw) * 0.8;
-      bE.ombro.quaternion.setFromEuler(new THREE.Euler(-sw * 0.6, 0, 0)); bD.ombro.quaternion.setFromEuler(new THREE.Euler(sw * 0.6, 0, 0));
+      [0, Math.PI].forEach((desl, l) => {
+        const f = u.fase * 9 + desl, quad = Math.sin(f) * 0.28;
+        const dj = Math.atan2(Math.sin(f - Math.PI - 0.3), Math.cos(f - Math.PI - 0.3));
+        const joel = 0.08 + (Math.abs(dj) < 1.3 ? Math.cos(dj / 1.3 * Math.PI / 2) * 0.8 : 0);
+        const [q, j, pe] = u.pernas[l];
+        q.rotation.x = quad; j.rotation.x = joel; pe.rotation.x = -(quad + joel) * (joel > 0.3 ? 0.7 : 1);
+      });
+      u.esq.peito.rotation.y = -sw * 0.2; u.esq.coluna.rotation.x = 0.04; u.esq.peito.rotation.x = 0; u.esq.cabeca.rotation.x = 0;
+      // braço oposto à perna: perna 0 (lado -x) vai à frente junto com o braço do lado +x
+      bE.ombro.quaternion.copy(qA.setFromEuler(eA.set(-sw * 0.7, 0, 0))).multiply(bE.qBraco);
+      bD.ombro.quaternion.copy(qA.setFromEuler(eA.set(sw * 0.7, 0, 0))).multiply(bD.qBraco);
+      bE.cot.quaternion.slerp(bE.qCot, Math.min(1, dt * 8)); bD.cot.quaternion.slerp(bD.qCot, Math.min(1, dt * 8));
+      bE.mao.quaternion.identity(); bD.mao.quaternion.identity();
       return;
     }
-    if (!u.esq) for (const [q, j] of u.pernas) { q.rotation.x *= 0.8; j.rotation.x *= 0.8; }
     if (u.estado === "agindo" && u.alvo) {
       u.tAcao += dt;
       virarPara(av, u.alvo.x, u.alvo.z, dt * 6);
-      const dur = u.esq && u.girar ? 2.2 : 1.3;
-      if (u.tAcao < dur) {
+      const dur = u.girar ? 2.2 : 1.3;
+      if (u.tAcao < dur) {   // a outra mão apoia perto da peça; ao girar, o punho gira em torno do antebraço
         apontarBraco(av, bD, u.alvo, dt * 7);
-        if (u.esq) {   // a outra mão apoia perto da peça; ao girar, o punho gira em torno do antebraço
-          apontarBraco(av, bE, vC.set(u.alvo.x, u.alvo.y + 0.08, u.alvo.z), dt * 4);
-          const ang = u.girar && u.tAcao > 0.5 ? Math.sin((u.tAcao - 0.5) * 7) * 1.3 : 0;
-          bD.mao.quaternion.setFromAxisAngle(bD.eixoMao, ang);
-        } else if (u.girar && u.tAcao > 0.5) bD.mao.rotation.y = Math.sin((u.tAcao - 0.5) * 10) * 0.9;
-      } else { u.estado = "parado"; u.alvo = null; bD.mao.rotation.set(0, 0, 0); if (u.esq) bE.mao.rotation.set(0, 0, 0); }
+        apontarBraco(av, bE, vC.set(u.alvo.x, u.alvo.y + 0.08, u.alvo.z), dt * 4);
+        bD.mao.rotation.set(0, u.girar && u.tAcao > 0.5 ? Math.sin((u.tAcao - 0.5) * 7) * 1.3 : 0, 0);
+      } else { u.estado = "parado"; u.alvo = null; bD.mao.rotation.set(0, 0, 0); bE.mao.rotation.set(0, 0, 0); }
       return;
     }
-    // parado: respiração leve; o coordenador ergue o rádio quando fala
-    const respira = Math.sin(u.fase * 1.6) * 0.02;
-    if (u.esq) {   // braços soltos ao lado do corpo; ao falar no rádio, ergue o braço como no modelo original
-      const k = Math.min(1, dt * 4), kf = Math.min(1, dt * 6);
-      bD.ombro.quaternion.slerp(qA.setFromEuler(new THREE.Euler(respira, 0, 0)).multiply(bD.qBraco), k); bD.cot.quaternion.slerp(bD.qCot, k);
-      if (u.falando > 0) { u.falando -= dt; bE.ombro.quaternion.slerp(qA.identity(), kf); bE.cot.quaternion.slerp(qA.identity(), kf); }
-      else { bE.ombro.quaternion.slerp(qA.setFromEuler(new THREE.Euler(-respira, 0, 0)).multiply(bE.qBraco), k); bE.cot.quaternion.slerp(bE.qCot, k); }
-      return;
-    }
-    bD.ombro.quaternion.slerp(qB.setFromEuler(new THREE.Euler(0.05 + respira, 0, 0.06)), Math.min(1, dt * 4));
-    bD.cot.rotation.x += (-(u.prancheta ? 1.2 : 0.15) - bD.cot.rotation.x) * Math.min(1, dt * 4);
-    if (u.falando > 0) {
-      u.falando -= dt;
-      bE.ombro.quaternion.slerp(qB.setFromEuler(new THREE.Euler(-0.35, 0, -0.35)), Math.min(1, dt * 6));
-      bE.cot.rotation.x += (-2.2 - bE.cot.rotation.x) * Math.min(1, dt * 6);
-    } else {
-      bE.ombro.quaternion.slerp(qB.setFromEuler(new THREE.Euler(-respira, 0, -0.06)), Math.min(1, dt * 4));
-      bE.cot.rotation.x += (-0.15 - bE.cot.rotation.x) * Math.min(1, dt * 4);
-    }
+    // parado: braços soltos com respiração leve; o coordenador leva o rádio à boca quando fala
+    const respira = Math.sin(u.fase * 1.6) * 0.02, k = Math.min(1, dt * 4), kf = Math.min(1, dt * 6);
+    bD.ombro.quaternion.slerp(qA.setFromEuler(eA.set(respira, 0, 0)).multiply(bD.qBraco), k); bD.cot.quaternion.slerp(bD.qCot, k);
+    if (u.falando > 0 && bE.qFala) { u.falando -= dt; bE.ombro.quaternion.slerp(bE.qFala, kf); bE.cot.quaternion.slerp(bE.qFalaCot, kf); }
+    else { if (u.falando > 0) u.falando -= dt; bE.ombro.quaternion.slerp(qA.setFromEuler(eA.set(-respira, 0, 0)).multiply(bE.qBraco), k); bE.cot.quaternion.slerp(bE.qCot, k); }
   }
-  const mantenedor = criarAvatar({ nome: "MANTENEDOR", corNome: "#f2a400", roupa: 0xe8681f, calca: 0x23324a, luva: 0xd9c040, capacete: 0xf4f4f2 });
+  // Tons de pele variados, refletindo a diversidade do Brasil
+  const mantenedor = criarAvatar({ nome: "MANTENEDOR", corNome: "#f2a400", roupa: 0xe8681f, calca: 0x23324a, luva: 0xd9c040, capacete: 0xf4f4f2, pele: 0xb37a52 });          // pardo
   posAvatar(mantenedor, -0.7, 3.0); mantenedor.rotation.y = Math.PI * 0.8;
-  const coordenador = criarAvatar({ nome: "COORDENADOR", corNome: "#cfe8ff", roupa: 0xe8681f, calca: 0x23324a, luva: 0xd9c040, capacete: 0x2f6fd6, colete: 0xd8f000, radio: true, prancheta: true });
-  coordenador.userData.prancheta = true;
+  const coordenador = criarAvatar({ nome: "COORDENADOR", corNome: "#cfe8ff", roupa: 0xe8681f, calca: 0x23324a, luva: 0xd9c040, capacete: 0x2f6fd6, colete: 0xd8f000, radio: true, prancheta: true, pele: 0x6a4430 });   // preto
   posAvatar(coordenador, 3.6, 3.5); coordenador.rotation.y = Math.PI * 1.15;
   const CASA_MANT = new THREE.Vector3(-0.7, 0, 3.0);
 
-  // ---------- Colisão: bonecos e câmera não atravessam a máquina, a caixa de junção, o quadro, o KGT nem as pessoas ----------
-  // Tudo no plano do chão (x, z): objetos são retângulos, pessoas são círculos. Quem anda é empurrado para fora e,
-  // se o caminho reto até o destino cruza um objeto, contorna pelo canto mais curto.
-  const R_PESSOA = 0.25, R_CAMERA = 0.3;
+  // ---------- Colisão da câmera: não atravessa a máquina, a caixa de junção, o quadro nem o KGT ----------
+  // Tudo no plano do chão (x, z), objetos como retângulos. A câmera é empurrada para fora e, se o caminho reto até o destino
+  // cruza um objeto, contorna pelo canto mais curto. Os bonecos não têm colisão (pedido do Erick, 15/10/2026).
+  const R_CAMERA = 0.3;
   const figurasFixas = [];   // trabalhadores parados da cena (preenchido quando trabalhadores.glb carrega)
   const kgtEquipe = [];      // os três da equipe do KGT: saem do raio de ação quando a máquina opera
   let obstaculos = [], tObstaculos = 0;
@@ -954,16 +943,8 @@ body.vr #stick { display: none; }
     const cc = kgtCaixaCacamba(); if (cc) l.push(Object.assign(cc, { kgt: true }));     // caçamba do KGT, quando está baixa
     obstaculos = l;
   }
-  function pessoas(ignorar) {   // círculos das pessoas, menos quem está andando
-    const l = figurasFixas.map(f => f.position);
-    if (ignorar !== mantenedor) l.push(mantenedor.position);
-    l.push(coordenador.position);
-    if (ignorar !== rig) l.push(rig.position);
-    return l;
-  }
-  // tira o ponto p (x, z) de dentro dos objetos e das pessoas, mantendo a distância r
-  function empurrar(p, r, ignorar) {
-    const ps = pessoas(ignorar);
+  // tira o ponto p (x, z) de dentro dos objetos, mantendo a distância r
+  function empurrar(p, r) {
     for (let it = 0; it < 3; it++) {
       for (const c of obstaculos) {
         const qx = THREE.MathUtils.clamp(p.x, c.x0, c.x1), qz = THREE.MathUtils.clamp(p.z, c.z0, c.z1);
@@ -973,12 +954,6 @@ body.vr #stick { display: none; }
         // dentro do retângulo: sai pela borda mais próxima
         const s = [p.x - c.x0, c.x1 - p.x, p.z - c.z0, c.z1 - p.z], m = Math.min(...s);
         if (m === s[0]) p.x = c.x0 - r; else if (m === s[1]) p.x = c.x1 + r; else if (m === s[2]) p.z = c.z0 - r; else p.z = c.z1 + r;
-      }
-      for (const q of ps) {
-        const dx = p.x - q.x, dz = p.z - q.z, d = Math.hypot(dx, dz), min = r + R_PESSOA;
-        if (d >= min) continue;
-        if (d < 1e-6) { p.x = q.x + min; continue; }
-        p.x = q.x + dx / d * min; p.z = q.z + dz / d * min;
       }
     }
     return p;
@@ -1033,58 +1008,7 @@ body.vr #stick { display: none; }
       });
       return o;
     }
-    // Trabalhador "acenando" articulado (braços soltos do corpo): as malhas trazem os pesos de cada osso (_joints/_weights,
-    // ver trabalhadores_app.py), cada parte do corpo segue um osso só, como corpo sólido.
-    // Contrato dos bonecos: pernas [quadril, joelho, pé], braços { ombro, cot, mao, dir, eixoMao, qBraco, qCot, qReto } e esq (coluna, peito, cabeça).
-    const OSSOS = [
-      ["raiz", -1, [0, 0.93, -0.03]], ["coluna", 0, [0, 1.08, 0]], ["peito", 1, [-0.02, 1.25, 0.08]], ["pescoco", 2, [-0.05, 1.42, 0.13]], ["cabeca", 3, [-0.07, 1.48, 0.15]],
-      ["ombro_D", 2, [-0.19, 1.39, 0.07]], ["cotovelo_D", 5, [-0.25, 1.33, 0.32]], ["mao_D", 6, [-0.22, 1.5, 0.55]],
-      ["ombro_E", 2, [0.18, 1.38, 0.05]], ["cotovelo_E", 8, [0.4, 1.29, 0.14]], ["mao_E", 9, [0.22, 1.2, 0.33]],
-      ["quadril_D", 0, [-0.08, 0.9, -0.08]], ["joelho_D", 11, [-0.07, 0.48, -0.1]], ["pe_D", 12, [-0.06, 0.12, -0.12]],
-      ["quadril_E", 0, [0.09, 0.9, -0.01]], ["joelho_E", 14, [0.08, 0.48, 0]], ["pe_E", 15, [0.08, 0.12, -0.03]]
-    ];
-    function vestirArticulado(av, tom, cracha, capacete) {
-      const u = av.userData, f = new THREE.Color(tom).convertSRGBToLinear();
-      const ossos = OSSOS.map(([n]) => { const b = new THREE.Bone(); b.name = n; return b; });
-      OSSOS.forEach(([, pai, p], i) => { const q = pai >= 0 ? OSSOS[pai][2] : [0, 0, 0]; ossos[i].position.set(p[0] - q[0], p[1] - q[1], p[2] - q[2]); if (pai >= 0) ossos[pai].add(ossos[i]); });
-      const corpo = new THREE.Group(); corpo.add(ossos[0]); corpo.updateMatrixWorld(true);
-      const esq = new THREE.Skeleton(ossos), malhas = [];
-      g.scene.traverse(m => {
-        if (!m.isMesh || !m.geometry.attributes._joints) return;
-        const geo = m.geometry.clone();
-        geo.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(Array.from(geo.attributes._joints.array), 4));
-        geo.setAttribute("skinWeight", new THREE.Float32BufferAttribute(geo.attributes._weights.array, 4));
-        const mt = m.material.clone(); mt.skinning = true;
-        if (/__pele/.test(m.name + (m.parent ? m.parent.name : ""))) mt.color.setRGB(Math.min(1, mt.color.r * f.r / PELE_REF[0]), Math.min(1, mt.color.g * f.g / PELE_REF[1]), Math.min(1, mt.color.b * f.b / PELE_REF[2]));
-        else if (capacete && AMARELO(mt.color)) mt.color.setHex(capacete).convertSRGBToLinear();
-        const sm = new THREE.SkinnedMesh(geo, mt); sm.castShadow = true; sm.frustumCulled = false; sm.userData.avatar = true;
-        corpo.add(sm); malhas.push(sm);
-      });
-      corpo.updateMatrixWorld(true);
-      malhas.forEach(sm => sm.bind(esq, sm.matrixWorld));
-      const B = n => ossos[OSSOS.findIndex(o => o[0] === n)];
-      const braco = l => {
-        const b = { ombro: B("ombro_" + l), cot: B("cotovelo_" + l), mao: B("mao_" + l) };
-        b.dir = b.cot.position.clone().add(b.mao.position).normalize(); b.eixoMao = b.mao.position.clone().normalize();
-        b.dirSup = b.cot.position.clone().normalize();
-        // pose solta: braço para baixo, um pouco afastado do corpo, cotovelo levemente dobrado para a frente
-        const lado = Math.sign(b.ombro.position.x);
-        b.qBraco = new THREE.Quaternion().setFromUnitVectors(b.dirSup, new THREE.Vector3(lado * 0.2, -1, 0.02).normalize());
-        const ante = new THREE.Vector3(lado * 0.08, -0.85, 0.5).normalize().applyQuaternion(b.qBraco.clone().invert());
-        b.qCot = new THREE.Quaternion().setFromUnitVectors(b.eixoMao, ante);
-        b.qReto = new THREE.Quaternion().setFromUnitVectors(b.eixoMao, b.dirSup);   // braço esticado para alcançar a peça
-        return b;
-      };
-      u.boneco.forEach(c => { if (c !== u.nome) c.visible = false; });
-      u.pernas = ["D", "E"].map(l => [B("quadril_" + l), B("joelho_" + l), B("pe_" + l)]);
-      u.bracos = [braco("D"), braco("E")];
-      u.esq = { coluna: B("coluna"), peito: B("peito"), cabeca: B("cabeca") };
-      u.nome.position.set(...cracha); u.nome.rotation.set(0, 0, 0); u.esq.peito.add(u.nome);   // crachá no peito, acompanha o tronco
-      av.add(corpo); u.corpo = corpo;
-    }
     // Tons de pele variados, refletindo a diversidade do Brasil
-    vestirArticulado(mantenedor, 0xb37a52, [0.02, 0.06, 0.16]);              // pardo: anda, agacha e gira o punho
-    vestirArticulado(coordenador, 0x6a4430, [0.02, 0.06, 0.16], 0x2f6fd6);  // preto, capacete azul; ergue o braço ao falar no rádio
     const aux = modelo("c", 0xe6b693);                                     // branco
     aux.position.set(5.2, alturaLastro(2.6), 2.6); aux.rotation.y = Math.atan2(0 - 5.2, 1.5 - 2.6);
     scene.add(aux); figurasFixas.push(aux);
@@ -1164,7 +1088,7 @@ body.vr #stick { display: none; }
     // marcadores dados no sistema do modelo e pendurados na peça que os leva
     const marca = (pai, x, y, z) => { const o = new THREE.Object3D(); o.position.set(x, y, z); root.add(o); o.updateMatrixWorld(true); pai.attach(o); return o; };
     kgt.olho = marca(P.giro, 1.15, 2.6, -1.25);       // olhos do operador, na cabine
-    kgt.quadro = marca(P.giro, 1.36, 2.42, -0.36);    // quadro de controles dentro da cabine, à frente e à esquerda do operador
+    kgt.quadro = marca(P.giro, 1.36, 2.56, -0.36);    // quadro de controles dentro da cabine, à frente e à esquerda do operador
     kgt.ponta = marca(P.cacamba, GIRO_X, 2.26, 2.8);  // dentes da caçamba
     kgt.descer = new THREE.Object3D(); kgt.descer.position.set(2.4, 0, -1.2); root.add(kgt.descer);         // onde o operador desce, ao lado da cabine
     posarKgt();
@@ -1519,16 +1443,14 @@ body.vr #stick { display: none; }
     dir.normalize();
     // fica do outro lado da peça, de frente para o aluno, perto o bastante para alcançar
     const fica = new THREE.Vector3(ponto.x + dir.x * 0.42, 0, ponto.z + dir.z * 0.42);
-    atualizarObstaculos(); empurrar(fica, R_PESSOA, mantenedor);   // sem pisar dentro da máquina
-    u.alvo = ponto.clone(); u.girar = girar; u.tAcao = 0; u.tAndando = 0;
+    u.alvo = ponto.clone(); u.girar = girar; u.tAcao = 0;
     if (Math.hypot(fica.x - mantenedor.position.x, fica.z - mantenedor.position.z) < 0.15) u.estado = "agindo";
     else { u.destino = fica; u.estado = "andando"; som.passos(); }
   }
-  function mantenedorVoltar() { const u = mantenedor.userData; u.alvo = null; u.destino = CASA_MANT.clone(); u.estado = "andando"; u.tAndando = 0; }
+  function mantenedorVoltar() { const u = mantenedor.userData; u.alvo = null; u.destino = CASA_MANT.clone(); u.estado = "andando"; }
   function atualizarAvatares(dt) {
     tObstaculos -= dt; if (tObstaculos <= 0) { atualizarObstaculos(); tObstaculos = 0.5; }
     atualizarAvatar(mantenedor, dt);
-    empurrar(mantenedor.position, R_PESSOA, mantenedor); mantenedor.position.y = alturaLastro(mantenedor.position.z);
     // coordenador fica de frente para o aluno
     const olho = new THREE.Vector3(); camera.getWorldPosition(olho);
     virarPara(coordenador, olho.x, olho.z, dt * 2);
@@ -3774,7 +3696,7 @@ body.vr #stick { display: none; }
   function teleportar(p) {
     rig.position.x = THREE.MathUtils.clamp(p.x, MUNDO.x0, MUNDO.x1);
     rig.position.z = THREE.MathUtils.clamp(p.z, MUNDO.z0, MUNDO.z1);
-    empurrar(rig.position, R_CAMERA, rig);
+    empurrar(rig.position, R_CAMERA);
     rig.updateMatrixWorld(true);
     posicionarPainel(yawAtual());
   }
@@ -4219,7 +4141,7 @@ body.vr #stick { display: none; }
     if (destino) {
       if (mv.frente || mv.lado) destino = null;
       else {
-        empurrar(destino, R_CAMERA, rig);   // o ponto tocado pode estar colado na máquina
+        empurrar(destino, R_CAMERA);   // o ponto tocado pode estar colado na máquina
         const d = Math.hypot(destino.x - rig.position.x, destino.z - rig.position.z);
         const h = rumo(rig.position, destino, R_CAMERA), hx = h.x - rig.position.x, hz = h.z - rig.position.z, dh = Math.hypot(hx, hz) || 1;
         const passo = 2.0 * dt;
@@ -4228,8 +4150,8 @@ body.vr #stick { display: none; }
         rig.updateMatrixWorld(true);
       }
     }
-    // a câmera não entra nos objetos nem nas pessoas (na cabine do KGT ela vai junto com o KGT)
-    if (!kgt.operando) empurrar(rig.position, R_CAMERA, rig);
+    // a câmera não entra nos objetos (na cabine do KGT ela vai junto com o KGT)
+    if (!kgt.operando) empurrar(rig.position, R_CAMERA);
     rig.updateMatrixWorld(true);
     if (destino) { alvoChao.visible = true; alvoChao.position.set(destino.x, alturaLastro(destino.z) + 0.03, destino.z); }
 
