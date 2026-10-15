@@ -3756,7 +3756,8 @@ body.vr #stick { display: none; }
     };
     prox();
   }
-  function mantenedorParaZona() { const u = mantenedor.userData; u.alvo = null; u.destino = ZONA_SEGURA.clone().add(new THREE.Vector3(-0.7, 0, 0.5));   // atrás do participante, sem tapar a vista u.estado = "andando"; }
+  // o mantenedor fica atrás do participante na zona segura, sem tapar a vista
+  function mantenedorParaZona() { const u = mantenedor.userData; u.alvo = null; u.destino = ZONA_SEGURA.clone().add(new THREE.Vector3(-0.7, 0, 0.5)); u.estado = "andando"; }
   // espera a cinta: o participante toca na peça (ou o mantenedor passa a cinta, quando é do outro papel)
   function esperarCinta(e, alvoId, ponto, texto) {
     return new Promise(r => {
