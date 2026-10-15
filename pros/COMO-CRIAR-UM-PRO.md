@@ -4,7 +4,7 @@ Cada procedimento (PRO, PGS, IT) vira **um arquivo JSON** nesta pasta. O app lê
 
 - o cartão na biblioteca de treinamentos;
 - o menu do treinamento, com um botão por roteiro;
-- a escolha de papel (coordenador ou executante) antes de começar;
+- a escolha de papel (coordenador ou executante; nas trocas com o KGT, também operador de EVP) antes de começar;
 - as etapas (decisões, toques nas peças da cena, falas de rádio, efeitos na cena);
 - os desafios desse tema, que entram no menu Desafios e no sorteio geral;
 - o resultado no relatório e na planilha CSV.
@@ -87,7 +87,7 @@ Quiz (perguntas de sim ou não, sem papel):
 
 ### Etapas
 
-Campos comuns: `tipo`, `papel` (`coordenador`, `executante` ou `ambos`), `se`, `titulo`.
+Campos comuns: `tipo`, `papel` (`coordenador`, `executante`, `operador` ou `ambos`), `se`, `titulo`.
 
 **decisao**: múltipla escolha. A certa e as erradas são embaralhadas na tela.
 
@@ -165,9 +165,12 @@ Metas: `partida` (ligar o motor com o freio de mão puxado), `transporte` (braç
   - `travamento` (unidade de travamento da CTS-2): `clipers`, `conector`, `juncao`, `dormente`.
 - `acao`: `soltar` e `fixar` (fixações do grupo, na ordem em que piscam; `fixar` é a ordem inversa), `descarregar` (o KGT traz a peça nova pendurada e a deposita ao lado da via), `retirar` (o KGT iça a peça velha; se ainda houver fixação presa, não iça e conta erro), `posicionar` (o KGT pega a peça nova e assenta no lugar). Sem `descarregar`, a peça nova já está no palete ao lado da via.
 - `ferramenta` (opcional): ferramenta mostrada em cada fixação, no lugar da padrão de cada uma.
-- Nas ações com o KGT (`descarregar`, `retirar`, `posicionar`), na primeira delas o participante escolhe quem opera o KGT. **Eu opero o KGT**: ele vai para a cabine, o KGT se posiciona e aciona os estabilizadores, e ele leva o gancho até a peça com os controles (lança, braço, giro e caçamba, com Movimento fino para o ajuste). O executante passa a cinta, ele leva a carga até a caixa verde e toca em Assentar e soltar. O sinaleiro mostra no quadro quanto falta (gire, afaste ou aproxime, suba ou desça). **O operador opera**: o KGT faz tudo sozinho. Vale para qualquer papel.
-- **Implemento do KGT**: o KGT trabalha com a concha (gancho e cinta) ou com a garra giratória. A troca de implemento é feita no suporte "IMPLEMENTO RESERVA" ao lado da vaga: na fase de preparação (antes de "Ir para o local da troca") ou pelo botão "Trocar para a garra/concha" da cabine, com o KGT parado e sem carga. Com a garra não há cinta: abra a garra, alinhe com "Girar garra" (o sinaleiro mostra quantos graus faltam), toque em "Fechar a garra" e, no destino, em "Assentar e abrir a garra". No modo automático (O operador opera) o KGT usa a concha. Não há campo novo no JSON.
-- `papel` padrão: `executante`.
+- Nas ações com o KGT (`descarregar`, `retirar`, `posicionar`) o papel é `operador` (operador de EVP), e o roteiro passa a oferecer esse terceiro papel. **Operador de EVP**: o participante vai para a cabine, o KGT se posiciona e aciona os estabilizadores, e ele leva a garra até a peça com os controles (lança, braço, giro e Girar garra, com Movimento fino para o ajuste), fecha a garra, leva a carga até a caixa verde e toca em Assentar e abrir a garra. O sinaleiro mostra no quadro quanto falta (gire, afaste ou aproxime, suba ou desça, graus da garra). As outras etapas são feitas pela equipe (avatares). **Coordenador e executante**: o operador do KGT (avatar) faz a troca sozinho com a garra.
+- Enquanto o KGT trabalha, toda a equipe (mantenedor, coordenador e os outros trabalhadores) fica na zona segura, fora do raio de ação; quando a peça termina de assentar, a equipe volta e aplica as fixações.
+- Os componentes novos (agulha, unidade de motor e unidade de travamento) já ficam lado a lado ao lado da via desde a primeira etapa de troca, e o KGT já vem com a garra montada.
+- **Implemento do KGT**: o operador de EVP pode trocar a garra pela concha (gancho e cinta; aí o executante passa a cinta) no suporte "IMPLEMENTO RESERVA" ao lado da vaga, na fase de preparação ou pelo botão "Trocar para a concha" da cabine, com o KGT parado e sem carga. Não há campo novo no JSON.
+- `papeis.operador` (opcional) descreve o operador de EVP na tela de escolha de papel.
+- `papel` padrão: `executante` (nas ações com o KGT, `operador`).
 
 ### Peças da cena (`alvo`, `errado`, `pistas`)
 
