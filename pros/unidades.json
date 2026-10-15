@@ -1,0 +1,725 @@
+{
+  "formato": "treino-pro-vr/1",
+  "id": "unid",
+  "pro": "PRO-001122 rev. 24 · Anexo 5.4",
+  "etiqueta": "Troca de unidade CTS-2",
+  "titulo": "Troca das unidades de motor e travamento da CTS-2",
+  "resumo": "Troca de verdade na cena: soltar clipers, conectores militares, peça de junção e parafusos do dormente oco, o KGT retira a unidade velha e assenta a nova, fixar, medir a força, desbloquear e testar a concordância.",
+  "grupo": "CTS-2",
+  "prefixo": "EE",
+  "papeis": {
+    "coordenador": "Pede a LDL e o comando local ao CCP, confere a garra de bloqueio, conduz o operador do KGT pelo rádio, pede os comandos do teste de concordância e devolve a máquina ao controle central.",
+    "executante": "Gira a chave de comando local e o comutador, aplica o cepo, solta e aplica as fixações da unidade, passa a cinta no gancho do KGT, alinha a unidade, instala o DAM e mede a força."
+  },
+  "falaInicio": "Equipe, troca de unidade da máquina de chave do AMV 03. Procedimentos de segurança 01 e 02 em todos os passos.",
+  "falaFim": "Unidade trocada e máquina em controle central.",
+  "sorteio": {
+    "forca": {
+      "tipo": "faixa",
+      "ok": [
+        550,
+        720
+      ],
+      "fora": [
+        [
+          430,
+          520
+        ],
+        [
+          750,
+          820
+        ]
+      ]
+    }
+  },
+  "roteiros": [
+    {
+      "id": "travamento",
+      "botao": "Trocar unidade\nde travamento",
+      "modulo": "Troca da unidade de travamento em 3D (PRO-001122 Anexo 5.4)",
+      "descricao": "Clipers, conectores, peça de junção e dormente oco soltos na cena; o KGT retira a unidade velha e assenta a nova.",
+      "etapas": [
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Acesso à via",
+          "visto": "Programada a troca da unidade de travamento da MCH CTS-2 do AMV 03. O primeiro passo?",
+          "certa": "Solicitar a LDL ao CCP com autorização de comando local da MCH CTS-2 e só entrar na via após a autorização.",
+          "erradas": [
+            "Entrar na via e girar a chave de comando local enquanto o CCP responde.",
+            "Pedir só a LDL: o comando local é liberado depois, na hora do teste."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passo 1: solicitar LDL ao CCP com autorização de comando local da MCH CTS-2; após autorização, adentrar a via.",
+          "efeitos": [
+            "ldl:abrir:troca da unidade de travamento da MCH do AMV 03"
+          ]
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "chave",
+          "titulo": "Comando local",
+          "corpo": "Tampa do dormente oco ao lado da unidade de motor retirada. Gire a chave da caixa de junção da posição 0 para a 1. Toque na chave.",
+          "efeitos": [
+            "caixa:abrir",
+            "lampada:verde",
+            "som:chave"
+          ],
+          "radio": [
+            {
+              "quem": "Coordenador",
+              "texto": "CCP, {prefixo}. Solicito autorizar a máquina de chave do AMV 03 em comando local."
+            },
+            {
+              "quem": "CCP",
+              "texto": "{prefixo}, máquina de chave do AMV 03 autorizada em comando local."
+            }
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "LED de comando local",
+          "visto": "O CCP autorizou. O LED de comando local da caixa de junção não acendeu. O que fazer?",
+          "certa": "Fazer um teste de comando girando a chave no sentido da seta, segurando por 2 segundos até gerar o pulso de comando.",
+          "erradas": [
+            "Seguir sem o LED: a autorização do CCP basta.",
+            "Desligar o disjuntor da caixa de junção e religar."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passo 1.5: se o LED não acender, testar o comando girando a chave no sentido da seta por 2 segundos até gerar o pulso."
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "comutador",
+          "titulo": "Comutador em MANUAL",
+          "corpo": "Abra a tampa da unidade do motor e gire a chave de comutação para o modo manual. Toque no comutador.",
+          "efeitos": [
+            "comutador:manual"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Garra de bloqueio",
+          "visto": "Comutador em manual. Como fica o bloqueio da MCH?",
+          "certa": "Garra de bloqueio de segurança instalada, com cadeado e etiqueta individual de cada membro da equipe.",
+          "erradas": [
+            "Um cadeado só, do coordenador, para a equipe toda.",
+            "Sem garra: o comutador em manual já basta."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, procedimento de segurança 01: cada membro da equipe instala seu cadeado e etiqueta individual na garra de bloqueio."
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "cepo",
+          "titulo": "Cepo de bloqueio",
+          "corpo": "Instale o cepo entre a agulha aberta e o trilho de encosto, no limite de movimentação da agulha. Toque no cepo.",
+          "efeitos": [
+            "cepo:on",
+            "som:encaixe"
+          ]
+        },
+        {
+          "tipo": "troca",
+          "componente": "travamento",
+          "acao": "soltar",
+          "grupo": "clipers",
+          "titulo": "Desconecte as agulhas",
+          "corpo": "Retire o contrapino, o pino e o cliper de cada lado, na ordem. Toque em cada fixação que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 3: retirar os contrapinos, porcas, parafusos e espaçadores dos clipers e da barra auxiliar, o contrapino e o pino de travamento inferior, e retirar os clipers."
+        },
+        {
+          "tipo": "troca",
+          "componente": "travamento",
+          "acao": "soltar",
+          "grupo": "conector",
+          "titulo": "Retire os conectores militares",
+          "corpo": "Desrosqueie o conector da unidade. Toque no conector que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 4: retirar os conectores militares; conector travado ou sujo, limpar por dentro."
+        },
+        {
+          "tipo": "troca",
+          "componente": "travamento",
+          "acao": "soltar",
+          "grupo": "juncao",
+          "titulo": "Desacople as unidades",
+          "corpo": "Solte os parafusos da peça de junção entre a unidade de motor e a de travamento. Toque em cada parafuso que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 5: desconectar a unidade de travamento da unidade de motor (peça de junção e trava do cilindro de proteção)."
+        },
+        {
+          "tipo": "troca",
+          "componente": "travamento",
+          "acao": "soltar",
+          "grupo": "dormente",
+          "titulo": "Solte do dormente oco",
+          "corpo": "Solte os quatro parafusos que prendem a unidade de travamento ao dormente oco. Toque em cada um que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 6: desconectar as unidades do dormente oco; parafuso emperrado, folgar com a parafusadeira elétrica."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Antes de içar",
+          "visto": "O KGT vai retirar a unidade de travamento. O que garantir?",
+          "certa": "Gancho olhal com trava, cinta adequada para a unidade e rádio entre o operador do KGT e o coordenador; equipe fora do raio de ação.",
+          "erradas": [
+            "Gancho comum, sem trava: a unidade é leve.",
+            "Combinar os sinais com o operador antes e dispensar o rádio."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passos 7 e 8: gancho olhal com trava, cinta adequada e comunicação por rádio portátil entre o operador do KGT e o coordenador."
+        },
+        {
+          "tipo": "troca",
+          "componente": "travamento",
+          "acao": "retirar",
+          "titulo": "Retire a unidade de travamento",
+          "corpo": "O KGT desce o gancho sobre a unidade. Passe a cinta tocando na unidade e vá para a zona segura. O KGT só iça com todos fora do raio de ação.",
+          "explica": "PRO-001122 Anexo 5.4, passo 7: retirar a unidade defeituosa com o KGT ou caminhão com equipamento de guindar."
+        },
+        {
+          "tipo": "troca",
+          "componente": "travamento",
+          "acao": "posicionar",
+          "titulo": "Instale a unidade de travamento nova",
+          "corpo": "O KGT desce o gancho sobre a unidade nova no palete. Passe a cinta tocando nela e vá para a zona segura. O KGT a assenta no dormente oco.",
+          "explica": "PRO-001122 Anexo 5.4, passo 8: instalar a nova unidade com o KGT ou caminhão munck."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Alinhamento",
+          "visto": "A unidade nova ficou fora do eixo do dormente oco. Como alinhar?",
+          "certa": "Com o gabarito de 8 mm; e, se estiver desalinhada com os furos de fixação, com a alavanca.",
+          "erradas": [
+            "Apertar os parafusos: o aperto puxa a unidade para o eixo.",
+            "Bater na unidade com a marreta até encaixar."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passo 9: unidade desalinhada com os furos, alinhar com a alavanca; desalinhada com o eixo do dormente oco, gabarito de 8 mm."
+        },
+        {
+          "tipo": "troca",
+          "componente": "travamento",
+          "acao": "fixar",
+          "grupo": "dormente",
+          "titulo": "Fixe no dormente oco",
+          "corpo": "Coloque e aperte os quatro parafusos de fixação. Toque em cada peça transparente que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 9: conectar a unidade ao dormente oco e checar o aperto dos parafusos de fixação."
+        },
+        {
+          "tipo": "troca",
+          "componente": "travamento",
+          "acao": "fixar",
+          "grupo": "juncao",
+          "titulo": "Acople as unidades",
+          "corpo": "Recoloque os parafusos da peça de junção. Toque em cada peça transparente que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 10: acoplar a peça de junção, reposicionar a trava do cilindro e confirmar o aperto dos parafusos."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Peça de junção",
+          "visto": "Peça de junção acoplada e trava do cilindro no encaixe. O que confirma o acoplamento?",
+          "certa": "Um teste de movimentação da MCH em modo manual.",
+          "erradas": [
+            "Um comando elétrico pelo CCP, já com a máquina em automático.",
+            "Olhar a peça de junção: se está parafusada, está acoplada."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passo 10, ação corretiva: acoplar a peça de junção e realizar testes de movimentação da MCH em modo manual."
+        },
+        {
+          "tipo": "troca",
+          "componente": "travamento",
+          "acao": "fixar",
+          "grupo": "clipers",
+          "titulo": "Conecte as agulhas",
+          "corpo": "Recoloque o cliper, depois o pino e por último o contrapino, de cada lado. Toque em cada peça transparente que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 11: reconectar os clipers e a barra auxiliar, com pino e contrapino na parte inferior dos clipers."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Montagem dos clipers",
+          "visto": "Clipers e barra auxiliar reconectados. O que conferir antes de seguir?",
+          "certa": "Pino e contrapino na parte inferior dos clipers, a sequência de isolantes e arruelas da barra auxiliar e as coifas instaladas como o fabricante recomenda.",
+          "erradas": [
+            "Só o aperto das porcas da barra auxiliar.",
+            "Nada: os clipers só encaixam de um jeito."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passo 11, desvios: falta de pino e contrapino na parte inferior dos clipers, montagem incorreta de isolantes e arruelas, coifas mal instaladas."
+        },
+        {
+          "tipo": "troca",
+          "componente": "travamento",
+          "acao": "fixar",
+          "grupo": "conector",
+          "titulo": "Reposicione os conectores militares",
+          "corpo": "Rosqueie o conector na unidade nova. Toque no conector transparente que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 12: reposicionar os conectores militares."
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "dam",
+          "titulo": "Instale o DAM",
+          "corpo": "Faça as etapas 1 e 2 da IT-DAM: conecte o DAM à MCH. Toque no DAM.",
+          "efeitos": [
+            "dam:instalar"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Força de movimentação",
+          "visto": "Célula de carga entre a agulha e o trilho, comando pelo DAM: {forca.txt} kgf.",
+          "certa": "{forca.ok?Dentro da faixa de 550 a 720 kgf: seguir.|Fora da faixa de 550 a 720 kgf: ajustar a porca da embreagem e medir de novo.}",
+          "erradas": [
+            "{forca.ok?Fora da faixa: ajustar a porca da embreagem.|Dentro da faixa: seguir.}",
+            "Seguir sem medir: unidade nova vem ajustada de fábrica."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passo 14: ajustes de pressão e força com a célula de carga; a força da CTS-2 fica entre 550 e 720 kgf (PRO-001122 Anexo 5). Comandos pelo DAM com a técnica Yoshi Yoshi.",
+          "efeitos": [
+            "ferramenta:celula_carga:agulhas:{forca.txt} kgf"
+          ],
+          "conferencia": true
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "cepo",
+          "titulo": "Retire o cepo",
+          "corpo": "Força ajustada. Retire o cepo pela alça. Toque no cepo.",
+          "efeitos": [
+            "cepo:off",
+            "som:encaixe",
+            "ferramentas:guardar"
+          ]
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "comutador",
+          "titulo": "Desbloqueie a máquina",
+          "corpo": "Retire a garra de bloqueio e gire a chave de comutação de volta para o modo motor (AUTOMÁTICO). Toque no comutador.",
+          "efeitos": [
+            "comutador:auto"
+          ]
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "dam",
+          "titulo": "Retire o DAM",
+          "corpo": "Faça a etapa 4 da IT-DAM: desconecte o DAM da MCH. Toque no DAM.",
+          "efeitos": [
+            "dam:retirar"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Teste de concordância",
+          "visto": "DAM retirado e equipe fora da área de movimentação das agulhas. Como testar?",
+          "certa": "Pedir ao CCP o comando para NORMAL, confirmar a posição física em campo e a concordância no intertravamento; repetir para REVERSO. No rádio, repetir e confirmar cada mensagem.",
+          "erradas": [
+            "Testar só a posição NORMAL, que é a de circulação.",
+            "Pedir os dois comandos seguidos e conferir só no fim."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passo 16.2 e 16.3: comando para normal e reverso, confirmando a posição física da PA e a concordância com o intertravamento; comandos remotos pelo protocolo do ROF, com repetição e confirmação.",
+          "efeitos": [
+            "amv:reverso",
+            "amv:normal"
+          ],
+          "radio": [
+            {
+              "quem": "Coordenador",
+              "texto": "CCP, {prefixo}. Equipe fora da área de movimentação. Solicito comando do AMV 03 para reverso."
+            },
+            {
+              "quem": "CCP",
+              "texto": "{prefixo}, comando do AMV 03 para reverso. Confirme a posição."
+            }
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Encerramento",
+          "visto": "Unidade de travamento nova testada. O que fazer antes de devolver a LDL?",
+          "certa": "Aplicar 5S, recolhendo ferramentas e resíduos, e devolver a máquina para o controle central girando a chave de comando local para a posição 0.",
+          "erradas": [
+            "Devolver a LDL e deixar a chave em comando local para o próximo teste.",
+            "Deixar a unidade velha ao lado da via para o recolhimento."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passos 16.4 e 16.5: aplicar 5S no local e devolver a máquina para o controle central.",
+          "efeitos": [
+            "kgt:voltar",
+            "ldl:devolver:Troca da unidade de travamento da máquina de chave do AMV 03 concluída. Máquina em controle central."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "motor",
+      "botao": "Trocar unidade\nde motor",
+      "modulo": "Troca da unidade de motor em 3D (PRO-001122 Anexo 5.4)",
+      "descricao": "Conector, peça de junção e dormente oco soltos na cena; o KGT retira a unidade velha e assenta a nova.",
+      "etapas": [
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Acesso à via",
+          "visto": "Programada a troca da unidade de motor da MCH CTS-2 do AMV 03. O primeiro passo?",
+          "certa": "Solicitar a LDL ao CCP com autorização de comando local da MCH CTS-2 e só entrar na via após a autorização.",
+          "erradas": [
+            "Entrar na via e girar a chave de comando local enquanto o CCP responde.",
+            "Pedir só a LDL: o comando local é liberado depois, na hora do teste."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passo 1: solicitar LDL ao CCP com autorização de comando local da MCH CTS-2; após autorização, adentrar a via.",
+          "efeitos": [
+            "ldl:abrir:troca da unidade de motor da MCH do AMV 03"
+          ]
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "chave",
+          "titulo": "Comando local",
+          "corpo": "Tampa do dormente oco ao lado da unidade de motor retirada. Gire a chave da caixa de junção da posição 0 para a 1. Toque na chave.",
+          "efeitos": [
+            "caixa:abrir",
+            "lampada:verde",
+            "som:chave"
+          ],
+          "radio": [
+            {
+              "quem": "Coordenador",
+              "texto": "CCP, {prefixo}. Solicito autorizar a máquina de chave do AMV 03 em comando local."
+            },
+            {
+              "quem": "CCP",
+              "texto": "{prefixo}, máquina de chave do AMV 03 autorizada em comando local."
+            }
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "LED de comando local",
+          "visto": "O CCP autorizou. O LED de comando local da caixa de junção não acendeu. O que fazer?",
+          "certa": "Fazer um teste de comando girando a chave no sentido da seta, segurando por 2 segundos até gerar o pulso de comando.",
+          "erradas": [
+            "Seguir sem o LED: a autorização do CCP basta.",
+            "Desligar o disjuntor da caixa de junção e religar."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passo 1.5: se o LED não acender, testar o comando girando a chave no sentido da seta por 2 segundos até gerar o pulso."
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "comutador",
+          "titulo": "Comutador em MANUAL",
+          "corpo": "Abra a tampa da unidade do motor e gire a chave de comutação para o modo manual. Toque no comutador.",
+          "efeitos": [
+            "comutador:manual"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Garra de bloqueio",
+          "visto": "Comutador em manual. Como fica o bloqueio da MCH?",
+          "certa": "Garra de bloqueio de segurança instalada, com cadeado e etiqueta individual de cada membro da equipe.",
+          "erradas": [
+            "Um cadeado só, do coordenador, para a equipe toda.",
+            "Sem garra: o comutador em manual já basta."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, procedimento de segurança 01: cada membro da equipe instala seu cadeado e etiqueta individual na garra de bloqueio."
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "cepo",
+          "titulo": "Cepo de bloqueio",
+          "corpo": "Instale o cepo entre a agulha aberta e o trilho de encosto, no limite de movimentação da agulha. Toque no cepo.",
+          "efeitos": [
+            "cepo:on",
+            "som:encaixe"
+          ]
+        },
+        {
+          "tipo": "troca",
+          "componente": "motor",
+          "acao": "soltar",
+          "grupo": "conector",
+          "titulo": "Retire os conectores militares",
+          "corpo": "Desrosqueie o conector da unidade. Toque no conector que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 4: retirar os conectores militares; conector travado ou sujo, limpar por dentro."
+        },
+        {
+          "tipo": "troca",
+          "componente": "motor",
+          "acao": "soltar",
+          "grupo": "juncao",
+          "titulo": "Desacople as unidades",
+          "corpo": "Solte os parafusos da peça de junção entre a unidade de motor e a de travamento. Toque em cada parafuso que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 5: desconectar a unidade de travamento da unidade de motor (peça de junção e trava do cilindro de proteção)."
+        },
+        {
+          "tipo": "troca",
+          "componente": "motor",
+          "acao": "soltar",
+          "grupo": "dormente",
+          "titulo": "Solte do dormente oco",
+          "corpo": "Solte os quatro parafusos que prendem a unidade de motor ao dormente oco. Toque em cada um que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 6: desconectar as unidades do dormente oco; parafuso emperrado, folgar com a parafusadeira elétrica."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Antes de içar",
+          "visto": "O KGT vai retirar a unidade de motor. O que garantir?",
+          "certa": "Gancho olhal com trava, cinta adequada para a unidade e rádio entre o operador do KGT e o coordenador; equipe fora do raio de ação.",
+          "erradas": [
+            "Gancho comum, sem trava: a unidade é leve.",
+            "Combinar os sinais com o operador antes e dispensar o rádio."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passos 7 e 8: gancho olhal com trava, cinta adequada e comunicação por rádio portátil entre o operador do KGT e o coordenador."
+        },
+        {
+          "tipo": "troca",
+          "componente": "motor",
+          "acao": "retirar",
+          "titulo": "Retire a unidade de motor",
+          "corpo": "O KGT desce o gancho sobre a unidade. Passe a cinta tocando na unidade e vá para a zona segura. O KGT só iça com todos fora do raio de ação.",
+          "explica": "PRO-001122 Anexo 5.4, passo 7: retirar a unidade defeituosa com o KGT ou caminhão com equipamento de guindar."
+        },
+        {
+          "tipo": "troca",
+          "componente": "motor",
+          "acao": "posicionar",
+          "titulo": "Instale a unidade de motor nova",
+          "corpo": "O KGT desce o gancho sobre a unidade nova no palete. Passe a cinta tocando nela e vá para a zona segura. O KGT a assenta no dormente oco.",
+          "explica": "PRO-001122 Anexo 5.4, passo 8: instalar a nova unidade com o KGT ou caminhão munck."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Alinhamento",
+          "visto": "A unidade nova ficou fora do eixo do dormente oco. Como alinhar?",
+          "certa": "Com o gabarito de 8 mm; e, se estiver desalinhada com os furos de fixação, com a alavanca.",
+          "erradas": [
+            "Apertar os parafusos: o aperto puxa a unidade para o eixo.",
+            "Bater na unidade com a marreta até encaixar."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passo 9: unidade desalinhada com os furos, alinhar com a alavanca; desalinhada com o eixo do dormente oco, gabarito de 8 mm."
+        },
+        {
+          "tipo": "troca",
+          "componente": "motor",
+          "acao": "fixar",
+          "grupo": "dormente",
+          "titulo": "Fixe no dormente oco",
+          "corpo": "Coloque e aperte os quatro parafusos de fixação. Toque em cada peça transparente que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 9: conectar a unidade ao dormente oco e checar o aperto dos parafusos de fixação."
+        },
+        {
+          "tipo": "troca",
+          "componente": "motor",
+          "acao": "fixar",
+          "grupo": "juncao",
+          "titulo": "Acople as unidades",
+          "corpo": "Recoloque os parafusos da peça de junção. Toque em cada peça transparente que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 10: acoplar a peça de junção, reposicionar a trava do cilindro e confirmar o aperto dos parafusos."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Peça de junção",
+          "visto": "Peça de junção acoplada e trava do cilindro no encaixe. O que confirma o acoplamento?",
+          "certa": "Um teste de movimentação da MCH em modo manual.",
+          "erradas": [
+            "Um comando elétrico pelo CCP, já com a máquina em automático.",
+            "Olhar a peça de junção: se está parafusada, está acoplada."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passo 10, ação corretiva: acoplar a peça de junção e realizar testes de movimentação da MCH em modo manual."
+        },
+        {
+          "tipo": "troca",
+          "componente": "motor",
+          "acao": "fixar",
+          "grupo": "conector",
+          "titulo": "Reposicione os conectores militares",
+          "corpo": "Rosqueie o conector na unidade nova. Toque no conector transparente que pisca.",
+          "explica": "PRO-001122 Anexo 5.4, passo 12: reposicionar os conectores militares."
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "dam",
+          "titulo": "Instale o DAM",
+          "corpo": "Faça as etapas 1 e 2 da IT-DAM: conecte o DAM à MCH. Toque no DAM.",
+          "efeitos": [
+            "dam:instalar"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Força de movimentação",
+          "visto": "Célula de carga entre a agulha e o trilho, comando pelo DAM: {forca.txt} kgf.",
+          "certa": "{forca.ok?Dentro da faixa de 550 a 720 kgf: seguir.|Fora da faixa de 550 a 720 kgf: ajustar a porca da embreagem e medir de novo.}",
+          "erradas": [
+            "{forca.ok?Fora da faixa: ajustar a porca da embreagem.|Dentro da faixa: seguir.}",
+            "Seguir sem medir: unidade nova vem ajustada de fábrica."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passo 14: ajustes de pressão e força com a célula de carga; a força da CTS-2 fica entre 550 e 720 kgf (PRO-001122 Anexo 5). Comandos pelo DAM com a técnica Yoshi Yoshi.",
+          "efeitos": [
+            "ferramenta:celula_carga:agulhas:{forca.txt} kgf"
+          ],
+          "conferencia": true
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "cepo",
+          "titulo": "Retire o cepo",
+          "corpo": "Força ajustada. Retire o cepo pela alça. Toque no cepo.",
+          "efeitos": [
+            "cepo:off",
+            "som:encaixe",
+            "ferramentas:guardar"
+          ]
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "comutador",
+          "titulo": "Desbloqueie a máquina",
+          "corpo": "Retire a garra de bloqueio e gire a chave de comutação de volta para o modo motor (AUTOMÁTICO). Toque no comutador.",
+          "efeitos": [
+            "comutador:auto"
+          ]
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "dam",
+          "titulo": "Retire o DAM",
+          "corpo": "Faça a etapa 4 da IT-DAM: desconecte o DAM da MCH. Toque no DAM.",
+          "efeitos": [
+            "dam:retirar"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Teste de concordância",
+          "visto": "DAM retirado e equipe fora da área de movimentação das agulhas. Como testar?",
+          "certa": "Pedir ao CCP o comando para NORMAL, confirmar a posição física em campo e a concordância no intertravamento; repetir para REVERSO. No rádio, repetir e confirmar cada mensagem.",
+          "erradas": [
+            "Testar só a posição NORMAL, que é a de circulação.",
+            "Pedir os dois comandos seguidos e conferir só no fim."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passo 16.2 e 16.3: comando para normal e reverso, confirmando a posição física da PA e a concordância com o intertravamento; comandos remotos pelo protocolo do ROF, com repetição e confirmação.",
+          "efeitos": [
+            "amv:reverso",
+            "amv:normal"
+          ],
+          "radio": [
+            {
+              "quem": "Coordenador",
+              "texto": "CCP, {prefixo}. Equipe fora da área de movimentação. Solicito comando do AMV 03 para reverso."
+            },
+            {
+              "quem": "CCP",
+              "texto": "{prefixo}, comando do AMV 03 para reverso. Confirme a posição."
+            }
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Encerramento",
+          "visto": "Unidade de motor nova testada. O que fazer antes de devolver a LDL?",
+          "certa": "Aplicar 5S, recolhendo ferramentas e resíduos, e devolver a máquina para o controle central girando a chave de comando local para a posição 0.",
+          "erradas": [
+            "Devolver a LDL e deixar a chave em comando local para o próximo teste.",
+            "Deixar a unidade velha ao lado da via para o recolhimento."
+          ],
+          "explica": "PRO-001122 Anexo 5.4, passos 16.4 e 16.5: aplicar 5S no local e devolver a máquina para o controle central.",
+          "efeitos": [
+            "kgt:voltar",
+            "ldl:devolver:Troca da unidade de motor da máquina de chave do AMV 03 concluída. Máquina em controle central."
+          ]
+        }
+      ]
+    }
+  ],
+  "desafios": [
+    {
+      "id": "cliper_sem_contrapino",
+      "nome": "Cliper sem o contrapino inferior",
+      "curto": "Cliper sem\ncontrapino",
+      "critico": true,
+      "relato": [
+        {
+          "quem": "Coordenador",
+          "instrucao": true,
+          "texto": "Executante, antes do teste, confira a montagem da unidade de travamento nova."
+        }
+      ],
+      "pistas": {
+        "clips": "No cliper do lado da máquina, o pino inferior está no lugar, mas sem o contrapino.",
+        "trava": "Unidade de travamento fixada no dormente oco.",
+        "barra": "Barra auxiliar montada com isolantes e arruelas."
+      },
+      "verificacoes": [
+        {
+          "id": "pino",
+          "botao": "Puxar o\npino",
+          "texto": "O pino inferior sai com a mão: nada o prende."
+        }
+      ],
+      "correcao": "PRO-001122 Anexo 5.4, passo 11: instalar pino e contrapino na parte inferior dos clipers."
+    },
+    {
+      "id": "juncao_desacoplada",
+      "nome": "Peça de junção desacoplada",
+      "curto": "Junção\ndesacoplada",
+      "critico": true,
+      "relato": [
+        {
+          "quem": "Executante",
+          "instrucao": true,
+          "texto": "Coordenador, comandei em manual e o motor gira, mas as agulhas não se movem."
+        }
+      ],
+      "pistas": {
+        "trava": "Entre a unidade de motor e a de travamento, a peça de junção está solta, sem os parafusos.",
+        "motor": "Unidade de motor nova, fixada no dormente oco.",
+        "agulhas": "Agulhas paradas em NORMAL."
+      },
+      "verificacoes": [],
+      "correcao": "PRO-001122 Anexo 5.4, passo 10: acoplar a peça de junção, reposicionar a trava do cilindro, confirmar o aperto dos parafusos e testar a movimentação em modo manual."
+    },
+    {
+      "id": "comutador_manual",
+      "nome": "Comutador esquecido em MANUAL",
+      "curto": "Comutador\nem manual",
+      "relato": [
+        {
+          "quem": "CCP",
+          "texto": "Equipe do AMV 03, aqui é o CCP. Comandei o AMV 03 para reverso e ele não se moveu."
+        }
+      ],
+      "pistas": {
+        "comutador": "A chave de comutação continua em MANUAL e a garra de bloqueio ainda está no lugar.",
+        "agulhas": "Agulhas em NORMAL, sem cepo.",
+        "dam": "DAM já retirado."
+      },
+      "verificacoes": [],
+      "correcao": "PRO-001122 Anexo 5.4, passo 15: desbloquear a máquina de chave (retirar a garra e voltar o comutador para o modo motor) antes do teste de concordância do passo 16."
+    }
+  ]
+}

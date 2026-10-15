@@ -4,65 +4,514 @@
   "pro": "PRO-020971 rev. 10 · EFC",
   "etiqueta": "Troca de componente",
   "titulo": "Substituição de componentes de AMV",
-  "resumo": "Troca da meia chave nº 20 VAE em decisões: temperatura, corte, rigging, zona crítica, junta e primeiro trem. Bondeamento de reforço no jacaré e na agulha (Anexo 12).",
+  "resumo": "Troca da agulha do lado da máquina em 3D (Anexo 10): soltar barras, coice e bondeamento, o KGT iça a velha e assenta a nova, ajustar e fixar. Meia chave nº 20 VAE em decisões e bondeamento de reforço (Anexo 12).",
   "grupo": "AMV",
   "prefixo": "VP",
   "papeis": {
-    "coordenador": "Abre e devolve a LDL, aprova o plano de rigging, isola a zona crítica, controla o EVP e informa o primeiro trem; confere o serviço do executante.",
-    "executante": "Mede a temperatura, aplica o cepo, marca e corta o trilho, monta a junta, esmerilha e faz o bondeamento."
+    "coordenador": "Abre e devolve a LDL, aprova o plano de rigging, define a zona segura, conduz o operador do KGT, isola a zona crítica e informa o primeiro trem; confere o serviço do executante.",
+    "executante": "Mede a temperatura, aplica o cepo, solta e aplica as fixações da agulha, passa a cinta no gancho do KGT, ajusta o coice, monta a junta e esmerilha."
   },
   "falaInicio": "Equipe, troca da meia chave do AMV 03. Plano de rigging na mão e zona crítica isolada.",
   "falaFim": "Troca concluída dentro do padrão.",
   "sorteio": {
-    "temp": { "tipo": "faixa", "ok": [34, 44], "fora": [[28, 33], [45, 50]] },
-    "esc": { "tipo": "faixa", "ok": [0.8, 1.4], "fora": [[2.0, 2.5]], "casas": 1 }
+    "temp": {
+      "tipo": "faixa",
+      "ok": [
+        34,
+        44
+      ],
+      "fora": [
+        [
+          28,
+          33
+        ],
+        [
+          45,
+          50
+        ]
+      ]
+    },
+    "esc": {
+      "tipo": "faixa",
+      "ok": [
+        0.8,
+        1.4
+      ],
+      "fora": [
+        [
+          2.0,
+          2.5
+        ]
+      ],
+      "casas": 1
+    },
+    "coice": {
+      "tipo": "faixa",
+      "ok": [
+        1,
+        4
+      ],
+      "fora": [
+        [
+          5,
+          7
+        ]
+      ]
+    }
   },
   "roteiros": [
     {
-      "id": "meiachave", "botao": "Começar", "modulo": "Substituição de componentes (PRO-020971)",
-      "descricao": "Troca da meia chave nº 20 VAE em decisões: temperatura neutra, marcação e corte, rigging, zona crítica, junta metálica, bondeamento e primeiro trem.\nAinda sem os modelos 3D da meia chave e do jacaré.",
+      "id": "agulha",
+      "botao": "Trocar a\nagulha",
+      "modulo": "Troca da agulha em 3D (PRO-020971 Anexo 10)",
+      "descricao": "Troca de verdade na cena: soltar barras, coice e bondeamento, o KGT iça a agulha velha e assenta a nova, ajustar e fixar.",
       "etapas": [
-        { "tipo": "decisao", "papel": "coordenador", "titulo": "Acesso à via", "visto": "Programada a troca da meia chave do AMV nº 20 VAE. O primeiro passo no campo?",
-          "certa": "Abrir a LDL com o CCO/CCP e bloquear a linha com jumper antes de ocupar o gabarito.", "erradas": ["Descarregar a meia chave na via e depois pedir a LDL.", "Começar a soltar a fixação enquanto o CCP responde."],
-          "explica": "PRO-020971, Anexo 6 passo 1 e atividades preliminares: só acessar a via com LDL concedida e bloqueio físico do circuito.",
-          "critico": { "1": "Ocupou o gabarito antes da LDL.", "2": "Ocupou o gabarito antes da LDL." }, "efeitos": ["ldl:abrir:substituição da meia chave"] },
-        { "tipo": "decisao", "papel": "executante", "titulo": "Temperatura do trilho", "visto": "Termômetro na alma do trilho, do lado contrário ao sol, depois de 5 a 10 minutos: {temp.txt} °C.",
-          "certa": "{temp.ok?Dentro da Faixa de Temperatura Neutra (34 a 44 °C): seguir.|Fora da Faixa de Temperatura Neutra (34 a 44 °C): não seguir com a troca.}",
-          "erradas": ["{temp.ok?Fora da faixa: não seguir.|Seguir: a temperatura não importa para a meia chave.}"],
-          "explica": "PRO-020971 8, passo 1: a troca do JPM e dos trilhos complementares é feita com a temperatura monitorada na FTN, 34 a 44 °C." },
-        { "tipo": "tocar", "papel": "executante", "alvo": "agulhas", "titulo": "Bloqueie as partes móveis", "corpo": "Com a via liberada pelo centro de controle, aplique o cepo nas agulhas. Toque nas agulhas.", "efeitos": ["cepo:on", "som:encaixe"] },
-        { "tipo": "decisao", "papel": "executante", "titulo": "Marcação do corte", "visto": "Como marcar o corte para a meia chave nova?",
-          "certa": "Medir a peça com trena milimetrada e marcar no boleto ou patim com tolerância de ± 3 mm, indicando o corte com duas setas.",
-          "erradas": ["Marcar a olho pela peça velha.", "Tolerância de ± 10 mm: a junta compensa."],
-          "explica": "PRO-020971 8, marcação do corte: comprimento da meia chave com ± 3 mm (abertura da junta) e duas setas na posição do corte." },
-        { "tipo": "decisao", "papel": "executante", "titulo": "Qualidade do corte", "visto": "Corte feito com policorte. A esconsidade entre boleto e patim ficou em {esc.txt} mm.",
-          "certa": "{esc.ok?Aceitável: até 1,5 mm.|Fora do padrão (máx. 1,5 mm): refazer o corte.}", "erradas": ["{esc.ok?Refazer: precisa ser zero.|Aceitar: o oxicorte acerta depois.}"],
-          "explica": "PRO-020971 8, corte: perpendicular ao eixo vertical, esconsidade admissível até 1,5 mm. Corte com oxicorte não serve para assentamento definitivo." },
-        { "tipo": "decisao", "papel": "coordenador", "titulo": "Retirar a meia chave", "visto": "A meia chave nº 20 VAE vai ser içada para fora da via.",
-          "certa": "Seguir o plano de rigging específico e manter as pessoas na zona segura.", "erradas": ["Içar com o guindauto sem plano: a peça é conhecida.", "Arrastar com a alavanca, com a equipe em volta guiando."],
-          "explica": "PRO-020971 7 e 8: plano de rigging obrigatório para meia chave nº 20 VAE e JPM; pessoas fora da zona crítica.",
-          "critico": { "1": "Içamento sem plano de rigging.", "2": "Equipe na zona de risco durante a movimentação da peça." } },
-        { "tipo": "decisao", "papel": "coordenador", "titulo": "Zona crítica", "visto": "Durante a movimentação dos trilhos, qual a distância mínima da zona crítica até a área de circulação segura?",
-          "certa": "20 m.", "erradas": ["5 m.", "2 m, a largura da entrevia."], "explica": "PRO-020971 7.2: zona crítica delimitada a no mínimo 20 m das áreas de circulação segura." },
-        { "tipo": "decisao", "papel": "coordenador", "titulo": "EVP no perímetro", "visto": "Qual a velocidade máxima do EVP dentro do perímetro da atividade?",
-          "certa": "3 km/h.", "erradas": ["10 km/h.", "5 km/h."], "explica": "PRO-020971 7.14: no máximo 3 km/h no deslocamento do EVP dentro do perímetro." },
-        { "tipo": "decisao", "papel": "executante", "titulo": "Junta metálica", "visto": "Vai ficar uma junta metálica até a solda. Como ela deve estar?",
-          "certa": "4 parafusos (2 de cada lado) e no mínimo 3 dormentes bons de cada lado, com grampos fixados.", "erradas": ["2 parafusos bastam até a solda.", "4 parafusos; dormentes não importam."],
-          "explica": "PRO-020971 7.5 e 7.11: junta metálica com 4 parafusos e 3 dormentes com resistência mecânica de cada lado. Furos biselados, a 100 mm do início da solda." },
-        { "tipo": "decisao", "papel": "executante", "titulo": "Diferença de perfil", "visto": "Na junta, a diferença de altura entre os boletos é de 2 mm.",
-          "certa": "Esmerilhar 2 m para cada lado, a partir do início da junta (1 m por mm).", "erradas": ["Esmerilhar 20 cm.", "Deixar: o trem assenta o degrau."],
-          "explica": "PRO-020971 7.4 (ABNT NBR 16387): para cada 1 mm de diferença de perfil, esmerilhar 1 m." },
-        { "tipo": "decisao", "papel": "executante", "titulo": "Bondeamento provisório", "visto": "O cabo de bondeamento definitivo não chegou.",
-          "certa": "Não usar arame: aguardar o material correto.", "erradas": ["Amarrar com arame até o cabo chegar.", "Deixar sem bondeamento."],
-          "explica": "PRO-020971 7.7: proibido arame para bondeamento, mesmo provisório." },
-        { "tipo": "tocar", "papel": "executante", "alvo": "cepo", "titulo": "Libere as agulhas", "corpo": "Componente assentado e fixado. Retire o cepo pela alça. Toque no cepo.", "efeitos": ["cepo:off", "som:encaixe"] },
-        { "tipo": "decisao", "papel": "coordenador", "titulo": "Encerramento", "visto": "Componente assentado e fixado. O que fazer antes de devolver a LDL?",
-          "certa": "Registrar a data de instalação, recolher sucata em bags fora do gabarito e deixar o caminho seguro livre.", "erradas": ["Deixar a sucata na entrevia para o próximo recolhimento.", "Só recolher as ferramentas."],
-          "explica": "PRO-020971 7.16, 7.17 e 11: data de instalação registrada; sucata em bags fora do gabarito, sem obstruir drenagem nem o caminho seguro." },
-        { "tipo": "decisao", "papel": "coordenador", "titulo": "Primeiro trem", "visto": "Ao devolver a LDL depois da troca da meia chave, o que informar?",
-          "certa": "Restrição de 30 km/h para o primeiro trem de carga ou locomotiva, que não pode ser de passageiros nem de produtos perigosos.", "erradas": ["Circulação normal.", "Restrição de 30 km/h por 24 horas para todos os trens."],
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Acesso à via",
+          "visto": "Programada a troca da agulha do lado da máquina no AMV 03. O primeiro passo no campo?",
+          "certa": "Abrir a LDL com o CCO/CCP e bloquear a linha com jumper antes de ocupar o gabarito.",
+          "erradas": [
+            "Descarregar a agulha nova na via e depois pedir a LDL.",
+            "Começar a soltar as fixações enquanto o CCP responde."
+          ],
+          "explica": "PRO-020971 Anexo 10, passo 1: manter contato com o CCO/CCP para abrir a LDL e bloquear a linha com jumper, roda trilho ou controle local; só acessar a via com a LDL concedida.",
+          "critico": {
+            "1": "Ocupou o gabarito antes da LDL.",
+            "2": "Ocupou o gabarito antes da LDL."
+          },
+          "efeitos": [
+            "ldl:abrir:substituição da agulha do AMV 03"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Descarga com o KGT",
+          "visto": "O KGT vai descarregar a agulha nova ao lado da via. O que garantir antes?",
+          "certa": "Zona segura definida e sinalizada, checklist da cinta e dos acessórios, quebra-quina na cinta e rádio entre operador, sinaleiro e coordenador.",
+          "erradas": [
+            "Só pedir ao operador que vá devagar.",
+            "Deixar a equipe perto da carga para ajudar a guiar com as mãos."
+          ],
+          "explica": "PRO-020971 Anexo 10, passo 2, controles: definir e sinalizar a zona segura, checklist dos implementos e acessórios de içamento, quebra-quina nas cintas, rádio entre operador, sinaleiro e coordenador e parar a atividade com alguém no raio de ação.",
+          "critico": {
+            "2": "Equipe no raio de ação durante o içamento."
+          }
+        },
+        {
+          "tipo": "troca",
+          "componente": "agulha",
+          "acao": "descarregar",
+          "papel": "coordenador",
+          "titulo": "Descarga da agulha nova",
+          "corpo": "O KGT traz a agulha nova na cinta e a deposita ao lado da via. Durante a movimentação, toda a equipe fica na zona segura (cones e faixa verde).",
+          "explica": "PRO-020971 Anexo 10, passo 2: descarga do componente com equipamento ferroviário (KGT), para o ativo ficar disponível no local da troca."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Temperatura do trilho",
+          "visto": "Termômetro de base magnética na alma do trilho, fora do sol direto: {temp.txt} °C.",
+          "certa": "{temp.ok?Dentro da Faixa de Temperatura Neutra (34 a 44 °C): seguir.|Fora da Faixa de Temperatura Neutra (34 a 44 °C): não instalar agora.}",
+          "erradas": [
+            "{temp.ok?Fora da faixa: não seguir.|Seguir: a temperatura não importa para a agulha.}"
+          ],
+          "explica": "PRO-020971 Anexo 10, passo 3: limpar a alma do trilho e fixar o termômetro fora da incidência direta do sol, para instalar o componente na faixa de temperatura neutra (34 a 44 °C)."
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "agulhas",
+          "titulo": "Bloqueie a meia chave",
+          "corpo": "Em NORMAL, a agulha do lado da máquina está aberta. Coloque o cepo entre ela e o trilho de encosto, bem ajustado, sem folga. Toque nas agulhas.",
+          "efeitos": [
+            "cepo:on",
+            "som:encaixe"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Marcação",
+          "visto": "Onde marcar o local do corte com trena metálica e marcador?",
+          "certa": "No centro do vão entre dormentes, para a soldagem aluminotérmica.",
+          "erradas": [
+            "Em cima de um dormente, para a solda ficar apoiada.",
+            "Em qualquer ponto, desde que fique a 1 m da ponta da agulha."
+          ],
+          "explica": "PRO-020971 Anexo 10, passo 4: a marcação do corte deve coincidir com o centro do vão (entre dormentes) para a soldagem aluminotérmica."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Limpeza da região da agulha",
+          "visto": "Vão tirar a brita de cima das fixações com o forcado. Como posicionar as pessoas?",
+          "certa": "Em forma alternada, para a brita projetada não atingir quem está perto.",
+          "erradas": [
+            "Lado a lado, para terminar mais rápido.",
+            "Uma de frente para a outra, no mesmo vão."
+          ],
+          "explica": "PRO-020971 Anexo 10, passo 5: limpar com o forcado, com as pessoas dispostas de forma alternada para evitar projeção de brita em quem está próximo."
+        },
+        {
+          "tipo": "troca",
+          "componente": "agulha",
+          "acao": "soltar",
+          "grupo": "barras",
+          "titulo": "Desconecte a agulha das barras",
+          "corpo": "Com o alicate, tire o contrapino; depois o pino de travamento e o cliper que liga a barra à agulha. Toque em cada fixação que pisca, na ordem.",
+          "explica": "PRO-020971 Anexo 10, passo 6: retirar os contrapinos com alicate universal, retirar as porcas e desconectar as barras de atuação e detecção da agulha a ser substituída."
+        },
+        {
+          "tipo": "troca",
+          "componente": "agulha",
+          "acao": "soltar",
+          "grupo": "coice",
+          "titulo": "Retire as talas de junção do coice",
+          "corpo": "Folgue os quatro parafusos e tire porcas e arruelas. Só depois tire as talas (com o pega-talas, se houver). Toque nos parafusos e depois nas talas.",
+          "explica": "PRO-020971 Anexo 10, passo 7: folgar todos os parafusos, remover porcas e arruelas, bater nas talas com marrão de 5 kg se preciso e retirar as talas manualmente ou com o pega-talas."
+        },
+        {
+          "tipo": "troca",
+          "componente": "agulha",
+          "acao": "soltar",
+          "grupo": "bondeamento",
+          "titulo": "Remova o cabo de bondeamento de reforço",
+          "corpo": "Corte o cabo na fixação do lado da agulha que vai sair. Toque no cabo de cobre do coice.",
+          "explica": "PRO-020971 Anexo 10, passo 8: cortar o cabo na posição da fixação do lado do componente que vai sair; se for reaproveitado, manter um lado fixado."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Antes de içar",
+          "visto": "A agulha velha vai ser içada pelo KGT. Quem fica perto da carga?",
+          "certa": "Só o coordenador, conduzindo o operador; o resto da equipe na zona segura. E a agulha tem de estar totalmente solta.",
+          "erradas": [
+            "Dois executantes segurando as pontas da agulha para ela não girar.",
+            "Toda a equipe ao lado da via, para ganhar tempo."
+          ],
+          "explica": "PRO-020971 Anexo 10, passos 9 e 10: manter toda a equipe na zona de segurança; só o coordenador e o operador conduzem a movimentação; antes de mover, verificar que a agulha está isenta de todas as fixações.",
+          "critico": {
+            "1": "Pessoas no raio de ação durante o içamento.",
+            "2": "Pessoas no raio de ação durante o içamento."
+          }
+        },
+        {
+          "tipo": "troca",
+          "componente": "agulha",
+          "acao": "retirar",
+          "titulo": "Retire a agulha velha com o KGT",
+          "corpo": "O KGT desce o gancho sobre a agulha. Passe a cinta (pinça) tocando na agulha e vá para a zona segura. O KGT só iça com todos fora do raio de ação.",
+          "explica": "PRO-020971 Anexo 10, passo 10: pega com a pinça ou ferramenta de içamento homologada e retirada da agulha para fora da via, em local seguro, sem atingir a máquina de chave, os tirantes e as barras."
+        },
+        {
+          "tipo": "troca",
+          "componente": "agulha",
+          "acao": "posicionar",
+          "titulo": "Assente a agulha nova",
+          "corpo": "O KGT desce o gancho sobre a agulha nova. Passe a cinta tocando na agulha nova e vá para a zona segura. O KGT a assenta nas placas de apoio.",
+          "explica": "PRO-020971 Anexo 10, passo 11: cinta no ponto indicado, içamento e movimento horizontal com cuidado, deposição bem encaixada nas placas de apoio e depois o KGT se afasta para tirar a cinta."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Ajuste do coice",
+          "visto": "Agulha encaixada. Com a trena, a abertura do coice deu {coice.txt} mm.",
+          "certa": "{coice.ok?Dentro do limite (máximo 4 mm): seguir para a fixação.|Acima de 4 mm: ajustar com alavanca lisa ou macaco hidráulico antes de fixar.}",
+          "erradas": [
+            "{coice.ok?Ajustar até ficar com 10 mm de folga.|Fixar assim: o aperto dos parafusos fecha a abertura.}"
+          ],
+          "explica": "PRO-020971 Anexo 10, passo 12: a ponta da agulha implantada fica paralela à existente; o coice ajustado para uma abertura máxima de 4 mm, com os parafusos passando livres nos furos.",
+          "efeitos": [
+            "ferramenta:trena:agulhas:{coice.txt} mm"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Barras",
+          "visto": "Onde devem ficar as barras de detecção e de operação?",
+          "certa": "Centralizadas, no meio do dormente oco de aço.",
+          "erradas": [
+            "Encostadas na parede do dormente oco do lado da máquina.",
+            "Em qualquer posição: a máquina corrige no primeiro comando."
+          ],
+          "explica": "PRO-020971 Anexo 10, passo 12: ajustar as barras de detecção e operação centralizadas, no meio do dormente oco.",
+          "efeitos": [
+            "ferramentas:guardar"
+          ]
+        },
+        {
+          "tipo": "troca",
+          "componente": "agulha",
+          "acao": "fixar",
+          "grupo": "barras",
+          "titulo": "Conecte a agulha às barras",
+          "corpo": "Recoloque o cliper, depois o pino de travamento e por último o contrapino. Toque em cada peça transparente que pisca.",
+          "explica": "PRO-020971 Anexo 10, passo 13: conectar as barras de atuação e detecção das agulhas (chave soquete nº 30) e o tirante (duas chaves nº 41)."
+        },
+        {
+          "tipo": "troca",
+          "componente": "agulha",
+          "acao": "fixar",
+          "grupo": "coice",
+          "titulo": "Monte o coice",
+          "corpo": "Coloque as talas de junção e depois os quatro parafusos, apertando com a chave de junta. Toque nas talas e depois nos parafusos.",
+          "explica": "PRO-020971 Anexo 10, passo 13: montar o coice com alavanca lisa, marrão e macaco hidráulico para inserir o calço, e apertar os parafusos com chave de junta ou MPP."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Bondeamento de reforço",
+          "visto": "O cabo de bondeamento do coice foi cortado na retirada. E agora?",
+          "certa": "Acionar a equipe de EE para instalar o bondeamento de reforço no final do coice, com cordoalha, sem arame.",
+          "erradas": [
+            "Amarrar com arame até a EE vir.",
+            "Liberar sem bondeamento: ele é só reforço."
+          ],
+          "explica": "PRO-020971 Anexo 12: o bondeamento de reforço da meia-chave na via sinalizada é instalado pela EE, no final do coice da agulha, com cordoalha (pino de 8 mm), solda exotérmica ou pinbrazing; arame é proibido."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Lubrificação",
+          "visto": "A agulha nova não tem roletes. O que fazer antes de liberar?",
+          "certa": "Repor a lubrificação das placas de deslizamento da agulha.",
+          "erradas": [
+            "Nada: agulha nova já vem lubrificada.",
+            "Lubrificar só se a máquina travar no teste."
+          ],
+          "explica": "PRO-020971 Anexo 10, passo 10, nota b: é obrigatório repor a lubrificação nas agulhas não providas de roletes."
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "cepo",
+          "titulo": "Libere as agulhas",
+          "corpo": "Agulha fixada. Retire o cepo pela alça. Toque no cepo.",
+          "efeitos": [
+            "cepo:off",
+            "som:encaixe"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Encerramento",
+          "visto": "Agulha assentada e fixada. O que fazer antes de devolver a LDL?",
+          "certa": "Registrar a data de instalação, recolher a sucata em bags fora do gabarito e deixar o caminho seguro livre.",
+          "erradas": [
+            "Deixar a agulha velha na entrevia para o próximo recolhimento.",
+            "Só recolher as ferramentas."
+          ],
+          "explica": "PRO-020971 7.16, 7.17 e 11: data de instalação registrada; sucata em bags fora do gabarito, sem obstruir drenagem nem o caminho seguro.",
+          "efeitos": [
+            "kgt:voltar"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Primeiro trem",
+          "visto": "Ao devolver a LDL depois da troca da agulha, o que informar?",
+          "certa": "Restrição de 30 km/h para o primeiro trem de carga ou locomotiva, que não pode ser de passageiros nem de produtos perigosos.",
+          "erradas": [
+            "Circulação normal.",
+            "Restrição de 30 km/h por 24 horas para todos os trens."
+          ],
           "explica": "ROF 14.28: após substituição de componentes de AMV, 30 km/h para o primeiro trem.",
-          "efeitos": ["ldl:devolver:Troca da meia chave do AMV 03 concluída. Restrição de 30 quilômetros por hora para o primeiro trem."] }
+          "efeitos": [
+            "ldl:devolver:Troca da agulha do AMV 03 concluída. Restrição de 30 quilômetros por hora para o primeiro trem."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "meiachave",
+      "botao": "Meia chave\nnº 20",
+      "modulo": "Substituição de componentes (PRO-020971)",
+      "descricao": "Troca da meia chave nº 20 VAE em decisões: temperatura neutra, marcação e corte, rigging, zona crítica, junta metálica, bondeamento e primeiro trem.\nEm decisões: a meia chave nº 20 e o jacaré ainda não têm modelo 3D.",
+      "etapas": [
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Acesso à via",
+          "visto": "Programada a troca da meia chave do AMV nº 20 VAE. O primeiro passo no campo?",
+          "certa": "Abrir a LDL com o CCO/CCP e bloquear a linha com jumper antes de ocupar o gabarito.",
+          "erradas": [
+            "Descarregar a meia chave na via e depois pedir a LDL.",
+            "Começar a soltar a fixação enquanto o CCP responde."
+          ],
+          "explica": "PRO-020971, Anexo 6 passo 1 e atividades preliminares: só acessar a via com LDL concedida e bloqueio físico do circuito.",
+          "critico": {
+            "1": "Ocupou o gabarito antes da LDL.",
+            "2": "Ocupou o gabarito antes da LDL."
+          },
+          "efeitos": [
+            "ldl:abrir:substituição da meia chave"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Temperatura do trilho",
+          "visto": "Termômetro na alma do trilho, do lado contrário ao sol, depois de 5 a 10 minutos: {temp.txt} °C.",
+          "certa": "{temp.ok?Dentro da Faixa de Temperatura Neutra (34 a 44 °C): seguir.|Fora da Faixa de Temperatura Neutra (34 a 44 °C): não seguir com a troca.}",
+          "erradas": [
+            "{temp.ok?Fora da faixa: não seguir.|Seguir: a temperatura não importa para a meia chave.}"
+          ],
+          "explica": "PRO-020971 8, passo 1: a troca do JPM e dos trilhos complementares é feita com a temperatura monitorada na FTN, 34 a 44 °C."
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "agulhas",
+          "titulo": "Bloqueie as partes móveis",
+          "corpo": "Com a via liberada pelo centro de controle, aplique o cepo nas agulhas. Toque nas agulhas.",
+          "efeitos": [
+            "cepo:on",
+            "som:encaixe"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Marcação do corte",
+          "visto": "Como marcar o corte para a meia chave nova?",
+          "certa": "Medir a peça com trena milimetrada e marcar no boleto ou patim com tolerância de ± 3 mm, indicando o corte com duas setas.",
+          "erradas": [
+            "Marcar a olho pela peça velha.",
+            "Tolerância de ± 10 mm: a junta compensa."
+          ],
+          "explica": "PRO-020971 8, marcação do corte: comprimento da meia chave com ± 3 mm (abertura da junta) e duas setas na posição do corte."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Qualidade do corte",
+          "visto": "Corte feito com policorte. A esconsidade entre boleto e patim ficou em {esc.txt} mm.",
+          "certa": "{esc.ok?Aceitável: até 1,5 mm.|Fora do padrão (máx. 1,5 mm): refazer o corte.}",
+          "erradas": [
+            "{esc.ok?Refazer: precisa ser zero.|Aceitar: o oxicorte acerta depois.}"
+          ],
+          "explica": "PRO-020971 8, corte: perpendicular ao eixo vertical, esconsidade admissível até 1,5 mm. Corte com oxicorte não serve para assentamento definitivo."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Retirar a meia chave",
+          "visto": "A meia chave nº 20 VAE vai ser içada para fora da via.",
+          "certa": "Seguir o plano de rigging específico e manter as pessoas na zona segura.",
+          "erradas": [
+            "Içar com o guindauto sem plano: a peça é conhecida.",
+            "Arrastar com a alavanca, com a equipe em volta guiando."
+          ],
+          "explica": "PRO-020971 7 e 8: plano de rigging obrigatório para meia chave nº 20 VAE e JPM; pessoas fora da zona crítica.",
+          "critico": {
+            "1": "Içamento sem plano de rigging.",
+            "2": "Equipe na zona de risco durante a movimentação da peça."
+          }
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Zona crítica",
+          "visto": "Durante a movimentação dos trilhos, qual a distância mínima da zona crítica até a área de circulação segura?",
+          "certa": "20 m.",
+          "erradas": [
+            "5 m.",
+            "2 m, a largura da entrevia."
+          ],
+          "explica": "PRO-020971 7.2: zona crítica delimitada a no mínimo 20 m das áreas de circulação segura."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "EVP no perímetro",
+          "visto": "Qual a velocidade máxima do EVP dentro do perímetro da atividade?",
+          "certa": "3 km/h.",
+          "erradas": [
+            "10 km/h.",
+            "5 km/h."
+          ],
+          "explica": "PRO-020971 7.14: no máximo 3 km/h no deslocamento do EVP dentro do perímetro."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Junta metálica",
+          "visto": "Vai ficar uma junta metálica até a solda. Como ela deve estar?",
+          "certa": "4 parafusos (2 de cada lado) e no mínimo 3 dormentes bons de cada lado, com grampos fixados.",
+          "erradas": [
+            "2 parafusos bastam até a solda.",
+            "4 parafusos; dormentes não importam."
+          ],
+          "explica": "PRO-020971 7.5 e 7.11: junta metálica com 4 parafusos e 3 dormentes com resistência mecânica de cada lado. Furos biselados, a 100 mm do início da solda."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Diferença de perfil",
+          "visto": "Na junta, a diferença de altura entre os boletos é de 2 mm.",
+          "certa": "Esmerilhar 2 m para cada lado, a partir do início da junta (1 m por mm).",
+          "erradas": [
+            "Esmerilhar 20 cm.",
+            "Deixar: o trem assenta o degrau."
+          ],
+          "explica": "PRO-020971 7.4 (ABNT NBR 16387): para cada 1 mm de diferença de perfil, esmerilhar 1 m."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Bondeamento provisório",
+          "visto": "O cabo de bondeamento definitivo não chegou.",
+          "certa": "Não usar arame: aguardar o material correto.",
+          "erradas": [
+            "Amarrar com arame até o cabo chegar.",
+            "Deixar sem bondeamento."
+          ],
+          "explica": "PRO-020971 7.7: proibido arame para bondeamento, mesmo provisório."
+        },
+        {
+          "tipo": "tocar",
+          "papel": "executante",
+          "alvo": "cepo",
+          "titulo": "Libere as agulhas",
+          "corpo": "Componente assentado e fixado. Retire o cepo pela alça. Toque no cepo.",
+          "efeitos": [
+            "cepo:off",
+            "som:encaixe"
+          ]
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Encerramento",
+          "visto": "Componente assentado e fixado. O que fazer antes de devolver a LDL?",
+          "certa": "Registrar a data de instalação, recolher sucata em bags fora do gabarito e deixar o caminho seguro livre.",
+          "erradas": [
+            "Deixar a sucata na entrevia para o próximo recolhimento.",
+            "Só recolher as ferramentas."
+          ],
+          "explica": "PRO-020971 7.16, 7.17 e 11: data de instalação registrada; sucata em bags fora do gabarito, sem obstruir drenagem nem o caminho seguro."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Primeiro trem",
+          "visto": "Ao devolver a LDL depois da troca da meia chave, o que informar?",
+          "certa": "Restrição de 30 km/h para o primeiro trem de carga ou locomotiva, que não pode ser de passageiros nem de produtos perigosos.",
+          "erradas": [
+            "Circulação normal.",
+            "Restrição de 30 km/h por 24 horas para todos os trens."
+          ],
+          "explica": "ROF 14.28: após substituição de componentes de AMV, 30 km/h para o primeiro trem.",
+          "efeitos": [
+            "ldl:devolver:Troca da meia chave do AMV 03 concluída. Restrição de 30 quilômetros por hora para o primeiro trem."
+          ]
+        }
       ]
     },
     {
@@ -71,33 +520,197 @@
       "modulo": "Bondeamento de reforço no jacaré e na agulha (PRO-020971 Anexo 12)",
       "descricao": "Bondeamento de reforço em jacaré e meia-chave na via sinalizada: quem instala, tipos permitidos, chanfro do furo, proibição de bypass e onde instalar em cada componente.",
       "etapas": [
-        {"tipo": "decisao", "papel": "coordenador", "titulo": "Quem instala", "visto": "A meia-chave nova do AMV 03 está na via sinalizada e precisa do bondeamento de reforço. Quem faz?", "certa": "A equipe de Eletroeletrônica (EE).", "erradas": ["A própria equipe da via permanente, no fim da troca.", "O operador do KGT."], "explica": "PRO-020971 Anexo 12, condição inicial 2: a instalação do bondeamento de reforço em jacaré e meia-chave na via sinalizada é responsabilidade da equipe de EE."},
-        {"tipo": "decisao", "papel": "coordenador", "titulo": "Onde é obrigatório", "visto": "Em quais componentes o bondeamento de reforço é obrigatório?", "certa": "Jacarés de ponta móvel e de ponta fixa e meia-chave instalados na via sinalizada.", "erradas": ["Só no jacaré de ponta móvel.", "Em qualquer AMV, sinalizado ou não, só quando der falha."], "explica": "PRO-020971 Anexo 12, condição inicial 1: obrigatório em JPM, JPF e meia-chave na via sinalizada, porque sem ele o circuito de via fica sujeito a falhas de sinalização."},
-        {"tipo": "decisao", "papel": "executante", "titulo": "Tipo de bondeamento", "visto": "Faltou cordoalha no caminhão. Um colega sugere amarrar arame entre os trilhos até amanhã. O que fazer?", "certa": "Não: só cordoalha para pino de 8 mm, solda exotérmica CADWELD ou solda pinbrazing; arame e arranjos provisórios são proibidos.", "erradas": ["Pode, se trocar pela cordoalha no dia seguinte.", "Pode, se o arame for de aço galvanizado."], "explica": "PRO-020971 Anexo 12, condições 3 e 4, e PRO-020971 condições gerais 7: proibido bondeamento de arame ou arranjo provisório, mesmo em caráter provisório.", "critico": {"1": "Instalou bondeamento de arame.", "2": "Instalou bondeamento de arame."}},
-        {"tipo": "decisao", "papel": "executante", "titulo": "Furo no trilho", "visto": "Furo feito no trilho para o pino da cordoalha. O que falta antes de instalar?", "certa": "Fazer o chanfro (rebarbação) nos dois lados do furo.", "erradas": ["Nada: é só encaixar o pino.", "Chanfrar só o lado de fora do trilho."], "explica": "PRO-020971 Anexo 12: é obrigatório o chanfro, rebarbação, em ambos os lados do furo no trilho."},
-        {"tipo": "decisao", "papel": "executante", "titulo": "Bypass", "visto": "Para ganhar tempo, a ideia é ligar um cabo de uma ponta à outra do componente, isolando ele todo. Pode?", "certa": "Não: o bondeamento tipo bypass, que isola o componente de extremo a extremo, é proibido.", "erradas": ["Pode: um cabo só é mais fácil de manter.", "Pode, se for com CADWELD."], "explica": "PRO-020971 Anexo 12: não pode ser feito bondeamento tipo bypass."},
-        {"tipo": "decisao", "papel": "executante", "titulo": "Meia-chave", "visto": "Onde instalar o bondeamento de reforço na meia-chave?", "certa": "No final do coice da agulha.", "erradas": ["Na ponta da agulha.", "No meio da agulha, em qualquer ponto."], "explica": "PRO-020971 Anexo 12: na meia-chave, o bondeamento é instalado no final do coice da agulha."},
-        {"tipo": "decisao", "papel": "executante", "titulo": "Jacaré de ponta móvel", "visto": "Onde instalar o bondeamento de reforço no jacaré de ponta móvel (JPM)?", "certa": "Na região de entrada e de saída das patas de lebre.", "erradas": ["Só na ponta móvel.", "No calcanhar, ligando as asas."], "explica": "PRO-020971 Anexo 12: no JPM, o bondeamento fica na entrada e na saída das patas de lebre."},
-        {"tipo": "decisao", "papel": "executante", "titulo": "Jacaré de ponta fixa", "visto": "Onde instalar o bondeamento de reforço no jacaré de ponta fixa (JPF)?", "certa": "Na entrada, envolvendo as juntas metálicas, e na saída, ligando os trilhos de envolvimento (asas) e o trilho do calcanhar.", "erradas": ["Só na saída, nas patas de lebre.", "De ponta a ponta do jacaré, com um cabo só."], "explica": "PRO-020971 Anexo 12: no JPF, na entrada envolvendo as juntas metálicas e na saída ligando asas e calcanhar."}
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Quem instala",
+          "visto": "A meia-chave nova do AMV 03 está na via sinalizada e precisa do bondeamento de reforço. Quem faz?",
+          "certa": "A equipe de Eletroeletrônica (EE).",
+          "erradas": [
+            "A própria equipe da via permanente, no fim da troca.",
+            "O operador do KGT."
+          ],
+          "explica": "PRO-020971 Anexo 12, condição inicial 2: a instalação do bondeamento de reforço em jacaré e meia-chave na via sinalizada é responsabilidade da equipe de EE."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "coordenador",
+          "titulo": "Onde é obrigatório",
+          "visto": "Em quais componentes o bondeamento de reforço é obrigatório?",
+          "certa": "Jacarés de ponta móvel e de ponta fixa e meia-chave instalados na via sinalizada.",
+          "erradas": [
+            "Só no jacaré de ponta móvel.",
+            "Em qualquer AMV, sinalizado ou não, só quando der falha."
+          ],
+          "explica": "PRO-020971 Anexo 12, condição inicial 1: obrigatório em JPM, JPF e meia-chave na via sinalizada, porque sem ele o circuito de via fica sujeito a falhas de sinalização."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Tipo de bondeamento",
+          "visto": "Faltou cordoalha no caminhão. Um colega sugere amarrar arame entre os trilhos até amanhã. O que fazer?",
+          "certa": "Não: só cordoalha para pino de 8 mm, solda exotérmica CADWELD ou solda pinbrazing; arame e arranjos provisórios são proibidos.",
+          "erradas": [
+            "Pode, se trocar pela cordoalha no dia seguinte.",
+            "Pode, se o arame for de aço galvanizado."
+          ],
+          "explica": "PRO-020971 Anexo 12, condições 3 e 4, e PRO-020971 condições gerais 7: proibido bondeamento de arame ou arranjo provisório, mesmo em caráter provisório.",
+          "critico": {
+            "1": "Instalou bondeamento de arame.",
+            "2": "Instalou bondeamento de arame."
+          }
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Furo no trilho",
+          "visto": "Furo feito no trilho para o pino da cordoalha. O que falta antes de instalar?",
+          "certa": "Fazer o chanfro (rebarbação) nos dois lados do furo.",
+          "erradas": [
+            "Nada: é só encaixar o pino.",
+            "Chanfrar só o lado de fora do trilho."
+          ],
+          "explica": "PRO-020971 Anexo 12: é obrigatório o chanfro, rebarbação, em ambos os lados do furo no trilho."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Bypass",
+          "visto": "Para ganhar tempo, a ideia é ligar um cabo de uma ponta à outra do componente, isolando ele todo. Pode?",
+          "certa": "Não: o bondeamento tipo bypass, que isola o componente de extremo a extremo, é proibido.",
+          "erradas": [
+            "Pode: um cabo só é mais fácil de manter.",
+            "Pode, se for com CADWELD."
+          ],
+          "explica": "PRO-020971 Anexo 12: não pode ser feito bondeamento tipo bypass."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Meia-chave",
+          "visto": "Onde instalar o bondeamento de reforço na meia-chave?",
+          "certa": "No final do coice da agulha.",
+          "erradas": [
+            "Na ponta da agulha.",
+            "No meio da agulha, em qualquer ponto."
+          ],
+          "explica": "PRO-020971 Anexo 12: na meia-chave, o bondeamento é instalado no final do coice da agulha."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Jacaré de ponta móvel",
+          "visto": "Onde instalar o bondeamento de reforço no jacaré de ponta móvel (JPM)?",
+          "certa": "Na região de entrada e de saída das patas de lebre.",
+          "erradas": [
+            "Só na ponta móvel.",
+            "No calcanhar, ligando as asas."
+          ],
+          "explica": "PRO-020971 Anexo 12: no JPM, o bondeamento fica na entrada e na saída das patas de lebre."
+        },
+        {
+          "tipo": "decisao",
+          "papel": "executante",
+          "titulo": "Jacaré de ponta fixa",
+          "visto": "Onde instalar o bondeamento de reforço no jacaré de ponta fixa (JPF)?",
+          "certa": "Na entrada, envolvendo as juntas metálicas, e na saída, ligando os trilhos de envolvimento (asas) e o trilho do calcanhar.",
+          "erradas": [
+            "Só na saída, nas patas de lebre.",
+            "De ponta a ponta do jacaré, com um cabo só."
+          ],
+          "explica": "PRO-020971 Anexo 12: no JPF, na entrada envolvendo as juntas metálicas e na saída ligando asas e calcanhar."
+        }
       ]
     }
   ],
   "desafios": [
-    { "id": "junta_2_parafusos", "nome": "Junta metálica com só 2 parafusos", "curto": "Junta com\n2 parafusos", "critico": true,
-      "relato": [ { "quem": "Coordenador", "instrucao": true, "texto": "Executante, antes de devolver a LDL, confira a troca da meia chave do AMV 03." } ],
-      "pistas": { "encosto": "Na junta provisória do trilho novo há só 2 parafusos, um de cada lado.", "dormente": "Há 3 dormentes bons de cada lado da junta, com grampos.", "agulhas": "Agulha nova assentada e fixada." },
-      "verificacoes": [ { "id": "solda", "botao": "Ver a\nprogramação", "texto": "A solda da junta está programada só para a semana que vem." } ],
-      "correcao": "PRO-020971 7.5: até a solda, a junta metálica leva 4 parafusos (2 de cada lado) e no mínimo 3 dormentes bons de cada lado." },
-    { "id": "arame", "nome": "Bondeamento provisório com arame", "curto": "Bondeamento\ncom arame",
-      "relato": [ { "quem": "Coordenador", "instrucao": true, "texto": "Executante, antes de devolver a LDL, confira a troca da meia chave do AMV 03." } ],
-      "pistas": { "encosto": "No lugar do cabo de bondeamento, a junta do trilho novo foi ligada com arame.", "dormente": "Junta com 4 parafusos e 3 dormentes bons de cada lado.", "barra": "Nada anormal nas barras." },
+    {
+      "id": "junta_2_parafusos",
+      "nome": "Junta metálica com só 2 parafusos",
+      "curto": "Junta com\n2 parafusos",
+      "critico": true,
+      "relato": [
+        {
+          "quem": "Coordenador",
+          "instrucao": true,
+          "texto": "Executante, antes de devolver a LDL, confira a troca da meia chave do AMV 03."
+        }
+      ],
+      "pistas": {
+        "encosto": "Na junta provisória do trilho novo há só 2 parafusos, um de cada lado.",
+        "dormente": "Há 3 dormentes bons de cada lado da junta, com grampos.",
+        "agulhas": "Agulha nova assentada e fixada."
+      },
+      "verificacoes": [
+        {
+          "id": "solda",
+          "botao": "Ver a\nprogramação",
+          "texto": "A solda da junta está programada só para a semana que vem."
+        }
+      ],
+      "correcao": "PRO-020971 7.5: até a solda, a junta metálica leva 4 parafusos (2 de cada lado) e no mínimo 3 dormentes bons de cada lado."
+    },
+    {
+      "id": "arame",
+      "nome": "Bondeamento provisório com arame",
+      "curto": "Bondeamento\ncom arame",
+      "relato": [
+        {
+          "quem": "Coordenador",
+          "instrucao": true,
+          "texto": "Executante, antes de devolver a LDL, confira a troca da meia chave do AMV 03."
+        }
+      ],
+      "pistas": {
+        "encosto": "No lugar do cabo de bondeamento, a junta do trilho novo foi ligada com arame.",
+        "dormente": "Junta com 4 parafusos e 3 dormentes bons de cada lado.",
+        "barra": "Nada anormal nas barras."
+      },
       "verificacoes": [],
-      "correcao": "PRO-020971 7.7: proibido arame para bondeamento, mesmo provisório; instalar o cabo de bondeamento correto." },
-    { "id": "degrau", "nome": "Degrau de 2 mm na junta sem esmerilhar", "curto": "Degrau\nna junta",
-      "relato": [ { "quem": "Coordenador", "instrucao": true, "texto": "Executante, antes de devolver a LDL, confira a troca da meia chave do AMV 03." } ],
-      "pistas": { "encosto": "Na junta, o boleto novo está 2 mm acima do antigo, sem esmerilhamento.", "dormente": "Dormentes firmes e com grampos.", "agulhas": "Agulha nova assentada." },
+      "correcao": "PRO-020971 7.7: proibido arame para bondeamento, mesmo provisório; instalar o cabo de bondeamento correto."
+    },
+    {
+      "id": "degrau",
+      "nome": "Degrau de 2 mm na junta sem esmerilhar",
+      "curto": "Degrau\nna junta",
+      "relato": [
+        {
+          "quem": "Coordenador",
+          "instrucao": true,
+          "texto": "Executante, antes de devolver a LDL, confira a troca da meia chave do AMV 03."
+        }
+      ],
+      "pistas": {
+        "encosto": "Na junta, o boleto novo está 2 mm acima do antigo, sem esmerilhamento.",
+        "dormente": "Dormentes firmes e com grampos.",
+        "agulhas": "Agulha nova assentada."
+      },
       "verificacoes": [],
-      "correcao": "PRO-020971 7.4: para cada 1 mm de diferença de perfil, esmerilhar 1 m; com 2 mm, 2 m para cada lado a partir do início da junta." },
-    {"id": "bondeamento_bypass", "nome": "Bondeamento tipo bypass", "curto": "Bondeamento\nbypass", "relato": [{"quem": "Coordenador", "instrucao": true, "texto": "Executante, confira o bondeamento do jacaré do AMV 03."}], "pistas": {"encosto": "Um cabo único liga a entrada à saída do jacaré, de ponta a ponta.", "agulhas": "Agulhas encostadas, sem anormalidade."}, "verificacoes": [{"id": "tipo", "botao": "Ver o\ntipo", "texto": "Cabo com conector de solda CADWELD nas duas pontas."}], "correcao": "PRO-020971 Anexo 12: bondeamento tipo bypass, que isola o componente de extremo a extremo, é proibido. No JPM instalar na entrada e na saída das patas de lebre."}
+      "correcao": "PRO-020971 7.4: para cada 1 mm de diferença de perfil, esmerilhar 1 m; com 2 mm, 2 m para cada lado a partir do início da junta."
+    },
+    {
+      "id": "bondeamento_bypass",
+      "nome": "Bondeamento tipo bypass",
+      "curto": "Bondeamento\nbypass",
+      "relato": [
+        {
+          "quem": "Coordenador",
+          "instrucao": true,
+          "texto": "Executante, confira o bondeamento do jacaré do AMV 03."
+        }
+      ],
+      "pistas": {
+        "encosto": "Um cabo único liga a entrada à saída do jacaré, de ponta a ponta.",
+        "agulhas": "Agulhas encostadas, sem anormalidade."
+      },
+      "verificacoes": [
+        {
+          "id": "tipo",
+          "botao": "Ver o\ntipo",
+          "texto": "Cabo com conector de solda CADWELD nas duas pontas."
+        }
+      ],
+      "correcao": "PRO-020971 Anexo 12: bondeamento tipo bypass, que isola o componente de extremo a extremo, é proibido. No JPM instalar na entrada e na saída das patas de lebre."
+    }
   ]
 }
