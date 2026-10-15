@@ -151,6 +151,22 @@ Quando a etapa é do outro papel, o avatar faz sozinho e o quadro mostra "Acompa
 
 Metas: `partida` (ligar o motor com o freio de mão puxado), `transporte` (braço e cabine para a frente, lança elevada), `freio` (andar a no máximo 5 km/h e frear), `circular` (buzinar uma vez, andar 3 m a no máximo 20 km/h e parar), `patolas` (baixar os estabilizadores), `giro` (girar 90 graus com patolas baixadas e voltar), `recolherPatolas`, `estacionar` (parar, freio de estacionamento e motor desligado). Passar do limite de velocidade ou dar a partida sem freio conta como erro. Com alguém no raio de ação a máquina não gira nem anda.
 
+**troca**: troca de componente de verdade na cena 3D. O participante solta as fixações na ordem (cada uma pisca), o KGT da cena retira a peça velha e assenta a nova, e depois o participante aplica as fixações (aparecem transparentes). Durante a movimentação do KGT a equipe vai para a zona segura (faixa verde com cones); quem entra no raio de ação pausa o KGT e conta erro. Quando a etapa é do outro papel, o mantenedor faz sozinho.
+
+```json
+{ "tipo": "troca", "componente": "travamento", "acao": "soltar", "grupo": "juncao",
+  "titulo": "Desacople as unidades", "corpo": "Solte os parafusos da peça de junção.",
+  "explica": "PRO-001122 Anexo 5.4, passo 5." }
+```
+
+- `componente` e seus grupos de fixações (`grupo`, um só, ou `grupos`, lista; sem nenhum, vale o componente inteiro):
+  - `agulha` (agulha do lado da máquina): `barras` (contrapino, pino e cliper de cada lado), `coice` (4 parafusos e as 2 talas de junção), `bondeamento` (cabo de cobre do coice).
+  - `motor` (unidade de motor da CTS-2): `conector` (conector militar), `juncao` (parafusos da peça de junção), `dormente` (4 parafusos no dormente oco).
+  - `travamento` (unidade de travamento da CTS-2): `clipers`, `conector`, `juncao`, `dormente`.
+- `acao`: `soltar` e `fixar` (fixações do grupo, na ordem em que piscam; `fixar` é a ordem inversa), `descarregar` (o KGT traz a peça nova pendurada e a deposita ao lado da via), `retirar` (o KGT iça a peça velha; se ainda houver fixação presa, não iça e conta erro), `posicionar` (o KGT pega a peça nova e assenta no lugar). Sem `descarregar`, a peça nova já está no palete ao lado da via.
+- `ferramenta` (opcional): ferramenta mostrada em cada fixação, no lugar da padrão de cada uma.
+- `papel` padrão: `executante`.
+
 ### Peças da cena (`alvo`, `errado`, `pistas`)
 
 `agulhas`, `encosto` (trilho de encosto), `clips`, `barra`, `dormente` (dormente oco), `coifa`, `trava`, `motor`, `tampa` (tampa do motor), `comutador`, `manivela`, `caixa` (caixa de junção), `chave` (chave de comando local), `lampada`, `conA`, `conB` (conectores militares), `dam`, `cordoalha`, `placaPT` (placa Pessoas Trabalhando), `placaDentro` (placa no lugar errado, dentro do gabarito), `jumper`, `cepo`.
@@ -177,6 +193,9 @@ Uma peça que não está na lista vira etapa de confirmação, até alguém mode
 | `evento:<texto>` | registra um evento do CCP no relatório |
 | `trem:<segundos>` | um trem de minério passa daqui a tantos segundos |
 | `licenca:conceder:<quem>:<registro>` | licença do CCP fora de uma LDL (ex.: acesso do KGT à via): o trem fica retido e o CCP pede permissão para circular. `licenca:devolver:<registro>` devolve a linha |
+| `comutador:manual` / `comutador:auto` | chave de comutação do motor em MANUAL ou de volta para AUTOMÁTICO |
+| `dam:instalar` / `dam:retirar` | conecta ou desconecta o DAM da máquina |
+| `kgt:voltar` | o KGT recolhe a lança e volta para a vaga (fim de um roteiro com `troca`) |
 
 ### Desafios
 
