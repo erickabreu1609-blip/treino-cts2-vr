@@ -141,6 +141,16 @@ Quando a etapa é do outro papel, o avatar faz sozinho e o quadro mostra "Acompa
 
 **info**: só mostra um texto e o botão Continuar (pode ter `falas`, `radio` e `efeitos`).
 
+**operar**: o participante vai para a cabine da KGT da cena e cumpre uma meta com os controles (o quadro de controles fica dentro da cabine). Quando a etapa é do outro papel, a KGT se move sozinha. Pode ter `falas`, `radio` e `efeitos`, que rodam quando a meta é cumprida.
+
+```json
+{ "tipo": "operar", "papel": "executante", "meta": "freio", "titulo": "Teste de freio",
+  "corpo": "Solte o freio de estacionamento, ande a no máximo 5 km/h e freie.",
+  "explica": "PRO-031308, teste dos freios: aplicar o freio com velocidade máxima de 5 km/h." }
+```
+
+Metas: `partida` (ligar o motor com o freio de mão puxado), `transporte` (braço e cabine para a frente, lança elevada), `freio` (andar a no máximo 5 km/h e frear), `circular` (buzinar uma vez, andar 3 m a no máximo 20 km/h e parar), `patolas` (baixar os estabilizadores), `giro` (girar 90 graus com patolas baixadas e voltar), `recolherPatolas`, `estacionar` (parar, freio de estacionamento e motor desligado). Passar do limite de velocidade ou dar a partida sem freio conta como erro. Com alguém no raio de ação a máquina não gira nem anda.
+
 ### Peças da cena (`alvo`, `errado`, `pistas`)
 
 `agulhas`, `encosto` (trilho de encosto), `clips`, `barra`, `dormente` (dormente oco), `coifa`, `trava`, `motor`, `tampa` (tampa do motor), `comutador`, `manivela`, `caixa` (caixa de junção), `chave` (chave de comando local), `lampada`, `conA`, `conB` (conectores militares), `dam`, `cordoalha`, `placaPT` (placa Pessoas Trabalhando), `placaDentro` (placa no lugar errado, dentro do gabarito), `jumper`, `cepo`.

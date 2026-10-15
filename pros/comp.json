@@ -4,7 +4,7 @@
   "pro": "PRO-020971 rev. 10 · EFC",
   "etiqueta": "Troca de componente",
   "titulo": "Substituição de componentes de AMV",
-  "resumo": "Troca da meia chave nº 20 VAE em decisões: temperatura, corte, rigging, zona crítica, junta e primeiro trem.",
+  "resumo": "Troca da meia chave nº 20 VAE em decisões: temperatura, corte, rigging, zona crítica, junta e primeiro trem. Bondeamento de reforço no jacaré e na agulha (Anexo 12).",
   "grupo": "AMV",
   "prefixo": "VP",
   "papeis": {
@@ -64,6 +64,22 @@
           "explica": "ROF 14.28: após substituição de componentes de AMV, 30 km/h para o primeiro trem.",
           "efeitos": ["ldl:devolver:Troca da meia chave do AMV 03 concluída. Restrição de 30 quilômetros por hora para o primeiro trem."] }
       ]
+    },
+    {
+      "id": "bondeamento",
+      "botao": "Bondeamento\nde reforço",
+      "modulo": "Bondeamento de reforço no jacaré e na agulha (PRO-020971 Anexo 12)",
+      "descricao": "Bondeamento de reforço em jacaré e meia-chave na via sinalizada: quem instala, tipos permitidos, chanfro do furo, proibição de bypass e onde instalar em cada componente.",
+      "etapas": [
+        {"tipo": "decisao", "papel": "coordenador", "titulo": "Quem instala", "visto": "A meia-chave nova do AMV 03 está na via sinalizada e precisa do bondeamento de reforço. Quem faz?", "certa": "A equipe de Eletroeletrônica (EE).", "erradas": ["A própria equipe da via permanente, no fim da troca.", "O operador da KGT."], "explica": "PRO-020971 Anexo 12, condição inicial 2: a instalação do bondeamento de reforço em jacaré e meia-chave na via sinalizada é responsabilidade da equipe de EE."},
+        {"tipo": "decisao", "papel": "coordenador", "titulo": "Onde é obrigatório", "visto": "Em quais componentes o bondeamento de reforço é obrigatório?", "certa": "Jacarés de ponta móvel e de ponta fixa e meia-chave instalados na via sinalizada.", "erradas": ["Só no jacaré de ponta móvel.", "Em qualquer AMV, sinalizado ou não, só quando der falha."], "explica": "PRO-020971 Anexo 12, condição inicial 1: obrigatório em JPM, JPF e meia-chave na via sinalizada, porque sem ele o circuito de via fica sujeito a falhas de sinalização."},
+        {"tipo": "decisao", "papel": "executante", "titulo": "Tipo de bondeamento", "visto": "Faltou cordoalha no caminhão. Um colega sugere amarrar arame entre os trilhos até amanhã. O que fazer?", "certa": "Não: só cordoalha para pino de 8 mm, solda exotérmica CADWELD ou solda pinbrazing; arame e arranjos provisórios são proibidos.", "erradas": ["Pode, se trocar pela cordoalha no dia seguinte.", "Pode, se o arame for de aço galvanizado."], "explica": "PRO-020971 Anexo 12, condições 3 e 4, e PRO-020971 condições gerais 7: proibido bondeamento de arame ou arranjo provisório, mesmo em caráter provisório.", "critico": {"1": "Instalou bondeamento de arame.", "2": "Instalou bondeamento de arame."}},
+        {"tipo": "decisao", "papel": "executante", "titulo": "Furo no trilho", "visto": "Furo feito no trilho para o pino da cordoalha. O que falta antes de instalar?", "certa": "Fazer o chanfro (rebarbação) nos dois lados do furo.", "erradas": ["Nada: é só encaixar o pino.", "Chanfrar só o lado de fora do trilho."], "explica": "PRO-020971 Anexo 12: é obrigatório o chanfro, rebarbação, em ambos os lados do furo no trilho."},
+        {"tipo": "decisao", "papel": "executante", "titulo": "Bypass", "visto": "Para ganhar tempo, a ideia é ligar um cabo de uma ponta à outra do componente, isolando ele todo. Pode?", "certa": "Não: o bondeamento tipo bypass, que isola o componente de extremo a extremo, é proibido.", "erradas": ["Pode: um cabo só é mais fácil de manter.", "Pode, se for com CADWELD."], "explica": "PRO-020971 Anexo 12: não pode ser feito bondeamento tipo bypass."},
+        {"tipo": "decisao", "papel": "executante", "titulo": "Meia-chave", "visto": "Onde instalar o bondeamento de reforço na meia-chave?", "certa": "No final do coice da agulha.", "erradas": ["Na ponta da agulha.", "No meio da agulha, em qualquer ponto."], "explica": "PRO-020971 Anexo 12: na meia-chave, o bondeamento é instalado no final do coice da agulha."},
+        {"tipo": "decisao", "papel": "executante", "titulo": "Jacaré de ponta móvel", "visto": "Onde instalar o bondeamento de reforço no jacaré de ponta móvel (JPM)?", "certa": "Na região de entrada e de saída das patas de lebre.", "erradas": ["Só na ponta móvel.", "No calcanhar, ligando as asas."], "explica": "PRO-020971 Anexo 12: no JPM, o bondeamento fica na entrada e na saída das patas de lebre."},
+        {"tipo": "decisao", "papel": "executante", "titulo": "Jacaré de ponta fixa", "visto": "Onde instalar o bondeamento de reforço no jacaré de ponta fixa (JPF)?", "certa": "Na entrada, envolvendo as juntas metálicas, e na saída, ligando os trilhos de envolvimento (asas) e o trilho do calcanhar.", "erradas": ["Só na saída, nas patas de lebre.", "De ponta a ponta do jacaré, com um cabo só."], "explica": "PRO-020971 Anexo 12: no JPF, na entrada envolvendo as juntas metálicas e na saída ligando asas e calcanhar."}
+      ]
     }
   ],
   "desafios": [
@@ -81,6 +97,7 @@
       "relato": [ { "quem": "Coordenador", "instrucao": true, "texto": "Executante, antes de devolver a LDL, confira a troca da meia chave do AMV 03." } ],
       "pistas": { "encosto": "Na junta, o boleto novo está 2 mm acima do antigo, sem esmerilhamento.", "dormente": "Dormentes firmes e com grampos.", "agulhas": "Agulha nova assentada." },
       "verificacoes": [],
-      "correcao": "PRO-020971 7.4: para cada 1 mm de diferença de perfil, esmerilhar 1 m; com 2 mm, 2 m para cada lado a partir do início da junta." }
+      "correcao": "PRO-020971 7.4: para cada 1 mm de diferença de perfil, esmerilhar 1 m; com 2 mm, 2 m para cada lado a partir do início da junta." },
+    {"id": "bondeamento_bypass", "nome": "Bondeamento tipo bypass", "curto": "Bondeamento\nbypass", "relato": [{"quem": "Coordenador", "instrucao": true, "texto": "Executante, confira o bondeamento do jacaré do AMV 03."}], "pistas": {"encosto": "Um cabo único liga a entrada à saída do jacaré, de ponta a ponta.", "agulhas": "Agulhas encostadas, sem anormalidade."}, "verificacoes": [{"id": "tipo", "botao": "Ver o\ntipo", "texto": "Cabo com conector de solda CADWELD nas duas pontas."}], "correcao": "PRO-020971 Anexo 12: bondeamento tipo bypass, que isola o componente de extremo a extremo, é proibido. No JPM instalar na entrada e na saída das patas de lebre."}
   ]
 }

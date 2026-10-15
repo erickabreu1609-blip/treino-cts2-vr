@@ -1,4 +1,16 @@
 {
   "formato": "treino-pro-vr/indice-1",
-  "pros": ["ldl.json", "radio.json", "amv.json", "reset.json", "sens.json", "lub.json", "comp.json"]
+  "pros": [
+    "ldl.json",
+    "radio.json",
+    "amv.json",
+    "reset.json",
+    "sens.json",
+    "lub.json",
+    "comp.json",
+    "trilho.json",
+    "solda.json",
+    "dormente.json",
+    "evp.json"
+  ]
 }

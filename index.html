@@ -157,7 +157,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 novos PROs</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v14/10 novos PROs e KGT</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -930,6 +930,7 @@ body.vr #stick { display: none; }
   // se o caminho reto até o destino cruza um objeto, contorna pelo canto mais curto.
   const R_PESSOA = 0.25, R_CAMERA = 0.3;
   const figurasFixas = [];   // trabalhadores parados da cena (preenchido quando trabalhadores.glb carrega)
+  const kgtEquipe = [];      // os três da equipe da KGT: saem do raio de ação quando a máquina opera
   let obstaculos = [], tObstaculos = 0;
   const bxTmp = new THREE.Box3(), bxMalha = new THREE.Box3();
   function caixaVisivel(obj) {   // só o que está à vista conta (peças retiradas no "Explorar por dentro" deixam passar)
@@ -948,8 +949,8 @@ body.vr #stick { display: none; }
     l.push({ x0: 1.02, x1: 1.28, z0: 2.46, z1: 2.64 });   // DAM
     const meia = 0.7 * PAINEL_ESC + 0.1;                  // quadro de instruções e seus postes
     l.push({ x0: 0.6 - meia, x1: 0.6 + meia, z0: PAINEL_Z - 0.11, z1: PAINEL_Z + 0.02 });
-    l.push({ x0: KGT_POS.x - 2.7, x1: KGT_POS.x + 4.6, z0: KGT_POS.z - 2.05, z1: KGT_POS.z + 2.05 });   // KGT
-    l.push({ x0: 9.4, x1: 10.6, z0: 5.6, z1: 6.8 });      // caçamba da KGT apoiada no chão
+    l.push({ x0: KGT_POS.x - 2.7, x1: KGT_POS.x + 4.6, z0: KGT_POS.z - 2.05, z1: KGT_POS.z + 2.05 });   // KGT (KGT_POS acompanha a máquina)
+    const cc = kgtCaixaCacamba(); if (cc) l.push(cc);     // caçamba da KGT, quando está baixa
     obstaculos = l;
   }
   function pessoas(ignorar) {   // círculos das pessoas, menos quem está andando
@@ -1093,17 +1094,296 @@ body.vr #stick { display: none; }
     ].forEach(([nome, x, z, tom, capacete]) => {
       const f = modelo(nome, tom, capacete);
       f.position.set(x, alturaLastro(z), z); f.rotation.y = Math.atan2(KGT_POS.x - x, KGT_POS.z - z);
-      scene.add(f); figurasFixas.push(f);
+      f.userData.kgtCasa = [f.position.clone(), f.rotation.y];
+      scene.add(f); figurasFixas.push(f); kgtEquipe.push(f);
     });
   }, undefined, () => {});
   // KGT (escavadeira rodoferroviária, modelo do SketchUp do Erick) estacionada fora do lastro, do lado da caixa de junção,
-  // a 9 m da CTS-2 e paralela à via, com a caçamba virada para a máquina de chave. kgt.glb: origem no chão entre os pneus, frente em +z.
-  const KGT_POS = new THREE.Vector3(14, 0, 6.2);
+  // a 9 m da CTS-2 e paralela à via, com a caçamba virada para a máquina de chave. kgt.glb: origem no chão entre os pneus, frente em +z,
+  // malhas separadas por peça (nomes "<peça>__<n>", script cenario/kgt/kgt_partes.py) para a KGT ser operada no app.
+  const KGT_POS = new THREE.Vector3(14, 0, 6.2);   // posição atual da máquina (anda ao longo de x)
+  const KGT_X = [10, 21];                          // trecho onde ela pode andar, fora do lastro
+  // pinos no sistema do modelo: [z, y] (x do giro em GIRO_X); o braço todo trabalha no plano x = const
+  const KP = { giro: [-2.30, 0], lanca: [-1.817, 1.858], braco: [2.733, 4.208], cacamba: [4.223, 2.228],
+    l1a: [-1.367, 1.498], l1b: [-0.427, 3.348], l2a: [-1.647, 1.638], l2b: [-0.077, 3.608],
+    cba: [0.673, 4.248], cbb: [2.603, 4.768], cca: [3.193, 4.268], bielaA: [4.033, 2.488], bielaB: [4.223, 1.858], bielaC: [4.573, 2.308] };
+  const GIRO_X = 0.12;
+  const KLIM = { giro: [-Math.PI, Math.PI], lanca: [-0.5, 0.28], braco: [-0.9, 1.0], cacamba: [-1.3, 0.9], patolas: [0, 1] };
+  const KVEL = { giro: 0.35, lanca: 0.22, braco: 0.32, cacamba: 0.5, patolas: 0.7 };   // rad/s (patolas: curso por segundo)
+  const kgt = { pronta: false, giro: 0, lanca: 0, braco: 0, cacamba: 0, patolas: 0, vel: 0, freioEst: true, cmd: null, operando: false,
+    meta: null, buzinas: 0, maxVel: 0, andou: 0, ok: null, painelAnt: "", tPainel: 0, auto: null };
   new THREE.GLTFLoader().load("kgt.glb", g => {
-    g.scene.traverse(m => { if (m.isMesh) { m.material.side = THREE.DoubleSide; } });
-    g.scene.position.copy(KGT_POS); g.scene.rotation.y = -Math.PI / 2;
-    scene.add(g.scene);
+    const root = g.scene;
+    root.traverse(m => { if (m.isMesh) { m.material.side = THREE.DoubleSide; } });
+    root.position.copy(KGT_POS); root.rotation.y = -Math.PI / 2;
+    scene.add(root);
+    try { montarKgt(root); } catch (e) { console.warn("KGT sem articulação", e); }
   }, undefined, () => {});
+  function montarKgt(root) {
+    root.updateMatrixWorld(true);
+    const v3 = (p, x) => new THREE.Vector3(x == null ? GIRO_X : x, p[1], p[0]);
+    // pivô criado no lugar certo do modelo e depois pendurado no pai, sem mudar a posição no mundo
+    const pivo = (pai, p, x) => { const g = new THREE.Group(); g.position.copy(v3(p, x)); root.add(g); g.updateMatrixWorld(true); pai.attach(g); return g; };
+    const P = {};
+    P.giro = pivo(root, KP.giro); P.lanca = pivo(P.giro, KP.lanca); P.braco = pivo(P.lanca, KP.braco); P.cacamba = pivo(P.braco, KP.cacamba);
+    P.patolas = pivo(root, [0, 0], 0); P.lamina = pivo(root, [0, 0], 0);
+    P.bielaBraco = pivo(P.braco, KP.bielaA); P.bielaCacamba = pivo(P.braco, KP.bielaB);
+    // cilindros: camisa (A) gira no pino de baixo; haste (B) vai junto com o pino de cima, sempre alinhada com a camisa
+    const cil = (nome, pai, a, b, fimPai) => {
+      const c = { A: pivo(pai, a), B: pivo(pai, b), pai, rest: Math.atan2(b[1] - a[1], b[0] - a[0]) };
+      c.base = c.A.position.clone();   // pino de baixo no sistema do pai
+      if (fimPai) { c.fim = new THREE.Object3D(); c.fim.position.copy(v3(b)); root.add(c.fim); c.fim.updateMatrixWorld(true); fimPai.attach(c.fim); }
+      P[nome + "A"] = c.A; P[nome + "B"] = c.B; return c;
+    };
+    kgt.cil = [cil("cilLanca1", P.giro, KP.l1a, KP.l1b, P.lanca), cil("cilLanca2", P.giro, KP.l2a, KP.l2b, P.lanca), cil("cilBraco", P.lanca, KP.cba, KP.cbb, P.braco)];
+    kgt.cilCac = cil("cilCacamba", P.braco, KP.cca, KP.bielaC, null);
+    const pecas = { base: root, giro: P.giro, lanca: P.lanca, braco: P.braco, cacamba: P.cacamba, patolas: P.patolas, lamina: P.lamina, bielaBraco: P.bielaBraco, bielaCacamba: P.bielaCacamba };
+    const malhas = [];
+    root.traverse(m => { if (m.isMesh) malhas.push(m); });
+    for (const m of malhas) { const nm = /__/.test(m.name) ? m.name : m.parent.name, k = nm.split("__")[0]; (pecas[k] || P[k] || P.giro).attach(m); }
+    // quatro barras da caçamba, no sistema do braço (pivô do braço na origem)
+    const loc = p => new THREE.Vector2(p[0] - KP.braco[0], p[1] - KP.braco[1]);
+    const A = loc(KP.bielaA), B = loc(KP.bielaB), C = loc(KP.bielaC), H = loc(KP.cacamba);
+    kgt.fb = { A, B, H, rA: C.distanceTo(A), rB: C.distanceTo(B), C: C.clone(), C0: C.clone(),
+      restA: Math.atan2(C.y - A.y, C.x - A.x), restB: Math.atan2(C.y - B.y, C.x - B.x) };
+    kgt.root = root; kgt.P = P; kgt.pronta = true;
+    // marcadores dados no sistema do modelo e pendurados na peça que os leva
+    const marca = (pai, x, y, z) => { const o = new THREE.Object3D(); o.position.set(x, y, z); root.add(o); o.updateMatrixWorld(true); pai.attach(o); return o; };
+    kgt.olho = marca(P.giro, 1.15, 2.6, -1.25);       // olhos do operador, na cabine
+    kgt.quadro = marca(P.giro, 1.42, 2.47, -0.68);    // quadro pequeno dentro da cabine, à frente e à esquerda do operador
+    kgt.ponta = marca(P.cacamba, GIRO_X, 2.26, 2.8);  // dentes da caçamba
+    kgt.descer = new THREE.Object3D(); kgt.descer.position.set(2.4, 0, -1.2); root.add(kgt.descer);         // onde o operador desce, ao lado da cabine
+    posarKgt();
+  }
+  // aplica os ângulos às juntas, os cilindros e as bielas; devolve false se a pose for impossível (bielas não fecham)
+  const _v = new THREE.Vector3(), _w = new THREE.Vector3();
+  function posarKgt() {
+    const P = kgt.P, fb = kgt.fb;
+    P.giro.rotation.y = kgt.giro; P.lanca.rotation.x = kgt.lanca; P.braco.rotation.x = kgt.braco; P.cacamba.rotation.x = kgt.cacamba;
+    P.patolas.position.y = -0.34 * kgt.patolas; P.lamina.position.y = -0.3 * kgt.patolas;
+    kgt.root.position.copy(KGT_POS);
+    // B gira com a caçamba em volta de H (rotation.x = c leva o ângulo (z, y) de φ para φ - c)
+    const c = kgt.cacamba, d = fb.B.clone().sub(fb.H), ang = Math.atan2(d.y, d.x) - c, r = d.length();
+    const Bn = new THREE.Vector2(fb.H.x + r * Math.cos(ang), fb.H.y + r * Math.sin(ang));
+    const dd = Bn.distanceTo(fb.A);
+    if (dd > fb.rA + fb.rB || dd < Math.abs(fb.rA - fb.rB)) return false;
+    const a = (fb.rA * fb.rA - fb.rB * fb.rB + dd * dd) / (2 * dd), h = Math.sqrt(Math.max(0, fb.rA * fb.rA - a * a));
+    const ex = Bn.clone().sub(fb.A).divideScalar(dd), base = fb.A.clone().addScaledVector(ex, a);
+    const c1 = new THREE.Vector2(base.x - h * ex.y, base.y + h * ex.x), c2 = new THREE.Vector2(base.x + h * ex.y, base.y - h * ex.x);
+    const C = c1.distanceTo(fb.C) < c2.distanceTo(fb.C) ? c1 : c2; fb.C.copy(C);
+    P.bielaBraco.rotation.x = fb.restA - Math.atan2(C.y - fb.A.y, C.x - fb.A.x);
+    P.bielaCacamba.position.set(P.bielaCacamba.position.x, Bn.y, Bn.x);
+    P.bielaCacamba.rotation.x = fb.restB - Math.atan2(C.y - Bn.y, C.x - Bn.x);
+    kgt.root.updateMatrixWorld(true);
+    const mirar = (cl, fz, fy) => {
+      const th = cl.rest - Math.atan2(fy - cl.base.y, fz - cl.base.z);
+      cl.A.rotation.x = th; cl.B.position.set(cl.B.position.x, fy, fz); cl.B.rotation.x = th;
+    };
+    for (const cl of kgt.cil) { cl.fim.getWorldPosition(_v); cl.pai.worldToLocal(_v); mirar(cl, _v.z, _v.y); }
+    mirar(kgt.cilCac, C.x, C.y);
+    kgt.root.updateMatrixWorld(true);
+    return true;
+  }
+  function kgtCaixaCacamba() {
+    if (!kgt.pronta) return null;
+    const b = new THREE.Box3().setFromObject(kgt.P.cacamba);
+    return b.min.y < 1.8 ? { x0: b.min.x, x1: b.max.x, z0: b.min.z, z1: b.max.z } : null;
+  }
+  function kgtAlcance() {   // distância horizontal do eixo de giro até os dentes da caçamba
+    kgt.P.giro.getWorldPosition(_v); kgt.ponta.getWorldPosition(_w);
+    return { eixo: _v.clone(), r: Math.hypot(_w.x - _v.x, _w.z - _v.z) + 0.6 };
+  }
+  function pessoaNoRaio() {
+    const { eixo, r } = kgtAlcance();
+    const gente = figurasFixas.concat([mantenedor, coordenador]).concat(kgt.operando ? [] : [rig]);
+    return gente.some(p => Math.hypot(p.position.x - eixo.x, p.position.z - eixo.z) < r);
+  }
+  function afastarEquipeKgt(fora) {
+    kgtEquipe.forEach((f, i) => {
+      const [casa, ry] = f.userData.kgtCasa;
+      if (fora) { const x = 30 + i * 0.9, z = 8.6 + i * 1.2; f.position.set(x, alturaLastro(z), z); f.rotation.y = Math.atan2(KGT_POS.x - x, KGT_POS.z - z); }
+      else { f.position.copy(casa); f.rotation.y = ry; }
+    });
+  }
+  // movimento de uma junta, um pulso por toque no botão; volta atrás se bater no chão ou se as bielas não fecharem
+  function moverJunta(j, delta) {
+    const ant = kgt[j];
+    kgt[j] = THREE.MathUtils.clamp(ant + delta, KLIM[j][0], KLIM[j][1]);
+    if (kgt[j] === ant) return false;
+    let ok = posarKgt();
+    if (ok && j !== "patolas") {
+      const bc = new THREE.Box3().setFromObject(kgt.P.cacamba), bb = new THREE.Box3().setFromObject(kgt.P.braco);
+      if (bc.min.y < 0.02 || bb.min.y < 0.05) ok = false;
+    }
+    if (!ok) { kgt[j] = ant; posarKgt(); return false; }
+    return true;
+  }
+  function kgtPose() { return { giro: kgt.giro, lanca: kgt.lanca, braco: kgt.braco, cacamba: kgt.cacamba, patolas: kgt.patolas }; }
+  const KGT_CASA = { giro: 0, lanca: 0, braco: 0, cacamba: 0, patolas: 0 };
+  function resetKgt() {
+    if (!kgt.pronta) return;
+    Object.assign(kgt, KGT_CASA, { vel: 0, freioEst: true, motor: false, cmd: null, auto: null, meta: null });
+    KGT_POS.set(14, 0, 6.2); posarKgt();
+  }
+  // ----- operar: o participante senta na cabine; os controles ficam no quadro, que vem para a frente da cabine -----
+  const quadroCasa = {};
+  function entrarKgt() {
+    if (!kgt.pronta) return false;
+    if (!kgt.operando) {
+      quadroCasa.p = panel.position.clone(); quadroCasa.q = panel.quaternion.clone(); quadroCasa.s = panel.scale.x;
+      kgt.operando = true; destino = null; marcado = null; kgt.giroVisto = kgt.giro;
+      afastarEquipeKgt(true); som.hidraulico(0.8);
+      panel.material.depthTest = false; panel.renderOrder = 997;   // na cabine o quadro fica sempre à vista, na frente do painel da máquina
+      seguirKgt();
+      // olha para a frente da máquina, com o quadro de controles à vista
+      kgt.olho.getWorldPosition(_v); kgt.quadro.getWorldPosition(_w); const d = _w.sub(_v);
+      yaw = Math.atan2(-d.x, -d.z) - 0.25; pitch = Math.atan2(d.y, Math.hypot(d.x, d.z)) - 0.12; yawExtra = 0; gyroOffset = null;
+    }
+    seguirKgt();
+    return true;
+  }
+  function sairKgt() {
+    if (!kgt.operando) return;
+    kgt.operando = false; kgt.meta = null; kgt.cmd = null; kgt.vel = 0;
+    panel.position.copy(quadroCasa.p); panel.quaternion.copy(quadroCasa.q); panel.scale.setScalar(quadroCasa.s);
+    panel.material.depthTest = true; panel.renderOrder = 0;
+    for (const b of buttons) { b.material.depthTest = true; b.renderOrder = 0; }
+    kgt.descer.getWorldPosition(_v); rig.position.set(_v.x, 0, _v.z);
+    kgt.olho.getWorldPosition(_w); const d = _w.sub(_v.set(_v.x, camera.position.y, _v.z));
+    yaw = Math.atan2(-d.x, -d.z); pitch = Math.atan2(d.y, Math.hypot(d.x, d.z)); yawExtra = 0; gyroOffset = null;
+    layoutBotoes();
+  }
+  function seguirKgt() {
+    kgt.olho.getWorldPosition(_v); rig.position.set(_v.x, _v.y - camera.position.y, _v.z);
+    const d = kgt.giro - kgt.giroVisto; kgt.giroVisto = kgt.giro;
+    if (d) { yaw += d; yawExtra += d; }      // a cabine gira junto com o operador
+    kgt.quadro.getWorldPosition(_w);
+    panel.position.copy(_w); panel.scale.setScalar(0.22); panel.lookAt(_v);
+    layoutBotoes();
+  }
+  function botoesKgt(extra) {
+    return [["kgt:frente", "Frente\n+1 km/h"], ["kgt:re", "Ré\n+1 km/h"], ["kgt:freio", "Frear"], ["kgt:est", kgt.freioEst ? "Soltar freio\nde estac." : "Freio de\nestacionam."],
+      ["kgt:giroE", "Girar à\nesquerda"], ["kgt:giroD", "Girar à\ndireita"], ["kgt:lancaS", "Lança\nsobe"], ["kgt:lancaD", "Lança\ndesce"],
+      ["kgt:bracoA", "Braço\nabre"], ["kgt:bracoF", "Braço\nrecolhe"], ["kgt:cacA", "Caçamba\nabre"], ["kgt:cacF", "Caçamba\nfecha"],
+      ["kgt:patolas", kgt.patolas > 0.5 ? "Subir\npatolas" : "Baixar\npatolas"], ["kgt:buzina", "Buzina"], ["kgt:motor", kgt.motor ? "Desligar\nmotor" : "Ligar\nmotor"]].concat(extra || [["kgt:sair", "Sair da\nKGT"]]);
+  }
+  function statusKgt() {
+    return `Motor: ${kgt.motor ? "ligado" : "desligado"} · Velocidade: ${Math.round(Math.abs(kgt.vel))} km/h${kgt.vel < -0.1 ? " (ré)" : ""} · Patolas: ${kgt.patolas > 0.98 ? "baixadas" : kgt.patolas < 0.02 ? "recolhidas" : "em movimento"} · Freio de estacionamento: ${kgt.freioEst ? "aplicado" : "solto"}`;
+  }
+  // operação livre, pelo menu
+  function startKgtLivre() {
+    if (!kgt.pronta) { drawPanel("Operar a KGT", "A KGT ainda não carregou", "Abra o treino pelo site publicado e aguarde a cena carregar."); return setButtons([["menu", "Menu"]]); }
+    fecharDemo(); mode = "kgt"; pulseIds = [];
+    entrarKgt();
+    kgt.extra = [["kgt:casa", "Voltar à\nvaga"], ["kgt:sair", "Sair da\nKGT"]];
+    kgt.painel = () => { const av = avisoAtivo(); return ["Operar a KGT", "Você está na cabine da KGT", (av ? av + "\n" : "") + "Ligue o motor com o freio de mão puxado. Cada toque move um pouco. Antes de girar ou mexer o braço, confira que ninguém está no raio de ação da máquina e acione os estabilizadores (patolas).\n" + statusKgt(), av ? "#e5533d" : undefined]; };
+    redesenharKgt(true); setButtons(botoesKgt(kgt.extra));
+  }
+  function redesenharKgt(forcar) {
+    if (!kgt.painel) return;
+    const [et, ti, co, cor] = kgt.painel(), chave = et + ti + co + (cor || "");
+    if (!forcar && chave === kgt.painelAnt) return;
+    kgt.painelAnt = chave; drawPanel(et, ti, co, cor);
+  }
+  const avisoAtivo = () => performance.now() < (kgt.avisoAte || 0) ? kgt.aviso : "";
+  function avisoKgt(t) { som.erro(); kgt.aviso = t; kgt.avisoAte = performance.now() + 3500; redesenharKgt(true); }
+  function acaoKgt(a) {
+    if (a === "sair") { sairKgt(); kgt.painel = null; return mode === "ldl" && ldl ? acaoLdl("ldl:sair") : showMenu(); }
+    if (a === "casa") { resetKgt(); afastarEquipeKgt(true); seguirKgt(); return redesenharKgt(true); }
+    if (!kgt.operando || kgt.auto) return;
+    if (a === "buzina") { som.buzinaKgt(); kgt.buzinas++; return; }
+    if (a === "est") {
+      if (Math.abs(kgt.vel) > 0.05) return avisoKgt("Pare a máquina antes de aplicar o freio de estacionamento.");
+      kgt.freioEst = !kgt.freioEst; som.clique(); setButtons(botoesKgt(kgt.extra)); return redesenharKgt(true);
+    }
+    if (a === "motor") {
+      if (kgt.motor) { if (Math.abs(kgt.vel) > 0.05) return avisoKgt("Pare a máquina antes de desligar o motor."); kgt.motor = false; som.clique(); }
+      else { if (!kgt.freioEst) { kgt.partidaSemFreio = true; avisoKgt("Partida com o freio de mão solto: antes de dar a partida, puxe o freio de mão."); } kgt.motor = true; som.hidraulico(1.2); }
+      setButtons(botoesKgt(kgt.extra)); return redesenharKgt(true);
+    }
+    if (!kgt.motor && a !== "est") return avisoKgt("Motor desligado: ligue o motor primeiro.");
+    if (a === "freio") { kgt.vel = 0; som.trava && som.trava(); return redesenharKgt(true); }
+    if (a === "frente" || a === "re") {
+      if (kgt.freioEst) return avisoKgt("Freio de estacionamento aplicado: solte o freio para andar.");
+      if (kgt.patolas > 0.02) return avisoKgt("Patolas baixadas: recolha as patolas antes de deslocar.");
+      if (pessoaNoRaio()) return avisoKgt("Pessoa no raio de ação da máquina: não desloque.");
+      if (!kgt.andou && !kgt.vel) kgt.buzinouAntes = kgt.buzinas > 0;
+      kgt.vel = THREE.MathUtils.clamp(kgt.vel + (a === "frente" ? 1 : -1), -10, 30); som.hidraulico(0.4);
+      return redesenharKgt(true);
+    }
+    if (a === "patolas") { kgt.cmd = { j: "patolas", dir: kgt.patolas > 0.5 ? -1 : 1, resta: 1 }; som.hidraulico(1.6); return; }
+    const J = { giroE: ["giro", 1], giroD: ["giro", -1], lancaS: ["lanca", -1], lancaD: ["lanca", 1], bracoA: ["braco", -1], bracoF: ["braco", 1], cacA: ["cacamba", -1], cacF: ["cacamba", 1] }[a];
+    if (!J) return;
+    if (pessoaNoRaio()) return avisoKgt("Pessoa no raio de ação da máquina: pare e só opere com a área livre.");
+    if (Math.abs(kgt.vel) > 0.05) return avisoKgt("Pare a máquina antes de operar o braço.");
+    kgt.cmd = { j: J[0], dir: J[1], resta: KVEL[J[0]] * 0.6 }; som.hidraulico(0.6);
+  }
+  // metas das etapas "operar" dos treinos (pros/*.json)
+  const METAS_KGT = {
+    partida: { txt: "Confira o freio de estacionamento e ligue o motor.", ok: () => kgt.motor, falha: () => kgt.partidaSemFreio ? "Deu a partida sem o freio de mão puxado." : "" },
+    transporte: { txt: "Deixe o braço e a cabine voltados para a frente e a lança elevada.", ok: () => Math.abs(kgt.giro) < 0.08 && kgt.lanca <= -0.2 },
+    freio: { txt: "Solte o freio de estacionamento, ande a no máximo 5 km/h por pelo menos 2 m e freie.", ok: () => kgt.andou >= 2 && Math.abs(kgt.vel) < 0.05, falha: () => kgt.maxVel > 5.01 ? "Passou de 5 km/h no teste de freio." : "" },
+    circular: { txt: "Buzine uma vez, desloque a KGT pelo menos 3 m, a no máximo 20 km/h (operação em solo), e pare.", ok: () => kgt.andou >= 3 && Math.abs(kgt.vel) < 0.05,
+      falha: () => !kgt.buzinouAntes ? "Não buzinou antes de movimentar." : kgt.maxVel > 20.01 ? "Passou de 20 km/h na operação em solo." : "" },
+    patolas: { txt: "Acione os estabilizadores: baixe as patolas e a lâmina até apoiar no chão.", ok: () => kgt.patolas > 0.98 },
+    giro: { txt: "Com os estabilizadores acionados e a área livre, gire a superestrutura pelo menos 90 graus e volte a alinhar.", ok: () => kgt.girou && Math.abs(kgt.giro) < 0.08 && kgt.patolas > 0.98 },
+    recolherPatolas: { txt: "Recolha as patolas e a lâmina.", ok: () => kgt.patolas < 0.02 },
+    estacionar: { txt: "Pare a máquina, aplique o freio de estacionamento e desligue o motor.", ok: () => Math.abs(kgt.vel) < 0.05 && kgt.freioEst && !kgt.motor }
+  };
+  function iniciarMetaKgt(meta) {
+    Object.assign(kgt, { meta, buzinas: 0, maxVel: 0, andou: 0, girou: false, ok: null, buzinouAntes: false, partidaSemFreio: false });
+    if (meta === "partida") { kgt.motor = false; kgt.vel = 0; kgt.freioEst = Math.random() < 0.5; }   // às vezes o freio de mão ficou solto: confira antes da partida
+    if (meta !== "partida" && !kgt.motor) kgt.motor = true;
+  }
+  // a outra função faz a etapa: a máquina se move sozinha até cumprir a meta
+  function autoKgt(meta, done) {
+    if (!kgt.pronta) return done();
+    afastarEquipeKgt(true);
+    const alvo = { patolas: { patolas: 1 }, recolherPatolas: { patolas: 0 }, transporte: { giro: 0, lanca: -0.3, braco: 0.6, cacamba: 0.6 },
+      giro: { giro: 0 }, estacionar: { giro: 0, lanca: 0, braco: 0, cacamba: 0 } }[meta];
+    const passos = [];
+    if (meta === "partida") { kgt.freioEst = true; kgt.motor = true; som.hidraulico(1.2); return setTimeout(done, 1500); }
+    if (meta === "circular") { som.buzinaKgt(); kgt.freioEst = false; const x0 = KGT_POS.x, sx = x0 - 3.5 < KGT_X[0] ? -1 : 1; return setTimeout(() => tween(3, k => { KGT_POS.x = x0 - sx * 3.5 * ease(k); posarKgt(); }, done), 700); }
+    if (meta === "freio") {
+      kgt.freioEst = false; const x0 = KGT_POS.x, sx = x0 - 3 < KGT_X[0] ? -1 : 1;
+      return tween(3.2, k => { KGT_POS.x = x0 - sx * 3 * Math.sin(k * Math.PI / 2); posarKgt(); }, () => { kgt.vel = 0; som.trava && som.trava(); done(); });
+    }
+    if (meta === "giro") passos.push({ giro: Math.PI / 2 }, { giro: 0 });
+    else if (alvo) passos.push(alvo);
+    if (meta === "estacionar") { kgt.freioEst = true; kgt.motor = false; }
+    const rodar = () => {
+      const p = passos.shift(); if (!p) return done();
+      const de = kgtPose(); som.hidraulico(1.6);
+      tween(1.8, k => { for (const j in p) { kgt[j] = de[j] + (p[j] - de[j]) * ease(k); } posarKgt(); }, rodar);
+    };
+    rodar();
+  }
+  function atualizarKgt(dt) {
+    if (!kgt.pronta) return;
+    if (kgt.cmd && kgt.operando) {
+      const j = kgt.cmd.j;
+      const passo = Math.min(KVEL[j] * Math.min(dt, 0.1), kgt.cmd.resta);   // cada toque entrega o mesmo curso, mesmo em celular lento
+      kgt.cmd.resta -= passo;
+      if (!moverJunta(j, kgt.cmd.dir * passo) || kgt.cmd.resta <= 1e-4) {
+        if (j === "patolas") setButtons(botoesKgt(kgt.extra));
+        kgt.cmd = null;
+      }
+      if (j === "giro" && Math.abs(kgt.giro) > 1.5) kgt.girou = true;
+    }
+    if (kgt.operando && Math.abs(kgt.vel) > 0.01) {
+      const dx = kgt.vel / 3.6 * dt;
+      const nx = THREE.MathUtils.clamp(KGT_POS.x - dx, KGT_X[0], KGT_X[1]);
+      kgt.andou += Math.abs(nx - KGT_POS.x); kgt.maxVel = Math.max(kgt.maxVel, Math.abs(kgt.vel));
+      if (nx === KGT_POS.x) { kgt.vel = 0; avisoKgt(dx > 0 ? "Fim do trecho livre à frente: a máquina parou. Use a ré." : "Fim do trecho livre atrás: a máquina parou. Ande para a frente."); }
+      KGT_POS.x = nx; posarKgt();
+    }
+    if (kgt.operando) {
+      seguirKgt();
+      kgt.tPainel -= dt;
+      if (kgt.tPainel <= 0) { kgt.tPainel = 0.4; redesenharKgt(false); }
+      if (kgt.meta && kgt.ok === null && METAS_KGT[kgt.meta].ok()) { kgt.ok = true; if (kgt.aoCumprir) kgt.aoCumprir(); }
+    }
+  }
   function mantenedorAgir(ponto, girar) {
     const u = mantenedor.userData;
     const olho = new THREE.Vector3(); camera.getWorldPosition(olho);
@@ -1522,7 +1802,6 @@ body.vr #stick { display: none; }
     for (const b of buttons) { scene.remove(b); const i = pickables.indexOf(b); if (i >= 0) pickables.splice(i, 1); }
     buttons.length = 0;
     const n = list.length, porLinha = 4, w = n > 3 ? 0.4 : 0.46, gap = 0.04;
-    const right = new THREE.Vector3(); panel.getWorldDirection(right); right.cross(new THREE.Vector3(0, 1, 0)).normalize().negate();
     list.forEach(([id, label], i) => {
       const tx = canvasTex(1024, 288);
       tx.ctx.setTransform(1.6, 0, 0, 1.6, 0, 0);
@@ -1531,15 +1810,22 @@ body.vr #stick { display: none; }
       tx.ctx.fillStyle = "#1a1300"; tx.ctx.font = `700 ${fB}px ${FONT}`; tx.ctx.textAlign = "center"; tx.ctx.textBaseline = "middle";
       linhas.forEach((l, k) => tx.ctx.fillText(l, 320, 90 + (k - (linhas.length - 1) / 2) * (fB + 6), 620));
       tx.t.needsUpdate = true;
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.13), new THREE.MeshBasicMaterial({ map: tx.t }));
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.13), new THREE.MeshBasicMaterial({ map: tx.t, depthTest: !kgt.operando, transparent: kgt.operando }));
+      m.renderOrder = kgt.operando ? 998 : 0;
       const lin = Math.floor(i / porLinha), col = i % porLinha, nl = Math.min(porLinha, n - lin * porLinha);
-      const off = -(nl * w + (nl - 1) * gap) / 2 + w / 2 + col * (w + gap);
-      m.position.copy(panel.position).addScaledVector(right, off * PAINEL_ESC); m.position.y -= (0.5 + lin * 0.16) * PAINEL_ESC;
-      m.scale.setScalar(PAINEL_ESC);
-      m.quaternion.copy(panel.quaternion);
+      m.userData.off = -(nl * w + (nl - 1) * gap) / 2 + w / 2 + col * (w + gap); m.userData.lin = lin;
       m.userData.id = "btn:" + id;
       scene.add(m); pickables.push(m); buttons.push(m);
     });
+    layoutBotoes();
+  }
+  // botões embaixo do quadro, onde ele estiver (no poste ou na frente da cabine da KGT)
+  function layoutBotoes() {
+    const esc = panel.scale.x, right = new THREE.Vector3(); panel.getWorldDirection(right); right.cross(new THREE.Vector3(0, 1, 0)).normalize().negate();
+    for (const m of buttons) {
+      m.position.copy(panel.position).addScaledVector(right, m.userData.off * esc); m.position.y -= (0.5 + m.userData.lin * 0.16) * esc;
+      m.quaternion.copy(panel.quaternion);
+    }
   }
 
   // Retícula (círculo de mira) presa à câmera
@@ -1620,6 +1906,8 @@ body.vr #stick { display: none; }
         estalo(t + 0.27, 0.12, 2400, 0.4, 0.18);
       },
       // buzina de locomotiva: dois tons graves
+      buzinaKgt() { const t = agora(); if (t == null) return; tom(t, 0.4, 415, "square", 0.05); tom(t, 0.4, 523, "square", 0.04); },
+      hidraulico(dur) { const t = agora(); if (t == null) return; tom(t, dur || 0.6, 95, "sawtooth", 0.025, 120); estalo(t, dur || 0.6, 900, 0.7, 0.02); },
       buzina(dur) {
         const t = agora(); if (t == null) return; dur = dur || 1.6;
         [[311, 0.06], [370, 0.05], [466, 0.035]].forEach(([fq, v]) => {
@@ -1773,12 +2061,12 @@ body.vr #stick { display: none; }
     demoStats = null;
   }
   function showMenu() {
-    fecharDemo();
+    fecharDemo(); sairKgt(); kgt.painel = null; resetKgt(); afastarEquipeKgt(false);
     mode = "menu"; pulseIds = []; papel = null; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar();
     try { estadoLdlObjetos("off", false, "off"); mostrarCepo(false); } catch (e) {}   // placas, jumper e cepo dos treinos de LDL e de AMV
     drawPanel("Treinamento PRO-001122 · Anexo 5", "Manutenção preventiva da máquina de chave CTS-2",
       "Participante: " + quem() + ".\nEscolha um módulo tocando no botão. Antes de entrar na via, peça licença ao CCP. Sem licença passa trem de minério a cada " + (cfg.trem || 10) + " min.");
-    setButtons([["tour", "Tour da\nmáquina"], ["passosInicio", "Passos\n1 a 17"], ["demo", "Máquina\nfuncionando"], ["explorar", "Explorar\npor dentro"], ["desafios", "Desafios\nde defeitos"], [licenca.ativa ? "devolver" : "licenca", licenca.ativa ? "Devolver a\nlinha ao CCP" : "Pedir licença\nao CCP"]]);
+    setButtons([["tour", "Tour da\nmáquina"], ["passosInicio", "Passos\n1 a 17"], ["demo", "Máquina\nfuncionando"], ["explorar", "Explorar\npor dentro"], ["desafios", "Desafios\nde defeitos"], ["kgtLivre", "Operar\na KGT"], [licenca.ativa ? "devolver" : "licenca", licenca.ativa ? "Devolver a\nlinha ao CCP" : "Pedir licença\nao CCP"]]);
   }
 
   // ---------- Máquina em funcionamento: comando normal / reverso ----------
@@ -2680,7 +2968,7 @@ body.vr #stick { display: none; }
   function mostrarLdl() {
     const e = ldl.etapas[ldl.i];
     if (!e) return fimLdl();
-    pulseIds = []; ldl.d = null; ldl.conf = null;
+    pulseIds = []; ldl.d = null; ldl.conf = null; kgt.painel = null; kgt.meta = null; kgt.extra = null;
     if (e.prep) e.prep();
     if (ehAuto(e)) {
       if (e.decisao && e.conferencia && ldl.papel === "coordenador") return conferirLdl(e);
@@ -2691,6 +2979,7 @@ body.vr #stick { display: none; }
       if (e.apos && !e.feitoInfo) { e.apos(); e.feitoInfo = true; }
       return botoesSeguir();
     }
+    if (e.operar) return operarLdl(e);
     if (e.decisao) {
       const d = e.decisao;
       if (d.antes && !d.jaFalou) { d.antes(); d.jaFalou = true; }
@@ -2703,6 +2992,25 @@ body.vr #stick { display: none; }
     drawPanel(etiquetaLdl(), e.titulo, e.corpo);
     setButtons([["ldl:sair", "Sair"]]);
     pulseIds = [e.alvo].concat(Object.keys(e.errado || {}));
+  }
+  // Etapa "operar": o participante vai para a cabine da KGT e cumpre a meta com os controles
+  function operarLdl(e) {
+    if (!entrarKgt()) { drawPanel(etiquetaLdl(), e.titulo, e.corpo + "\n(A KGT ainda não carregou: toque em Continuar.)"); return botoesSeguir(); }
+    iniciarMetaKgt(e.operar);
+    const meta = METAS_KGT[e.operar];
+    kgt.extra = [["ldl:sair", "Sair"]];
+    kgt.painel = () => { const av = avisoAtivo(); return [etiquetaLdl(), e.titulo, (av ? av + "\n" : "") + e.corpo + "\n" + statusKgt(), av ? "#e5533d" : undefined]; };
+    kgt.aoCumprir = () => {
+      const falha = meta.falha ? meta.falha() : "";
+      ldl.achados.push({ titulo: e.nome || e.titulo, escolha: falha || "feito na KGT", correto: falha ? "dentro do padrão" : "feito na KGT", certo: !falha, critico: false });
+      if (falha) som.erro(); else som.selecionar();
+      if (e.apos) e.apos();
+      kgt.meta = null;
+      kgt.painel = () => [etiquetaLdl(), (falha ? "Atenção: " : "Feito: ") + e.titulo, (falha ? falha + "\n" : "") + e.explica + "\n" + statusKgt(), falha ? "#e5533d" : "#23c552"];
+      kgt.extra = [["ldl:seguir", "Continuar"], ["ldl:sair", "Sair"]];
+      setButtons(botoesKgt(kgt.extra)); redesenharKgt(true);
+    };
+    redesenharKgt(true); setButtons(botoesKgt(kgt.extra));
   }
   // Etapa do outro papel: o avatar faz (toque) ou a decisão aparece pronta, para o participante acompanhar.
   function autoLdl(e) {
@@ -2831,7 +3139,7 @@ body.vr #stick { display: none; }
   // Cada PRO é um arquivo JSON em pros/ (lista em pros/indice.json; guia de conversão em pros/COMO-CRIAR-UM-PRO.md).
   // O carregador sorteia as variáveis, troca os {campos} dos textos e transforma as etapas no formato do motor acima.
   // Um PRO novo também pode ser carregado no celular pela biblioteca ("Carregar PRO"), sem publicar o site.
-  const VERSAO = "13-10-papeis";
+  const VERSAO = "14-10-novos-pros";
   const PROS = {}, ordemPros = [], EXTRAS_KEY = "cts2-vr-pros-carregados";
   let prosErro = "";
   const valorVar = (f, c) => c.split(".").reduce((o, k) => o == null ? undefined : o[k], f);
@@ -2894,7 +3202,7 @@ body.vr #stick { display: none; }
       if (fn) { try { await fn(p.slice(1)); } catch (e) { console.warn("efeito", s, e); } }
     }
   }
-  const PAPEL_PADRAO = { tocar: "executante", decisao: "ambos", info: "ambos" };
+  const PAPEL_PADRAO = { tocar: "executante", decisao: "ambos", info: "ambos", operar: "executante" };
   function compilarEtapas(lista, f, def) {
     const out = [];
     for (const x of lista || []) {
@@ -2924,6 +3232,10 @@ body.vr #stick { display: none; }
         antes: x.radioAntes ? () => falar(x.radioAntes, f) : undefined, senao: x.radioSeErrar ? () => falar(x.radioSeErrar, f) : undefined, apos: depois });
       return { decisao: d, papel: papelE, conferencia: papelE === "executante" && x.conferencia !== false };
     }
+    if (x.tipo === "operar") {   // operar a KGT: o participante cumpre a meta pelos controles da cabine
+      return { operar: x.meta, titulo: T(x.titulo), corpo: T(x.corpo || (METAS_KGT[x.meta] || {}).txt || ""), explica: T(x.explica || ""), papel: papelE,
+        nome: x.nome ? T(x.nome) : undefined, apos: depois, anim: (ff, done) => autoKgt(x.meta, () => { depois(); done(); }) };
+    }
     if (x.tipo === "tocar" && PARTS[x.alvo]) {
       const errado = {}; for (const [k, v] of Object.entries(x.errado || {})) errado[k] = T(v);
       return { alvo: x.alvo, titulo: T(x.titulo), corpo: T(x.corpo || ""), papel: papelE, errado,
@@ -2950,7 +3262,8 @@ body.vr #stick { display: none; }
     if (!Array.isArray(def.roteiros) || !def.roteiros.length) erros.push('Falta "roteiros" (lista com pelo menos um roteiro).');
     const vEtapa = (x, onde) => {
       const t = x && x.tipo;
-      if (!["decisao", "tocar", "lista", "sorteio", "info"].includes(t)) return erros.push(`${onde}: tipo "${t}" desconhecido.`);
+      if (!["decisao", "tocar", "lista", "sorteio", "info", "operar"].includes(t)) return erros.push(`${onde}: tipo "${t}" desconhecido.`);
+      if (t === "operar" && !METAS_KGT[x.meta]) erros.push(`${onde}: meta "${x.meta}" desconhecida (use ${Object.keys(METAS_KGT).join(", ")}).`);
       if (x.papel && !["coordenador", "executante", "ambos"].includes(x.papel)) erros.push(`${onde}: papel "${x.papel}" inválido.`);
       if (t === "decisao") { if (!x.titulo || !x.visto || !x.certa) erros.push(`${onde}: decisão precisa de titulo, visto e certa.`); if (!Array.isArray(x.erradas) || !x.erradas.length) erros.push(`${onde}: decisão precisa de pelo menos uma resposta errada.`); }
       if (t === "tocar") { if (!x.alvo || !x.titulo) erros.push(`${onde}: toque precisa de alvo e titulo.`); else if (!PARTS[x.alvo]) avisos.push(`${onde}: a peça "${x.alvo}" não existe na cena; vira etapa de confirmação.`); }
@@ -2998,7 +3311,7 @@ body.vr #stick { display: none; }
   function menuRoteiro(id) {
     const def = PROS[id];
     if (!def) return showMenu();
-    fecharDemo();
+    fecharDemo(); sairKgt(); kgt.painel = null; resetKgt(); afastarEquipeKgt(false);
     mode = "menuRt"; pulseIds = []; papel = null; resetMaquina(); restaurarModelo(true); limparDesafio(); guardarFerramentas(); mantenedorVoltar();
     estadoLdlObjetos("off", false, "off"); mostrarCepo(false);
     if (posicao !== "normal") moverAmv("normal", false);
@@ -3218,6 +3531,8 @@ body.vr #stick { display: none; }
       som.selecionar();
       const b = id.slice(4);
       if (b === "menu") return showMenu();
+      if (b.startsWith("kgt:")) return acaoKgt(b.slice(4));
+      if (b === "kgtLivre") return startKgtLivre();
       if (b.startsWith("linha:")) return acaoLinha(b);
       if (b.startsWith("ldl:")) return acaoLdl(b);
       if (b.startsWith("rt:")) return acaoRoteiro(b);
@@ -3496,6 +3811,7 @@ body.vr #stick { display: none; }
   // Caminha suavemente até o ponto tocado
   let destino = null;
   function andarAte(p) {
+    if (kgt.operando) return hint("Você está na cabine da KGT: use os botões ou toque em Sair da KGT.");
     destino = new THREE.Vector3(THREE.MathUtils.clamp(p.x, -14, 14), 0, THREE.MathUtils.clamp(p.z, -8, 9));
     alvoChao.position.set(destino.x, alturaLastro(destino.z) + 0.03, destino.z); alvoChao.visible = true;
     som.passos();
@@ -3707,6 +4023,7 @@ body.vr #stick { display: none; }
     rig.updateMatrixWorld(true);
 
     const mv = entradaMovimento();
+    if (kgt.operando) mv.frente = mv.lado = 0;   // na cabine da KGT quem anda é a máquina
     if (mv.frente || mv.lado) {
       const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0;
       if (f.lengthSq() < 1e-6) f.set(0, 0, -1);
@@ -3745,8 +4062,8 @@ body.vr #stick { display: none; }
       if (performance.now() < ex.piscarAte) for (const p of ex.piscar) { p.material.emissive.setHex(0xf2a400); p.material.emissiveIntensity = 0.4 + 0.4 * Math.sin(t * 12); }
     }
     atualizarModelo(dt);
-    atualizarAvatares(dt); atualizarFerramentas(); atualizarTrem(dt);
-    for (const b of buttons) b.scale.setScalar((b.userData.id === hovered ? 1.06 : 1) * PAINEL_ESC);
+    atualizarAvatares(dt); atualizarFerramentas(); atualizarTrem(dt); atualizarKgt(dt);
+    for (const b of buttons) b.scale.setScalar((b.userData.id === hovered ? 1.06 : 1) * panel.scale.x);
 
     // caminhada até o ponto tocado
     if (destino) {
@@ -3761,8 +4078,9 @@ body.vr #stick { display: none; }
         rig.updateMatrixWorld(true);
       }
     }
-    // a câmera não entra nos objetos nem nas pessoas
-    empurrar(rig.position, R_CAMERA, rig); rig.updateMatrixWorld(true);
+    // a câmera não entra nos objetos nem nas pessoas (na cabine da KGT ela vai junto com a máquina)
+    if (!kgt.operando) empurrar(rig.position, R_CAMERA, rig);
+    rig.updateMatrixWorld(true);
     if (destino) { alvoChao.visible = true; alvoChao.position.set(destino.x, alturaLastro(destino.z) + 0.03, destino.z); }
 
     const w = stage.clientWidth, h = stage.clientHeight;
@@ -3783,6 +4101,7 @@ body.vr #stick { display: none; }
   if (!/test\.html$/.test(location.pathname)) abrirBib();
   if (!pessoa.nome || !pessoa.mat) pedirIdentificacao();
   document.fonts && document.fonts.ready.then(() => { if (mode === "menu") showMenu(); });
+  if (/[?&]teste\b/.test(location.search)) window.__t = { posar: () => posarKgt(), olhar: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(new THREE.Vector3().copy(rig.position).add(camera.position)); yaw = Math.atan2(-d.x, -d.z); pitch = Math.atan2(d.y, Math.hypot(d.x, d.z)); }, select, kgt, KGT_POS, PROS, validarPro, startRoteiro, rig, panel, buttons, modo: () => mode, ldl: () => ldl, painel: () => ultimoPainel };   // só para testes automáticos
   requestAnimationFrame(loop);
 })();
 </script>
