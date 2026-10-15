@@ -1346,7 +1346,7 @@ body.vr #stick { display: none; }
     if (!kgt.pronta) return false;
     if (!kgt.operando) {
       quadroCasa.p = panel.position.clone(); quadroCasa.q = panel.quaternion.clone(); quadroCasa.s = panel.scale.x;
-      kgt.operando = true; destino = null; marcado = null; kgt.giroVisto = kgt.giro;
+      kgt.operando = true; destino = null; marcado = null; kgt.giroVisto = kgt.giro + kgt.h;
       afastarEquipeKgt(true); som.hidraulico(0.8);
       panel.material.depthTest = false; panel.renderOrder = 997;   // na cabine o quadro fica sempre à vista, na frente do painel da máquina
       seguirKgt();
@@ -1373,8 +1373,8 @@ body.vr #stick { display: none; }
   const baseBotoes = new THREE.Object3D();   // na cabine os botões ficam separados do quadro, abaixo do para-brisa
   function seguirKgt() {
     kgt.olho.getWorldPosition(_v); rig.position.set(_v.x, _v.y - camera.position.y, _v.z);
-    const d = kgt.giro - kgt.giroVisto; kgt.giroVisto = kgt.giro;
-    if (d) { yaw += d; yawExtra += d; }      // a cabine gira junto com o operador
+    const d = angDif(kgt.giro + kgt.h - kgt.giroVisto); kgt.giroVisto = kgt.giro + kgt.h;   // curva do KGT e giro da cabine
+    if (d) { yaw += d; yawExtra += d; }      // a vista acompanha a cabine nas curvas e no giro
     kgt.quadro.getWorldPosition(_w);
     panel.position.copy(_w); panel.scale.setScalar(KGT_PAINEL_ESC); panel.lookAt(_v);
     kgt.botoes.getWorldPosition(baseBotoes.position); baseBotoes.lookAt(_v);
@@ -1500,6 +1500,11 @@ body.vr #stick { display: none; }
     };
     rodar();
   }
+  // sirene de ré: um bip a cada 0,9 s enquanto o KGT anda para trás (dirigido pelo participante ou sozinho)
+  function alarmeRe(dt, re) {
+    if (!re) { kgt.tRe = 0; return; }
+    kgt.tRe = (kgt.tRe || 0) - dt; if (kgt.tRe <= 0) { kgt.tRe = 0.9; som.re(); }
+  }
   function atualizarKgt(dt) {
     if (!kgt.pronta) return;
     if (kgt.cmd && kgt.operando) {
@@ -1514,6 +1519,8 @@ body.vr #stick { display: none; }
     }
     if (kgt.operando && !kgt.batido) controlesKgt(dt);
     const de = kgt.est; kgt.est += THREE.MathUtils.clamp(kgt.alvoEst - kgt.est, -1.2 * dt, 1.2 * dt);   // o volante leva um tempo para virar as rodas
+    if (kgt.operando) alarmeRe(dt, kgt.vel < -0.1);
+    som.motorKgt(kgt.motor && !kgt.batido, Math.abs(kgt.vel) / 30);
     if (kgt.operando && !kgt.batido && Math.abs(kgt.vel) > 0.01) { kgt.maxVel = Math.max(kgt.maxVel, Math.abs(kgt.vel)); dirigirKgt(kgt.vel / 3.6 * Math.min(dt, 0.1)); }
     else if (kgt.est !== de) posarKgt();
     vigiarViaKgt(dt);
@@ -2090,8 +2097,30 @@ body.vr #stick { display: none; }
       o.connect(g); g.connect(saida); o.start(t); o.stop(t + dur + 0.02);
     }
     function agora() { return iniciar() ? ctx.currentTime : null; }
+    let mot = null;   // ronco contínuo do motor do KGT
     return {
       iniciar,
+      // motor do KGT ligado: ronco grave com batida de diesel, que sobe um pouco com a velocidade; para quando desliga
+      motorKgt(ligado, giro) {
+        if (!ligado) {
+          if (mot && ctx) { const m = mot; mot = null; m.g.gain.cancelScheduledValues(ctx.currentTime); m.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.15); setTimeout(() => { try { m.os.forEach(o => o.stop()); } catch (e) {} }, 900); }
+          return;
+        }
+        if (!mot) {
+          const t = agora(); if (t == null) return;
+          const o = ctx.createOscillator(), o2 = ctx.createOscillator(), lfo = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain(), am = ctx.createGain(), lg = ctx.createGain();
+          o.type = "sawtooth"; o.frequency.value = 34; o2.type = "square"; o2.frequency.value = 68;
+          lfo.type = "sine"; lfo.frequency.value = 8.5; lg.gain.value = 0.5; am.gain.value = 0.6;
+          f.type = "lowpass"; f.frequency.value = 320;
+          const g2 = ctx.createGain(); g2.gain.value = 0.25;
+          o.connect(f); o2.connect(g2); g2.connect(f); f.connect(am); lfo.connect(lg); lg.connect(am.gain); am.connect(g); g.connect(saida);
+          g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06, t + 0.6);
+          [o, o2, lfo].forEach(x => x.start(t));
+          mot = { o, o2, lfo, g, os: [o, o2, lfo] };
+        }
+        const k = Math.min(1, giro || 0), t = ctx.currentTime;
+        mot.o.frequency.setTargetAtTime(34 + 26 * k, t, 0.3); mot.o2.frequency.setTargetAtTime(68 + 52 * k, t, 0.3); mot.lfo.frequency.setTargetAtTime(8.5 + 9 * k, t, 0.3);
+      },
       // relé / contator fechando
       rele() { const t = agora(); if (t == null) return; estalo(t, 0.04, 3200, 2, 0.9); estalo(t + 0.012, 0.06, 900, 3, 0.6); },
       clique() { const t = agora(); if (t == null) return; estalo(t, 0.03, 2500, 4, 0.6); },
@@ -2129,7 +2158,9 @@ body.vr #stick { display: none; }
       // buzina de locomotiva: dois tons graves
       // batida pesada: trem contra o KGT
       batida() { const t = agora(); if (t == null) return; estalo(t, 0.7, 260, 0.8, 1.3); estalo(t + 0.04, 0.5, 1700, 2, 0.9); tom(t, 0.9, 70, "sine", 0.5, 30); estalo(t + 0.35, 0.6, 600, 1, 0.7); },
-      buzinaKgt() { const t = agora(); if (t == null) return; tom(t, 0.4, 415, "square", 0.05); tom(t, 0.4, 523, "square", 0.04); },
+      buzinaKgt() { som.buzina(1.2); },   // buzina igual à do trem (pedido do Erick)
+      // alarme de ré: bip agudo intermitente enquanto o KGT anda para trás
+      re() { const t = agora(); if (t == null) return; tom(t, 0.42, 1250, "square", 0.045); },
       hidraulico(dur) { const t = agora(); if (t == null) return; tom(t, dur || 0.6, 95, "sawtooth", 0.025, 120); estalo(t, dur || 0.6, 900, 0.7, 0.02); },
       buzina(dur) {
         const t = agora(); if (t == null) return; dur = dur || 1.6;
@@ -3775,6 +3806,7 @@ body.vr #stick { display: none; }
     } else if (s.tipo === "andar") {
       const x = s.x0 + (s.x - s.x0) * e, z = s.z0 + (s.z - s.z0) * e, f = kgtFrente(kgt.h);
       kgt.rodaAng = s.r0 + ((x - s.x0) * f.x + (z - s.z0) * f.z) / KR.raio;
+      if (((s.x - s.x0) * f.x + (s.z - s.z0) * f.z) < 0) alarmeRe(dt, true);
       KGT_POS.x = x; KGT_POS.z = z; KGT_POS.y = alturaKgt(); posarKgt();
     }
     if (kt.pousar) kt.pousar.k = s.pousar ? e : kt.pousar.k;
@@ -4009,7 +4041,7 @@ body.vr #stick { display: none; }
     }
     if (a === "descarregar" && c.novaNoChao) return concluirTroca(e);
     if (kgt.implemento !== "garra") { kgt.implemento = "garra"; posarKgt(); atualizarReserva(); }
-    kt.visivel = false;
+    kt.visivel = false; kgt.motor = true;   // o operador liga o motor
     const off = c.centro.clone().sub(c.pega), up = h => new THREE.Vector3(0, h || 0, 0);
     const G = (D, h) => D.clone().add(off).add(up(h));   // centro da garra para a carga (origem no ponto de pega) ficar em D
     const ir = (D, h, yaw, dur, extra, abertura) => juntas(poseGarra(G(D, h), yaw, c.kgt, abertura), dur, "carga", extra);
@@ -4252,7 +4284,7 @@ body.vr #stick { display: none; }
     if (!kgt.pronta) return;
     kt.visivel = false;
     await filaKgt([juntas({ giro: 0, lanca: 0, braco: 0, cacamba: 0, rot: 0 }, 1.8, null), juntas({ patolas: 0 }, 1.0, null), { tipo: "esperarZona", zona: "kgt" }, { tipo: "andar", x: 14, z: 6.2, dur: 6, zona: "kgt" }]);
-    afastarEquipeKgt(false); voltarFigurasTroca();
+    afastarEquipeKgt(false); voltarFigurasTroca(); kgt.motor = false;
   }
   function atualizarTroca(dt, t) {
     passoKgtTroca(dt);
