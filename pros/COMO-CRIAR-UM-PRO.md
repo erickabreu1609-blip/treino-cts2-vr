@@ -141,7 +141,7 @@ Quando a etapa é do outro papel, o avatar faz sozinho e o quadro mostra "Acompa
 
 **info**: só mostra um texto e o botão Continuar (pode ter `falas`, `radio` e `efeitos`).
 
-**operar**: o participante vai para a cabine da KGT da cena e cumpre uma meta com os controles (o quadro de controles fica dentro da cabine). Quando a etapa é do outro papel, a KGT se move sozinha. Pode ter `falas`, `radio` e `efeitos`, que rodam quando a meta é cumprida.
+**operar**: o participante vai para a cabine do KGT da cena e cumpre uma meta com os controles (o quadro de controles fica dentro da cabine). O KGT dirige como um carro (volante, Frente/Ré ou o controle na tela). Se ele entrar na via sem LDL ou licença, toca o alarme de ocupação indevida e o próximo trem pode bater nele (falha crítica, o treino recomeça). Quando a etapa é do outro papel, o KGT se move sozinho. Pode ter `falas`, `radio` e `efeitos`, que rodam quando a meta é cumprida.
 
 ```json
 { "tipo": "operar", "papel": "executante", "meta": "freio", "titulo": "Teste de freio",
@@ -176,6 +176,7 @@ Uma peça que não está na lista vira etapa de confirmação, até alguém mode
 | `ldl:encerrar:<motivo>` | encerra a LDL sem fala |
 | `evento:<texto>` | registra um evento do CCP no relatório |
 | `trem:<segundos>` | um trem de minério passa daqui a tantos segundos |
+| `licenca:conceder:<quem>:<registro>` | licença do CCP fora de uma LDL (ex.: acesso do KGT à via): o trem fica retido e o CCP pede permissão para circular. `licenca:devolver:<registro>` devolve a linha |
 
 ### Desafios
 
