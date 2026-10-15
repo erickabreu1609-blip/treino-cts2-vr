@@ -165,6 +165,7 @@ Metas: `partida` (ligar o motor com o freio de mão puxado), `transporte` (braç
   - `travamento` (unidade de travamento da CTS-2): `clipers`, `conector`, `juncao`, `dormente`.
 - `acao`: `soltar` e `fixar` (fixações do grupo, na ordem em que piscam; `fixar` é a ordem inversa), `descarregar` (o KGT traz a peça nova pendurada e a deposita ao lado da via), `retirar` (o KGT iça a peça velha; se ainda houver fixação presa, não iça e conta erro), `posicionar` (o KGT pega a peça nova e assenta no lugar). Sem `descarregar`, a peça nova já está no palete ao lado da via.
 - `ferramenta` (opcional): ferramenta mostrada em cada fixação, no lugar da padrão de cada uma.
+- Nas ações com o KGT (`descarregar`, `retirar`, `posicionar`), na primeira delas o participante escolhe quem opera o KGT. **Eu opero o KGT**: ele vai para a cabine, o KGT se posiciona e aciona os estabilizadores, e ele leva o gancho até a peça com os controles (lança, braço, giro e caçamba, com Movimento fino para o ajuste). O executante passa a cinta, ele leva a carga até a caixa verde e toca em Assentar e soltar. O sinaleiro mostra no quadro quanto falta (gire, afaste ou aproxime, suba ou desça). **O operador opera**: o KGT faz tudo sozinho. Vale para qualquer papel.
 - `papel` padrão: `executante`.
 
 ### Peças da cena (`alvo`, `errado`, `pistas`)
