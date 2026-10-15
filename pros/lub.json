@@ -1,0 +1,81 @@
+{
+  "formato": "treino-pro-vr/1",
+  "id": "lub",
+  "pro": "PRO-016249 rev. 08 · EFC",
+  "etiqueta": "Lubrificação do AMV",
+  "titulo": "Lubrificação manual do AMV",
+  "resumo": "Cepo, limpeza das placas, graxa grafitada na reta e na reversa, comando com autorização e roletes.",
+  "grupo": "AMV",
+  "prefixo": "VP",
+  "papeis": {
+    "coordenador": "Pede a LDL, pede ao centro de controle o comando para a reversa, decide diante de chuva e de perda de indicação e confere o serviço do executante.",
+    "executante": "Aplica e retira o cepo, limpa as placas, passa a graxa na reta e na reversa e lubrifica os roletes."
+  },
+  "falaInicio": "Equipe, lubrificação das placas do AMV 03. Cepo sempre pela alça.",
+  "falaFim": "Lubrificação concluída sem desvios.",
+  "sorteio": {
+    "chuva": { "tipo": "chance", "p": 0.4 },
+    "semIndicacao": { "tipo": "chance", "p": 0.35 }
+  },
+  "roteiros": [
+    {
+      "id": "lubrificacao", "botao": "Começar", "modulo": "Lubrificação manual (PRO-016249)",
+      "descricao": "LDL, cepo, limpeza das placas, graxa grafitada na reta e na reversa, comando com autorização do centro de controle e roletes. Chuva e perda de indicação podem ser sorteadas.",
+      "etapas": [
+        { "tipo": "decisao", "papel": "coordenador", "titulo": "Acesso à via", "visto": "A lubrificação das placas do AMV 03 está programada. Como entrar na via?",
+          "certa": "Pedir a LDL ao CCP (PGS-003781) e entrar só com a linha jumpeada ou ocupada.", "erradas": ["Entrar rápido entre dois trens.", "Avisar o CCP e entrar sem LDL: é serviço curto."],
+          "explica": "PRO-016249, atividades preliminares: solicitar a LDL conforme o PGS-003781; parâmetro: linha jumpeada ou ocupada com EVP.",
+          "critico": { "1": "Entrou na via sem LDL.", "2": "Entrou na via sem LDL." }, "efeitos": ["ldl:abrir:lubrificação do AMV"] },
+        { "tipo": "tocar", "papel": "executante", "alvo": "agulhas", "titulo": "Bloqueie o AMV",
+          "corpo": "Coloque o cepo (mão amiga) entre a agulha e o trilho de encosto, sempre segurando pela alça. Toque nas agulhas.", "efeitos": ["cepo:on", "som:encaixe"] },
+        { "tipo": "decisao", "papel": "executante", "titulo": "Limpeza das placas", "visto": "Como limpar as placas de deslizamento?",
+          "certa": "Raspar com espátula (escova de aço e pano se preciso) e coletar o resíduo num recipiente.", "erradas": ["Jogar desengripante e deixar escorrer na brita.", "Não limpar: a graxa nova empurra a velha."],
+          "explica": "PRO-016249 9: raspar graxa e sujeira com espátula, escova de aço e pano; recolher o resíduo, sem deixar graxa na brita ou nos dormentes." },
+        { "tipo": "decisao", "se": "chuva", "papel": "coordenador", "titulo": "Começou a chover", "visto": "Começa a chover forte durante a limpeza das placas.",
+          "certa": "Parar a atividade e aguardar o tempo normalizar.", "erradas": ["Acelerar para terminar antes de molhar.", "Passar a graxa assim mesmo: ela protege da água."],
+          "explica": "PRO-016249 9: com chuva, parar e aguardar o tempo normalizar.",
+          "falas": [ { "quem": "Coordenador", "instrucao": true, "texto": "Equipe, parem a atividade e aguardem a chuva passar." } ] },
+        { "tipo": "tocar", "papel": "executante", "alvo": "agulhas", "titulo": "Lubrifique a posição reta",
+          "corpo": "Com o pincel de 2\", passe uma camada fina e uniforme de graxa grafitada nas placas da posição reta. Toque nas agulhas.", "efeitos": ["som:clique"] },
+        { "tipo": "decisao", "papel": "executante", "titulo": "Onde passar graxa", "visto": "Quais placas recebem graxa?",
+          "certa": "Só as placas com movimento efetivo das agulhas: primeiro na reta, depois na reversa.", "erradas": ["Todas as placas do AMV, inclusive as fixas.", "Também o boleto do trilho de encosto, para a agulha deslizar."],
+          "explica": "PRO-016249 9: graxa só nas placas com ação efetiva de movimentação; lubrificar a reta e depois a reversa. Na lateral da ponta da agulha, só se houver desgaste por contato do friso." },
+        { "tipo": "decisao", "papel": "coordenador", "titulo": "Mover para a reversa", "visto": "É uma máquina de chave elétrica sem controle local. Como levar as agulhas para a reversa?",
+          "certa": "Retirar o cepo e pedir ao centro de controle; com a autorização e após retirar o jumper, a MCH é movimentada.",
+          "erradas": ["Abrir a portinhola e mover na manivela sem avisar ninguém.", "Pedir o comando com o cepo instalado."],
+          "explica": "PRO-016249 9: o AMV elétrico sem controle local só é movimentado com autorização do centro de controle, após a retirada do jumper da via.",
+          "critico": { "1": "Movimentou a MCH sem autorização do centro de controle." },
+          "radio": [ { "quem": "Coordenador", "texto": "CCP, {prefixo}. Cepo retirado, pessoal fora das agulhas. Peço comando do AMV 03 para reversa." }, { "quem": "CCP", "texto": "{prefixo}, comando para reversa." } ],
+          "efeitos": ["cepo:off", "objetos:on:0:off", "amv:reverso:auto"] },
+        { "tipo": "decisao", "se": "semIndicacao", "papel": "coordenador", "titulo": "Perdeu a indicação", "visto": "Depois do comando, o AMV ficou sem indicação.",
+          "certa": "Acionar o MCM e seguir o fluxo do processo.", "erradas": ["Forçar na manivela até indicar.", "Devolver a LDL e deixar a falha para a EE achar."],
+          "explica": "PRO-016249 9, desvios: perda de indicação do AMV → acionar o MCM e seguir o fluxo." },
+        { "tipo": "tocar", "papel": "executante", "alvo": "agulhas", "titulo": "Lubrifique a reversa",
+          "corpo": "Recoloque o jumper e o cepo e passe a graxa nas placas da posição reversa. Toque nas agulhas.", "efeitos": ["objetos:on:0:on", "cepo:on", "som:clique"] },
+        { "tipo": "decisao", "papel": "executante", "titulo": "Roletes das agulhas", "visto": "O AMV tangencial tem roletes nas agulhas com pino graxeiro. Como lubrificar?",
+          "certa": "Encaixar o bico da bomba no pino graxeiro, bombear até encher o rolete e limpar o excesso.", "erradas": ["Passar graxa com o pincel por fora do rolete.", "Roletes não se lubrificam."],
+          "explica": "PRO-016249 9: bomba de graxa no pino graxeiro até o completo enchimento e retirada das sobras." },
+        { "tipo": "tocar", "papel": "executante", "alvo": "cepo", "titulo": "Encerre", "corpo": "Retire o cepo pela alça e recolha os resíduos de graxa. Toque no cepo.",
+          "efeitos": ["cepo:off", "som:encaixe", "ldl:devolver:Lubrificação do AMV 03 concluída.", "amv:normal:auto"] }
+      ]
+    }
+  ],
+  "desafios": [
+    { "id": "graxa_brita", "nome": "Graxa e resíduo deixados na brita", "curto": "Graxa na\nbrita",
+      "relato": [ { "quem": "Coordenador", "instrucao": true, "texto": "Executante, antes de devolver a LDL, confira se a lubrificação do AMV 03 ficou no padrão." } ],
+      "pistas": { "agulhas": "As placas de deslizamento estão com camada fina e uniforme de graxa grafitada.", "dormente": "Há graxa velha raspada escorrida sobre a brita e os dormentes, fora do recipiente.", "cepo": "O cepo já foi retirado." },
+      "verificacoes": [],
+      "correcao": "PRO-016249 9: o resíduo raspado vai para um recipiente; não deixar graxa na brita nem nos dormentes. Recolher antes de encerrar." },
+    { "id": "graxa_fixas", "nome": "Graxa nas placas fixas e no boleto", "curto": "Graxa no\nlugar errado",
+      "relato": [ { "quem": "Coordenador", "instrucao": true, "texto": "Executante, antes de devolver a LDL, confira se a lubrificação do AMV 03 ficou no padrão." } ],
+      "pistas": { "encosto": "O boleto do trilho de encosto foi engraxado.", "agulhas": "As placas sem movimento efetivo das agulhas também receberam graxa.", "dormente": "Brita limpa." },
+      "verificacoes": [],
+      "correcao": "PRO-016249 9: graxa só nas placas com movimento efetivo das agulhas, primeiro na reta e depois na reversa; o boleto não leva graxa." },
+    { "id": "comando_sem_autorizacao", "nome": "Comando pedido com o cepo e o jumper no lugar", "curto": "Comando\ncom cepo", "critico": true,
+      "relato": [ { "quem": "CCP", "texto": "Equipe do AMV 03, aqui é o CCP. Vocês pediram comando para reversa, mas o circuito continua ocupado e a máquina não completou." } ],
+      "prep": ["cepo:on", "objetos:on:0:on"],
+      "pistas": { "cepo": "O cepo continua entre a agulha e o trilho de encosto.", "jumper": "O jumper continua instalado na via.", "agulhas": "A agulha parou no cepo." },
+      "verificacoes": [],
+      "correcao": "PRO-016249 9: retirar o cepo, retirar o jumper e só então pedir ao centro de controle o comando da MCH sem controle local." }
+  ]
+}

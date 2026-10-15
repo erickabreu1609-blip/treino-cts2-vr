@@ -1,0 +1,92 @@
+{
+  "formato": "treino-pro-vr/1",
+  "id": "sens",
+  "pro": "PRO-001164 rev. 11 · PGS-006334 rev. 03",
+  "etiqueta": "Inspeção sensitiva",
+  "titulo": "Inspeção sensitiva e classificação de defeitos",
+  "resumo": "Regras da inspeção sensitiva e defeitos sorteados para classificar em P0, P1F, P1 e P2.",
+  "grupo": "Via",
+  "prefixo": "VP",
+  "papeis": {
+    "coordenador": "Monta a equipe, pede a LDL, trata anomalias de risco com o centro de controle, define prazos e registros e confere as classificações do inspetor.",
+    "executante": "Inspetor: mede o desgaste com o vampiro e classifica os defeitos encontrados."
+  },
+  "falaInicio": "Equipe, inspeção sensitiva da linha 02 e do AMV 03. Duas pessoas, EAT ligado.",
+  "falaFim": "Inspeção registrada e classificada corretamente.",
+  "listas": {
+    "CLASSIF": [
+      ["Desgaste do boleto medido com o vampiro: 33%.", "P0 com restrição imediata", ["P0 com restrição programada", "P1F"]],
+      ["Desgaste do boleto medido com o vampiro: 32%.", "P0 com restrição programada", ["P0 com restrição imediata", "P1"]],
+      ["Desgaste do boleto medido com o vampiro: 31%.", "P1F", ["P1", "P0 com restrição programada"]],
+      ["Desgaste do boleto medido com o vampiro: 30%.", "P1", ["P1F", "P2"]],
+      ["Placa de apoio na ponta da agulha se movendo 9 mm com a passagem do trem (dormente de madeira).", "Dormente inservível (I)", ["Dormente bom: o limite é 12 mm", "Dormente ausente (A)"]],
+      ["Dormente queimado, sem resistência vertical nem lateral.", "Dormente ausente (A)", ["Dormente inservível (I)", "Dormente bom"]],
+      ["Dormente de concreto com abrasão de 22 mm na região do trilho.", "Dormente inservível (I)", ["Dormente bom", "Dormente ausente (A)"]],
+      ["Placa de apoio em linha de pátio se movendo 10 mm, fora da região da agulha.", "Dormente ainda dentro do limite (12 mm)", ["Dormente inservível (I)", "Dormente ausente (A)"]],
+      ["Parafuso curto comprimindo a mola do rolete do jacaré: mola comprimida, sem função.", "P0 com restrição programada", ["P1", "P0 com interdição"]],
+      ["Bandeja do jacaré descentralizada no vão.", "P0 com restrição programada", ["P2", "P0 com interdição"]],
+      ["RCF e amassamento na transição da pata de lebre para a ponta principal do jacaré.", "P0 com restrição programada", ["P2", "P1"]],
+      ["Toque severo do friso na ponta da agulha, com risco de fratura.", "P0 com restrição programada", ["P1", "P2"]],
+      ["Punhos das barras de detecção e atuação descentralizados em relação aos parafusos.", "P1F", ["P0 com interdição", "P2"]],
+      ["Escoras ajustáveis soltas na região da agulha.", "P0 com restrição programada", ["P2", "P1"]],
+      ["Trinca transversal na ponta do jacaré de ponta fixa (JPF), sem impedir a circulação restrita.", "P0 com restrição", ["P1F", "P0 com interdição"]],
+      ["Fratura na ponta principal do jacaré de ponta móvel (JPM).", "P0 com interdição", ["P0 com restrição programada", "P1F"]],
+      ["Vedação da agulha do JPM aberta 4 mm.", "P0 com interdição", ["P0 com restrição programada", "P1"]],
+      ["Vedação da agulha do JPM aberta 3 mm.", "P0 com restrição programada", ["P0 com interdição", "P2"]]
+    ]
+  },
+  "roteiros": [
+    {
+      "id": "inspecao", "botao": "Começar", "modulo": "Inspeção sensitiva e classificação (PRO-001164 / PGS-006334)",
+      "descricao": "Regras da inspeção, uso do vampiro, fratura na rota e 5 defeitos sorteados para classificar (P0, P1F, P1, P2, dormentes A e I).",
+      "etapas": [
+        { "tipo": "decisao", "papel": "coordenador", "titulo": "Equipe da inspeção", "visto": "Quantas pessoas, no mínimo, fazem a inspeção sensitiva de via?",
+          "certa": "Duas.", "erradas": ["Uma, com rádio.", "Três: inspetor, auxiliar e coordenador."], "explica": "PRO-001164 8.2.1: no mínimo duas pessoas." },
+        { "tipo": "decisao", "papel": "coordenador", "titulo": "Inspeção sobre a via", "visto": "A rota inclui o AMV 03 do pátio, inspecionado sobre a via.",
+          "certa": "Só com LDL aberta e usando o EAT o tempo todo.", "erradas": ["Pode ir sem LDL: inspeção visual não precisa.", "Basta avisar o CCP que vai entrar."],
+          "explica": "PRO-001164 8.2.5 e 10.1: inspeção sobre a via em pátio, terminal, AMV e TU só com LDL aberta, com EAT durante toda a inspeção.",
+          "critico": { "1": "Inspecionou sobre a via sem LDL.", "2": "Inspecionou sobre a via sem LDL." },
+          "efeitos": ["ldl:abrir:inspeção sensitiva"] },
+        { "tipo": "tocar", "papel": "executante", "alvo": "encosto", "titulo": "Meça o desgaste",
+          "corpo": "Com o vampiro, meça o desgaste do trilho de encosto. Toque no trilho de encosto, o trilho fixo do lado de fora da agulha.",
+          "efeitos": ["ferramenta:regua:encosto:F e C"] },
+        { "tipo": "decisao", "papel": "executante", "titulo": "Uso do vampiro", "visto": "Como posicionar o medidor de desgaste (vampiro)?",
+          "certa": "Trilho limpo, agulha C para o lado de dentro da bitola, ler F e C e converter pela tabela de desgaste.",
+          "erradas": ["Agulha C para fora da bitola e ler só a F.", "Medir sem limpar: a sujeira não altera a leitura."],
+          "explica": "PRO-001164 10.5: limpar o local, agulha C para a parte interna da bitola, registrar F e C e conferir na tabela do Anexo 01.",
+          "efeitos": ["ferramentas:guardar"] },
+        { "tipo": "decisao", "papel": "coordenador", "titulo": "Trilho fraturado na rota", "visto": "Mais à frente a equipe encontra um trilho fraturado.",
+          "certa": "Chamar o centro de controle em emergência e depois comunicar o MCM.", "erradas": ["Registrar no ValeForms no fim do dia.", "Marcar com tinta e seguir a rota."],
+          "explica": "PRO-001164 10.1 e 8.3.3: anomalia com risco à circulação (fratura de trilho, solda, tala) é comunicada em emergência ao centro de controle; depois ao MCM.",
+          "radio": [ { "quem": "Coordenador", "urgente": true, "texto": "Emergência, emergência, emergência. CCP, aqui é {prefixo}, na linha 02 do pátio. Trilho fraturado. Interditem a circulação." } ] },
+        { "tipo": "decisao", "papel": "coordenador", "titulo": "Prazo do P0 programado", "visto": "Um defeito foi classificado como P0 com restrição programada numa linha de pátio. Qual o prazo para retirá-lo antes de a velocidade ser reduzida?",
+          "certa": "30 dias (na linha tronco são 15 dias).", "erradas": ["15 dias.", "7 dias."],
+          "explica": "PGS-006334: P0 com restrição programada tem prazo de 30 dias em pátios e terminais e de 15 dias nas linhas 01 e 02 da linha tronco." },
+        { "tipo": "lista", "lista": "CLASSIF", "n": 5, "papel": "executante", "titulo": "Classifique", "pergunta": "Como classificar?",
+          "nome": "Classificação: {visto}", "explica": "PGS-006334: {visto} Classificação: {certa}." },
+        { "tipo": "decisao", "papel": "coordenador", "titulo": "Fim da inspeção", "visto": "A inspeção terminou. O que fazer com os registros?",
+          "certa": "Registrar todas as anomalias com dados de localização e evidências no ValeForms/PowerApp, dentro do prazo de cada prioridade.",
+          "erradas": ["Passar por rádio ao CCP e não registrar.", "Registrar só os P0."],
+          "explica": "PRO-001164 8.4 e PGS-006334: cadastro com localização, evidências e prazos por prioridade (P0, P1F, P1, P2).",
+          "efeitos": ["ldl:devolver:Inspeção sensitiva concluída."] }
+      ]
+    }
+  ],
+  "desafios": [
+    { "id": "desgaste33", "nome": "Desgaste de 33% no trilho de encosto (P0 imediata)", "curto": "Desgaste\n33%", "critico": true,
+      "relato": [ { "quem": "Coordenador", "instrucao": true, "texto": "Inspetor, a OM pede para conferir o AMV 03: ache o defeito mais grave e classifique." } ],
+      "pistas": { "encosto": "Vampiro no trilho de encosto, limpo e com a agulha C para dentro da bitola: a tabela dá 33% de desgaste do boleto.", "agulhas": "Agulhas sem trinca e sem toque do friso.", "dormente": "Dormente oco firme; a placa não se move.", "barra": "Punhos centralizados em relação aos parafusos." },
+      "verificacoes": [],
+      "correcao": "PGS-006334: desgaste de 33% ou mais é P0 com restrição imediata; comunicar e registrar com localização e evidência." },
+    { "id": "placa_agulha", "nome": "Dormente inservível na ponta da agulha", "curto": "Dormente\ninservível",
+      "relato": [ { "quem": "Coordenador", "instrucao": true, "texto": "Inspetor, a OM pede para conferir o AMV 03: ache o defeito mais grave e classifique." } ],
+      "pistas": { "dormente": "Com a passagem do trem, a placa de apoio na ponta da agulha se move 9 mm (dormente de madeira).", "encosto": "Vampiro: 24% de desgaste, dentro do limite.", "agulhas": "Agulhas sem trinca.", "barra": "Punhos centralizados." },
+      "verificacoes": [],
+      "correcao": "PGS-006334: placa movendo mais de 8 mm na região da ponta da agulha (ou mais de 12 mm em LT e pátio) torna o dormente inservível (I). Registrar e programar a troca." },
+    { "id": "punhos", "nome": "Punhos das barras descentralizados (P1F)", "curto": "Punhos\ndescentralizados",
+      "relato": [ { "quem": "Coordenador", "instrucao": true, "texto": "Inspetor, a OM pede para conferir o AMV 03: ache o defeito mais grave e classifique." } ],
+      "pistas": { "barra": "Os punhos das barras de detecção e atuação estão descentralizados em relação aos parafusos.", "encosto": "Vampiro: 20% de desgaste, dentro do limite.", "dormente": "Dormente firme.", "agulhas": "Agulhas sem trinca." },
+      "verificacoes": [],
+      "correcao": "PGS-006334: punhos das barras descentralizados são P1F; registrar no ValeForms com localização e evidência." }
+  ]
+}
