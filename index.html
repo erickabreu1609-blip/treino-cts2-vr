@@ -157,7 +157,7 @@ body.vr #stick { display: none; }
 <div id="stage"></div>
 <div id="stick" aria-label="Andar"><span></span></div>
 <div class="bar">
-  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v15/10 operar KGT</small></h1>
+  <h1>Máquina de chave <span>CTS-2</span> · protótipo <small style="font-size:11px;opacity:.6;font-weight:400">v15/10 garra KGT</small></h1>
   <button id="btnPessoa" type="button" title="Trocar participante">Identificar</button>
   <button id="btnGyro" type="button" aria-pressed="false">Giroscópio</button>
   <button id="btnVr" type="button">Modo óculos</button>
@@ -1038,9 +1038,9 @@ body.vr #stick { display: none; }
     l1a: [-1.367, 1.498], l1b: [-0.427, 3.348], l2a: [-1.647, 1.638], l2b: [-0.077, 3.608],
     cba: [0.673, 4.248], cbb: [2.603, 4.768], cca: [3.193, 4.268], bielaA: [4.033, 2.488], bielaB: [4.223, 1.858], bielaC: [4.573, 2.308] };
   const GIRO_X = 0.12;
-  const KLIM = { giro: [-Math.PI, Math.PI], lanca: [-0.5, 0.28], braco: [-0.9, 1.0], cacamba: [-1.3, 0.9], patolas: [0, 1] };
-  const KVEL = { giro: 0.35, lanca: 0.22, braco: 0.32, cacamba: 0.5, patolas: 0.7 };   // rad/s (patolas: curso por segundo)
-  const kgt = { pronta: false, giro: 0, lanca: 0, braco: 0, cacamba: 0, patolas: 0, vel: 0, freioEst: true, cmd: null, operando: false,
+  const KLIM = { giro: [-Math.PI, Math.PI], lanca: [-0.5, 0.28], braco: [-0.9, 1.0], cacamba: [-1.3, 0.9], patolas: [0, 1], garra: [0, 0.9], rot: [-Math.PI, Math.PI] };
+  const KVEL = { giro: 0.35, lanca: 0.22, braco: 0.32, cacamba: 0.5, patolas: 0.7, garra: 0.9, rot: 0.6 };   // garra: abertura das mandíbulas; rot: rotator da garra   // rad/s (patolas: curso por segundo)
+  const kgt = { pronta: false, giro: 0, lanca: 0, braco: 0, cacamba: 0, patolas: 0, implemento: "concha", garra: 0.6, rot: 0, vel: 0, freioEst: true, cmd: null, operando: false,
     h: 0, est: 0, alvoEst: 0, rodaAng: 0, linha: null, ocupando: null, batido: false, tAlarme: 0,
     meta: null, buzinas: 0, maxVel: 0, andou: 0, ok: null, painelAnt: "", tPainel: 0, auto: null };
   new THREE.GLTFLoader().load("kgt.glb?v=15-10-kgt-carro", g => {
@@ -1092,7 +1092,8 @@ body.vr #stick { display: none; }
     kgt.botoes = marca(P.giro, 1.50, 2.36, -0.40);    // botões de comando abaixo, à frente e à esquerda do volante
     kgt.ponta = marca(P.cacamba, GIRO_X, 2.26, 2.8);  // dentes da caçamba
     kgt.descer = new THREE.Object3D(); kgt.descer.position.set(2.4, 0, -1.2); root.add(kgt.descer);         // onde o operador desce, ao lado da cabine
-    posarKgt();
+    kgt.garraObj = criarGarra();
+    posarKgt(); atualizarReserva();
   }
   // aplica os ângulos às juntas, os cilindros e as bielas; devolve false se a pose for impossível (bielas não fecham)
   const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _v2 = new THREE.Vector3();
@@ -1122,7 +1123,94 @@ body.vr #stick { display: none; }
     for (const cl of kgt.cil) { cl.fim.getWorldPosition(_v); cl.pai.worldToLocal(_v); mirar(cl, _v.z, _v.y); }
     mirar(kgt.cilCac, C.x, C.y);
     kgt.root.updateMatrixWorld(true);
+    posarGarra();
     return true;
+  }
+  // ----- garra giratória (implemento trocável com a concha): pendurada no pino da concha, sempre na vertical -----
+  // mandíbulas abrem em x local; uma peça comprida tem de ficar ao longo de z local (atravessada entre as mandíbulas)
+  const GARRA_R = 0.45, GARRA_C = -1.24;   // raio das mandíbulas e centro de pega (abaixo do pino)
+  function criarGarra() {
+    const g = new THREE.Group(), amarelo = mat(0xe2b412, { roughness: 0.55, metalness: 0.2 }), aco = mat(0x3a3d40, { metalness: 0.6, roughness: 0.45 });
+    const elo = box(0.12, 0.35, 0.16, amarelo); elo.position.y = -0.175; g.add(elo);
+    const rot = cyl(0.17, 0.22, aco, 24); rot.position.y = -0.46; g.add(rot);
+    const cab = box(0.5, 0.25, 0.36, amarelo); cab.position.y = -0.695; g.add(cab);
+    for (const sx of [-1, 1]) { const cil = cyl(0.045, 0.42, aco, 10); cil.rotation.z = sx * 1.1; cil.position.set(sx * 0.2, -0.62, 0); g.add(cil); }
+    g.userData.mand = [-1, 1].map(sx => {
+      const a0 = Math.acos(sx * 0.16 / GARRA_R);   // ângulo do pivô na circunferência
+      const piv = new THREE.Group(); piv.position.set(sx * 0.16, GARRA_C + GARRA_R * Math.sin(a0), 0); g.add(piv);
+      const arco = 2.55;
+      for (const z of [-0.12, 0.12]) {
+        const t = new THREE.Mesh(new THREE.TorusGeometry(GARRA_R, 0.05, 8, 24, arco), amarelo);
+        t.position.set(-sx * 0.16, -GARRA_R * Math.sin(a0), z);   // centro da circunferência, relativo ao pivô
+        t.rotation.z = sx < 0 ? a0 : a0 - arco; t.scale.z = 1.6; piv.add(t);
+      }
+      const reforco = box(0.06, 0.08, 0.34, aco); reforco.position.set(-sx * 0.03, -0.04, 0); piv.add(reforco);
+      piv.userData.sx = sx; return piv;
+    });
+    g.visible = false; scene.add(g);
+    return g;
+  }
+  function abrirMandibulas(g, a) { for (const piv of g.userData.mand) piv.rotation.z = piv.userData.sx * a; }
+  const garraYaw = () => kgtYaw(kgt.h) + kgt.giro + kgt.rot;
+  function posarGarra() {
+    const g = kgt.garraObj; if (!g) return;
+    const usando = kgt.implemento === "garra";
+    g.visible = usando;
+    kgt.P.cacamba.traverse(m => { if (m.isMesh) m.visible = !usando; });
+    if (!usando) return;
+    kgt.P.cacamba.getWorldPosition(g.position);
+    g.rotation.set(0, garraYaw(), 0);
+    abrirMandibulas(g, kgt.garra);
+    g.updateMatrixWorld(true);
+  }
+  // centro de pega da garra, no mundo
+  function pontoGarra(v) { const g = kgt.garraObj; kgt.P.cacamba.getWorldPosition(v); v.y += GARRA_C; return v; }
+  // suporte do implemento reserva, ao lado da vaga do KGT (do lado de fora da via)
+  const SUPORTE = new THREE.Vector3(16.3, 0, 10.9);
+  const suporteImpl = (function () {
+    const g = new THREE.Group(), madeira = mat(0x8a5a2b, { roughness: 0.9 }), aco = mat(0x55595d, { metalness: 0.5, roughness: 0.5 });
+    for (const x of [-0.55, 0.55]) { const c = box(0.12, 0.45, 1.1, madeira); c.position.set(x, 0.225, 0); g.add(c); }
+    const placa = plaquinha("IMPLEMENTO RESERVA", "#f2c200"); placa.scale.setScalar(2.4); placa.position.set(0, 1.5, 0.75); g.add(placa);
+    const haste = cyl(0.015, 1.4, aco, 8); haste.position.set(0, 0.7, 0.78); g.add(haste);
+    g.position.set(SUPORTE.x, alturaLastro(SUPORTE.z), SUPORTE.z); scene.add(g);
+    return g;
+  })();
+  let reservaObj = null;   // o implemento que está no suporte (cópia da garra ou da concha)
+  function atualizarReserva() {
+    if (!kgt.pronta) return;
+    if (reservaObj) { suporteImpl.remove(reservaObj); reservaObj = null; }
+    if (kgt.implemento === "garra") {   // a concha fica no suporte
+      const c = new THREE.Group();
+      kgt.P.cacamba.updateMatrixWorld(true);
+      const inv = new THREE.Matrix4().copy(kgt.P.cacamba.matrixWorld).invert();
+      kgt.P.cacamba.traverse(m => { if (m.isMesh) { const k = m.clone(); k.visible = true; k.matrix.copy(inv).multiply(m.matrixWorld); k.matrix.decompose(k.position, k.quaternion, k.scale); c.add(k); } });
+      const b = new THREE.Box3().setFromObject(c), ctr = b.getCenter(new THREE.Vector3());
+      c.children.forEach(k => k.position.sub(ctr)); c.position.set(0, 0.45 + (b.max.y - b.min.y) / 2, 0); c.rotation.y = Math.PI / 2;
+      reservaObj = c;
+    } else {   // a garra fica no suporte, com as mandíbulas abertas
+      const g = criarGarra(); scene.remove(g); g.visible = true; abrirMandibulas(g, 0.6);
+      g.position.set(0, 0.45 - GARRA_C + 0.2, 0); reservaObj = g;
+    }
+    suporteImpl.add(reservaObj);
+  }
+  // troca de implemento: o braço leva o implemento ao suporte, desacopla, pega o outro e volta
+  function trocarImplemento(feito) {
+    const E = eixoKgt(), d = Math.hypot(SUPORTE.x - E.x, SUPORTE.z - E.z);
+    if (d < 3.6 || d > 6.4) return avisoKgt("O implemento reserva fica no suporte ao lado da vaga: volte o KGT à vaga para trocar.");
+    if (kt.carga) return avisoKgt("Solte a carga antes de trocar o implemento.");
+    if (Math.abs(kgt.vel) > 0.05) return avisoKgt("Pare a máquina antes de trocar o implemento.");
+    kgt.auto = "implemento";
+    const alto = poseIk(new THREE.Vector3(SUPORTE.x, 2.4, SUPORTE.z)), baixo = poseIk(new THREE.Vector3(SUPORTE.x, 1.45, SUPORTE.z));
+    const p0 = kgtPose(), passos = [{ patolas: 1 }, alto, baixo, "troca", alto, { giro: p0.giro, lanca: p0.lanca, braco: p0.braco, cacamba: p0.cacamba }];
+    if (p0.patolas < 0.5) passos.push({ patolas: 0 });
+    const rodar = () => {
+      const p = passos.shift();
+      if (!p) { kgt.auto = null; refazerBotoesKgt(); redesenharKgt(true); if (feito) feito(); return; }
+      if (p === "troca") { kgt.implemento = kgt.implemento === "garra" ? "concha" : "garra"; kgt.garra = 0.6; kgt.rot = 0; posarKgt(); atualizarReserva(); som.encaixe(); som.trava && som.trava(); return setTimeout(rodar, 600); }
+      const de = kgtPose(); som.hidraulico(1.4);
+      tween(1.4, k => { for (const j of ["giro", "lanca", "braco", "cacamba", "patolas"]) if (p[j] != null) kgt[j] = de[j] + (j === "giro" ? angDif(p[j] - de[j]) : p[j] - de[j]) * ease(k); posarKgt(); }, rodar);
+    };
+    rodar();
   }
   function kgtCaixaCacamba() {
     if (!kgt.pronta) return null;
@@ -1207,8 +1295,10 @@ body.vr #stick { display: none; }
     if (kgt[j] === ant) return false;
     let ok = posarKgt();
     if (ok && j !== "patolas") {
-      const bc = new THREE.Box3().setFromObject(kgt.P.cacamba), bb = new THREE.Box3().setFromObject(kgt.P.braco);
-      if (bc.min.y < 0.02 || bb.min.y < 0.05) ok = false;
+      const bb = new THREE.Box3().setFromObject(kgt.P.braco);
+      if (bb.min.y < 0.05) ok = false;
+      else if (kgt.implemento === "garra") { if (pontoGarra(_v2).y < 0.02) ok = false; }   // a garra não entra no chão
+      else if (new THREE.Box3().setFromObject(kgt.P.cacamba).min.y < 0.02) ok = false;
     }
     if (!ok) { kgt[j] = ant; posarKgt(); return false; }
     return true;
@@ -1218,8 +1308,8 @@ body.vr #stick { display: none; }
   function resetKgt() {
     resetTroca();
     if (!kgt.pronta) return;
-    Object.assign(kgt, KGT_CASA, { vel: 0, freioEst: true, motor: false, cmd: null, auto: null, meta: null, h: 0, est: 0, alvoEst: 0, rodaAng: 0, ocupando: null });
-    KGT_POS.set(14, 0, 6.2); posarKgt();
+    Object.assign(kgt, KGT_CASA, { implemento: "concha", garra: 0.6, rot: 0, vel: 0, freioEst: true, motor: false, cmd: null, auto: null, meta: null, h: 0, est: 0, alvoEst: 0, rodaAng: 0, ocupando: null });
+    KGT_POS.set(14, 0, 6.2); posarKgt(); atualizarReserva();
   }
   // ----- operar: o participante senta na cabine; os controles ficam no quadro, que vem para a frente da cabine -----
   const quadroCasa = {};
@@ -1268,7 +1358,9 @@ body.vr #stick { display: none; }
       ["kgt:patolas", kgt.patolas > 0.5 ? "Recolher\nestabiliz." : "Acionar\nestabiliz."], ["kgt:motor", kgt.motor ? "Desligar\nmotor" : "Ligar\nmotor"],
       ["kgt:giroE", "Girar cabine\nà esquerda"], ["kgt:giroD", "Girar cabine\nà direita"],
       ["kgt:lancaS", "Lança\nsobe"], ["kgt:lancaD", "Lança\ndesce"], ["kgt:bracoA", "Braço\nabre"], ["kgt:bracoF", "Braço\nrecolhe"],
-      ["kgt:cacA", "Caçamba\nabre"], ["kgt:cacF", "Caçamba\nfecha"]].concat(extra);
+      ...(kgt.implemento === "garra" ? [["kgt:garA", "Garra\nabre"], ["kgt:garF", "Garra\nfecha"], ["kgt:rotE", "Girar garra\nà esquerda"], ["kgt:rotD", "Girar garra\nà direita"]]
+        : [["kgt:cacA", "Caçamba\nabre"], ["kgt:cacF", "Caçamba\nfecha"]]),
+      ["kgt:implemento", kgt.implemento === "garra" ? "Trocar para\na concha" : "Trocar para\na garra"]].concat(extra);
   }
   // botões da cabine; com o CCP pedindo a linha, as respostas ao CCP vêm antes dos controles
   function refazerBotoesKgt() { setButtons(kgt.linha ? kgt.linha.concat(botoesKgt([])) : botoesKgt(kgt.extra)); }
@@ -1328,7 +1420,13 @@ body.vr #stick { display: none; }
     }
     if (a === "patolas" && Math.abs(kgt.vel) > 0.05) return avisoKgt("Pare o KGT antes de acionar ou recolher os estabilizadores.");
     if (a === "patolas") { kgt.cmd = { j: "patolas", dir: kgt.patolas > 0.5 ? -1 : 1, resta: 1 }; som.hidraulico(1.6); return; }
-    const J = { giroE: ["giro", 1], giroD: ["giro", -1], lancaS: ["lanca", -1], lancaD: ["lanca", 1], bracoA: ["braco", -1], bracoF: ["braco", 1], cacA: ["cacamba", -1], cacF: ["cacamba", 1] }[a];
+    if (a === "implemento") {
+      if (kt.seg || kt.fila.length) return avisoKgt("Aguarde: o KGT ainda está se posicionando.");
+      if (pessoaNoRaio()) return avisoKgt("Pessoa no raio de ação da máquina: pare e só opere com a área livre.");
+      return trocarImplemento(() => { if (trocaSt.manual) { botoesManual(); redesenharKgt(true); } });
+    }
+    const J = { giroE: ["giro", 1], giroD: ["giro", -1], lancaS: ["lanca", -1], lancaD: ["lanca", 1], bracoA: ["braco", -1], bracoF: ["braco", 1], cacA: ["cacamba", -1], cacF: ["cacamba", 1],
+      garA: ["garra", 1], garF: ["garra", -1], rotE: ["rot", 1], rotD: ["rot", -1] }[a];
     if (!J) return;
     if (pessoaNoRaio()) return avisoKgt("Pessoa no raio de ação da máquina: pare e só opere com a área livre.");
     if (J[0] === "giro" && kgt.patolas < 0.98) return avisoKgt("Acione os estabilizadores antes de girar a superestrutura ou movimentar carga.");
@@ -3464,6 +3562,9 @@ body.vr #stick { display: none; }
       grupos: { clipers: ["contrapinoA", "contrapinoB", "pinoA", "pinoB", "cliperA", "cliperB"], conector: ["conTrava"], juncao: ["juncao1", "juncao2"],
         dormente: ["travaDorm1", "travaDorm2", "travaDorm3", "travaDorm4"] }
     };
+    // com a garra: pega no centro da peça, com a peça atravessada entre as mandíbulas (eixo comprido da peça)
+    for (const c of Object.values(TROCAS)) { const b = new THREE.Box3(); c.pecas().forEach(o => b.expandByObject(o)); c.centro = b.getCenter(new THREE.Vector3()); }
+    TROCAS.agulha.eixo = V(1, 0, 0); TROCAS.motor.eixo = V(0, 0, 1); TROCAS.travamento.eixo = V(0, 0, 1);
     return true;
   }
   // ----- gancho e cinta do KGT -----
@@ -3479,6 +3580,13 @@ body.vr #stick { display: none; }
   const _p = new THREE.Vector3();
   function pontaGancho(v) { kgt.ponta.getWorldPosition(v); v.y -= kt.L; return v; }
   function atualizarGancho() {
+    if (kt.carga && kt.porGarra && kgt.pronta) {   // carga presa na garra: acompanha o centro da garra e o giro do rotator
+      pontoGarra(_p); _q.setFromAxisAngle(_Y, garraYaw() - kt.yaw0);
+      const pos = _p.clone().sub(kt.off.clone().applyQuaternion(_q));
+      if (kt.pousar) { pos.lerp(kt.pousar.alvo, kt.pousar.k); if (kt.pousar.q) _q.slerp(kt.pousar.q, kt.pousar.k); }
+      kt.carga.position.copy(pos); kt.carga.quaternion.copy(_q);
+      gancho.visible = false; return;
+    }
     if (!kt.visivel || !kgt.pronta) { gancho.visible = false; return; }
     kgt.ponta.getWorldPosition(_p);
     gancho.visible = true; gancho.position.set(_p.x, _p.y - kt.L, _p.z);
@@ -3502,9 +3610,18 @@ body.vr #stick { display: none; }
     kt.carga = g; som.encaixe();
     return g;
   }
+  // garra: a carga vale a partir do centro da garra, com o giro atual do rotator como referência
+  const _q = new THREE.Quaternion(), _Y = new THREE.Vector3(0, 1, 0);
+  function engatarGarra(objs, pega) {
+    const g = new THREE.Group(); g.position.copy(pega); scene.add(g); g.updateMatrixWorld(true);
+    objs.forEach(o => g.attach(o));
+    pontoGarra(_p); kt.off.copy(_p).sub(pega); kt.yaw0 = garraYaw();
+    kt.carga = g; kt.porGarra = true; som.encaixe();
+    return g;
+  }
   function desengatar() {
     const g = kt.carga; if (!g) return [];
-    kt.carga = null; kt.pousar = null;
+    kt.carga = null; kt.pousar = null; kt.porGarra = false;
     g.children.filter(o => o.userData.cinta).forEach(o => g.remove(o));
     const objs = g.children.slice();
     objs.forEach(o => scene.attach(o));
@@ -3704,6 +3821,7 @@ body.vr #stick { display: none; }
     }
     if (ldl.kgtManual === undefined) return perguntarOperador(e);
     if (ldl.kgtManual) return manualKgt(c, e);
+    if (kgt.implemento !== "concha") { kgt.implemento = "concha"; posarKgt(); atualizarReserva(); }   // o operador trabalha com o gancho na concha
     if (a === "descarregar") return descarregar(c, e);
     if (a === "retirar") return retirarComp(c, e);
     if (a === "posicionar") return posicionar(c, e);
@@ -3835,6 +3953,12 @@ body.vr #stick { display: none; }
   async function novaNoGancho(c) {
     const E = eixoKgt(), lado = kgtMundo({ x: 0, z: 0 }, kgt.h, 1, 0);
     await filaKgt([juntas(Object.assign(poseIk(new THREE.Vector3(E.x + lado.x * 5, 2.6, E.z + lado.z * 5), KGT_POS), { patolas: 0 }), 0.05, null, { mudo: true })]);
+    if (comGarra()) {   // com a garra, a peça nova chega presa entre as mandíbulas, atravessada
+      kgt.rot = angDif(Math.atan2(c.eixo.x, c.eixo.z) - kgtYaw(kgt.h) - kgt.giro); kgt.garra = 0.12; posarKgt();
+      pontoGarra(_p); c.nova.position.copy(_p).sub(c.centro); c.nova.visible = true; c.nova.updateMatrixWorld(true);
+      engatarGarra([c.nova], c.pega.clone().add(c.nova.position));
+      return;
+    }
     kgt.root.updateMatrixWorld(true); pontaGancho(_p);
     const g = _p.clone();
     c.nova.position.copy(g).sub(c.pega); c.nova.visible = true; c.nova.updateMatrixWorld(true);
@@ -3891,6 +4015,7 @@ body.vr #stick { display: none; }
     if (b === "zona") { andarAte(ZONA_SEGURA.clone()); hint("Indo para a zona segura."); }
     if ((b === "euOpero" || b === "operador") && ldl && trocaSt.e) { ldl.kgtManual = b === "euOpero"; return mostrarTroca(trocaSt.e); }
     if (b === "engatar") return engatarManual();
+    if (b === "ir") return irManual();
     if (b === "soltar") return soltarManual();
     if (b === "fino") { kgt.fino = !kgt.fino; botoesManual(); return redesenharKgt(true); }
   }
@@ -3924,24 +4049,39 @@ body.vr #stick { display: none; }
     return p.length ? p.join(" · ") : "na posição";
   }
   const TOL_SOLTAR = { posicionar: 0.15, retirar: 0.4, descarregar: 0.5 };
+  const comGarra = () => kgt.implemento === "garra";
+  const grau = r => Math.round(Math.abs(r) * 180 / Math.PI) + "°";
+  // quanto falta girar a garra: na pega, a peça atravessada entre as mandíbulas; no assentamento, a peça na posição original
+  function giroGarraFalta(m) {
+    if (m.fase === "pegar") { const t = Math.atan2(m.c.eixo.x, m.c.eixo.z); let d = angDif(t - garraYaw()); if (d > Math.PI / 2) d -= Math.PI; if (d < -Math.PI / 2) d += Math.PI; return d; }
+    if (m.fase === "levar" && kt.porGarra && m.a === "posicionar") return angDif(kt.yaw0 - garraYaw());
+    return 0;
+  }
+  function textoGiroGarra(d) { return Math.abs(d) > 0.09 ? (d > 0 ? "gire a garra à esquerda " : "gire a garra à direita ") + grau(d) : ""; }
   function botoesManual() {
     const m = trocaSt.manual; if (!m) return;
     const fino = ["tr:fino", kgt.fino ? "Movimento\nnormal" : "Movimento\nfino"];
-    kgt.extra = m.fase === "pegar" || m.fase === "cinta" ? [["tr:engatar", "Engatar a\ncinta"], fino, ["ldl:sair", "Sair"]]
-      : m.fase === "levar" || m.fase === "assentar" ? [["tr:soltar", "Assentar e\nsoltar"], fino, ["ldl:sair", "Sair"]]
+    kgt.extra = m.fase === "preparar" ? [["tr:ir", "Ir para o\nlocal da troca"], ["ldl:sair", "Sair"]]
+      : m.fase === "pegar" || m.fase === "cinta" ? [["tr:engatar", comGarra() ? "Fechar a\ngarra" : "Engatar a\ncinta"], fino, ["ldl:sair", "Sair"]]
+      : m.fase === "levar" || m.fase === "assentar" ? [["tr:soltar", kt.porGarra ? "Assentar e\nabrir a garra" : "Assentar e\nsoltar"], fino, ["ldl:sair", "Sair"]]
       : m.fase === "feito" ? [["ldl:seguir", "Continuar"], ["ldl:sair", "Sair"]] : [["ldl:sair", "Sair"]];
     if (kgt.operando && !kgt.linha) refazerBotoesKgt();
   }
   function painelManual() {
-    const m = trocaSt.manual, e = m.e, av = avisoAtivo();
+    const m = trocaSt.manual, e = m.e, av = avisoAtivo(), g = comGarra();
     let txt = "", cor;
-    if (m.fase === "ir") txt = "O KGT vai até o local da troca e aciona os estabilizadores. Aguarde.";
-    else if (m.fase === "pegar") txt = `Leve o gancho até em cima da ${m.c.nome} e toque em Engatar a cinta.\nSinaleiro: ${guiaSinaleiro(pontaGancho(_p), m.pega)}.`;
-    else if (m.fase === "cinta") txt = "O executante está passando a cinta. Não mexa o KGT com ele no raio de ação.";
-    else if (m.fase === "levar") txt = `Leve a carga até a caixa verde (${m.ondeTxt}) e toque em Assentar e soltar.\nSinaleiro: ${guiaSinaleiro(kt.carga.position, m.destino)}.`;
+    if (m.fase === "preparar") txt = `O KGT está na vaga com a ${g ? "garra" : "concha"}. Se quiser, troque o implemento no suporte ao lado da vaga (botão Trocar para a ${g ? "concha" : "garra"}): com a garra você pega a peça direto, sem cinta; com a concha, o gancho e a cinta. Depois toque em Ir para o local da troca.`;
+    else if (m.fase === "ir") txt = "O KGT vai até o local da troca e aciona os estabilizadores. Aguarde.";
+    else if (m.fase === "pegar") {
+      const alvo = g ? m.centro : m.pega, de = g ? pontoGarra(_p) : pontaGancho(_p), rot = g ? textoGiroGarra(giroGarraFalta(m)) : "";
+      txt = g ? `Abra a garra, desça com a ${m.c.nome} atravessada entre as mandíbulas e toque em Fechar a garra.` : `Leve o gancho até em cima da ${m.c.nome} e toque em Engatar a cinta.`;
+      txt += `\nSinaleiro: ${guiaSinaleiro(de, alvo)}${rot ? " · " + rot : ""}.`;
+    }
+    else if (m.fase === "cinta") txt = g ? "Fechando a garra." : "O executante está passando a cinta. Não mexa o KGT com ele no raio de ação.";
+    else if (m.fase === "levar") { const rot = textoGiroGarra(giroGarraFalta(m)); txt = `Leve a carga até a caixa verde (${m.ondeTxt}) e toque em ${kt.porGarra ? "Assentar e abrir a garra" : "Assentar e soltar"}.\nSinaleiro: ${guiaSinaleiro(kt.carga.position, m.destino)}${rot ? " · " + rot : ""}.`; }
     else if (m.fase === "assentar") txt = "Assentando a carga.";
     else if (m.fase === "feito") { txt = "Carga assentada no lugar.\n" + (e.explica || ""); cor = "#23c552"; }
-    if (m.fase !== "feito") txt += "\nLança sobe e desce, braço abre e recolhe, cabine gira. Movimento fino para o ajuste final.";
+    if (m.fase === "pegar" || m.fase === "levar") txt += g ? "\nLança, braço e giro levam a garra; Girar garra alinha a peça. Movimento fino para o ajuste final." : "\nLança sobe e desce, braço abre e recolhe, cabine gira. Movimento fino para o ajuste final.";
     return [etiquetaLdl(), "Você opera o KGT: " + e.titulo, (av ? av + "\n" : "") + txt, av ? "#e5533d" : cor];
   }
   async function manualKgt(c, e) {
@@ -3951,33 +4091,58 @@ body.vr #stick { display: none; }
       return painelTroca(`O KGT não pode içar: a peça ainda está presa (${pendentesComp(c).slice(0, 3).map(f => f.nome).join("; ")}). Verifique se o componente está totalmente solto antes da movimentação.`, "#e5533d");
     }
     if (a === "descarregar" && c.novaNoChao) return concluirTroca(e);
-    kt.visivel = true; kt.L = c.L;
+    kt.L = c.L;
     const m = trocaSt.manual = { c, e, a, fase: "ir" };
     mantenedorParaZona(); coordenadorParaZona(); afastarFigurasTroca(c);
     entrarKgt(); kgt.motor = true; kgt.fino = false;
-    kgt.painel = painelManual; botoesManual(); redesenharKgt(true);
+    kgt.painel = painelManual;
+    if (!naPosicao(c)) {   // na vaga: dá para trocar o implemento antes de sair
+      m.fase = "preparar"; botoesManual(); redesenharKgt(true);
+      await new Promise(r => { m.ir = r; });
+      if (trocaSt.manual !== m) return;
+      m.fase = "ir";
+    }
+    kt.visivel = !comGarra();
+    botoesManual(); redesenharKgt(true);
     if (a === "descarregar") await novaNoGancho(c);
-    if (trocaSt.e !== e) return;
+    if (trocaSt.manual !== m) return;
     await filaKgt(segsIrTrabalho(c, a === "descarregar"));
-    if (trocaSt.e !== e) return;
+    if (trocaSt.manual !== m) return;
     if (a === "descarregar") { m.destino = c.pega.clone().add(c.novo); m.ondeTxt = "ao lado da via, no local da troca"; m.fase = "levar"; marcarDestino(kt.carga, m.destino); }
     else {
       if (a === "posicionar" && !c.nova.visible) { c.nova.position.copy(c.novo); c.nova.visible = true; c.novaNoChao = true; }
       m.pega = a === "retirar" ? c.pega.clone() : c.pega.clone().add(c.novo);
+      m.centro = a === "retirar" ? c.centro.clone() : c.centro.clone().add(c.novo);
+      if (comGarra()) kgt.garra = Math.max(kgt.garra, 0.6);
       m.fase = "pegar";
     }
     botoesManual(); redesenharKgt(true);
   }
+  function irManual() { const m = trocaSt.manual; if (m && m.fase === "preparar" && !kgt.auto && m.ir) { const r = m.ir; m.ir = null; r(); } }
   function engatarManual() {
-    const m = trocaSt.manual; if (!m || m.fase !== "pegar" || !kgt.operando) return;
+    const m = trocaSt.manual; if (!m || m.fase !== "pegar" || !kgt.operando || kgt.cmd) return;
+    const c = m.c;
+    if (comGarra()) {
+      const g = pontoGarra(new THREE.Vector3()), dh = Math.hypot(g.x - m.centro.x, g.z - m.centro.z), dv = g.y - m.centro.y, rot = giroGarraFalta(m);
+      if (kgt.garra < 0.4) return avisoKgt("Abra a garra antes de descer sobre a peça.");
+      if (dh > 0.2 || Math.abs(dv) > 0.15 || Math.abs(rot) > 0.26) return avisoKgt(`A garra ainda não está na posição de pega: ${[guiaSinaleiro(g, m.centro), textoGiroGarra(rot)].filter(t => t && t !== "na posição").join(" · ") || "ajuste"}.`);
+      m.fase = "cinta"; botoesManual(); redesenharKgt(true);
+      const a0 = kgt.garra; som.hidraulico(1);
+      tween(1.0, k => { kgt.garra = a0 + (0.12 - a0) * ease(k); posarGarra(); }, () => {
+        if (trocaSt.manual !== m) return;
+        if (m.a === "retirar") { engatarGarra([criarVelha(c)], c.pega); m.destino = c.pega.clone().add(c.velho); m.ondeTxt = c.id === "agulha" ? "fora da via, no local de descarte" : "o palete da unidade inservível"; }
+        else { c.nova.updateMatrixWorld(true); engatarGarra([c.nova], m.pega); m.destino = c.pega.clone(); m.ondeTxt = "o lugar da peça na via"; }
+        marcarDestino(kt.carga, m.destino);
+        m.fase = "levar"; botoesManual(); redesenharKgt(true);
+      });
+      return;
+    }
     const h = pontaGancho(new THREE.Vector3()), dh = Math.hypot(h.x - m.pega.x, h.z - m.pega.z), dv = h.y - m.pega.y;
     if (dh > 0.25 || dv > 0.45 || dv < -0.1) return avisoKgt(`O gancho ainda não está em cima da peça: ${guiaSinaleiro(h, m.pega)}.`);
-    if (kgt.cmd) return;
     m.fase = "cinta"; botoesManual(); redesenharKgt(true);
     mantenedorAgir(m.pega, false);
     setTimeout(() => {
       if (trocaSt.manual !== m) return;
-      const c = m.c;
       if (m.a === "retirar") { engatar([criarVelha(c)], c.pega, c.cinta); m.destino = c.pega.clone().add(c.velho); m.ondeTxt = c.id === "agulha" ? "fora da via, no local de descarte" : "o palete da unidade inservível"; }
       else { c.nova.updateMatrixWorld(true); engatar([c.nova], m.pega, c.cinta.map(p => p.clone().add(c.novo))); m.destino = c.pega.clone(); m.ondeTxt = "o lugar da peça na via"; }
       marcarDestino(kt.carga, m.destino);
@@ -3986,18 +4151,20 @@ body.vr #stick { display: none; }
     }, 2400);
   }
   function soltarManual() {
-    const m = trocaSt.manual; if (!m || m.fase !== "levar" || !kt.carga) return;
-    const p = kt.carga.position, d = m.destino, dh = Math.hypot(p.x - d.x, p.z - d.z), dv = p.y - d.y;
-    if (dh > TOL_SOLTAR[m.a] || dv > 0.5 || dv < -0.2) return avisoKgt(`A carga ainda não está sobre o lugar certo: ${guiaSinaleiro(p, d)}.`);
-    if (kgt.cmd) return;
+    const m = trocaSt.manual; if (!m || m.fase !== "levar" || !kt.carga || kgt.cmd) return;
+    const p = kt.carga.position, d = m.destino, dh = Math.hypot(p.x - d.x, p.z - d.z), dv = p.y - d.y, rot = giroGarraFalta(m);
+    if (dh > TOL_SOLTAR[m.a] || dv > 0.5 || dv < -0.2 || Math.abs(rot) > 0.17)
+      return avisoKgt(`A carga ainda não está sobre o lugar certo: ${[guiaSinaleiro(p, d), textoGiroGarra(rot)].filter(t => t && t !== "na posição").join(" · ") || "ajuste"}.`);
     m.fase = "assentar"; alvoMarca.visible = false; botoesManual(); redesenharKgt(true);
-    kt.pousar = { alvo: d.clone(), k: 0 };
+    const garra = kt.porGarra;
+    kt.pousar = { alvo: d.clone(), k: 0, q: garra && m.a === "posicionar" ? new THREE.Quaternion() : null };
     tween(0.9, k => { if (kt.pousar) kt.pousar.k = ease(k); }, () => {
       if (trocaSt.manual !== m) return;
       const c = m.c;
       if (m.a === "retirar") { const objs = desengatar(); c.velha = objs[0] || c.velha; }
       else if (m.a === "descarregar") { desengatar(); c.novaNoChao = true; }
       else instalarNova(c);
+      if (garra) { const a0 = kgt.garra; tween(0.8, k => { kgt.garra = a0 + (0.6 - a0) * ease(k); posarGarra(); }); som.hidraulico(0.8); }
       m.fase = "feito"; trocaSt.feito = true; som.selecionar();
       const e = m.e;
       if (!e.feitoReg) { e.feitoReg = true; ldl.achados.push({ titulo: e.nome || e.titulo, escolha: "feito na cena", correto: "feito na cena", certo: true, critico: false }); if (e.apos) e.apos(); }
@@ -4045,7 +4212,7 @@ body.vr #stick { display: none; }
   // Cada PRO é um arquivo JSON em pros/ (lista em pros/indice.json; guia de conversão em pros/COMO-CRIAR-UM-PRO.md).
   // O carregador sorteia as variáveis, troca os {campos} dos textos e transforma as etapas no formato do motor acima.
   // Um PRO novo também pode ser carregado no celular pela biblioteca ("Carregar PRO"), sem publicar o site.
-  const VERSAO = "15-10-operar-kgt";
+  const VERSAO = "15-10-garra-kgt";
   const PROS = {}, ordemPros = [], EXTRAS_KEY = "cts2-vr-pros-carregados";
   let prosErro = "";
   const valorVar = (f, c) => c.split(".").reduce((o, k) => o == null ? undefined : o[k], f);
@@ -5029,7 +5196,7 @@ body.vr #stick { display: none; }
   if (!/test\.html$/.test(location.pathname)) abrirBib();
   if (!pessoa.nome || !pessoa.mat) pedirIdentificacao();
   document.fonts && document.fonts.ready.then(() => { if (mode === "menu") showMenu(); });
-  if (/[?&]teste\b/.test(location.search)) window.__t = { posar: () => posarKgt(), olhar: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(new THREE.Vector3().copy(rig.position).add(camera.position)); yaw = Math.atan2(-d.x, -d.z); pitch = Math.atan2(d.y, Math.hypot(d.x, d.z)); }, select, kgt, KGT_POS, trem, licenca, chamarTrem, kgtNaVia, pedidoCcp: () => pedidoCcp(), autoKgt, PROS, validarPro, startRoteiro, rig, panel, buttons, modo: () => mode, ldl: () => ldl, painel: () => ultimoPainel, scene, partGroups, THREE, kgtAlcance, moverJunta, TROCAS, FIX, kt, trocaSt, pessoaNoRaio, acaoKgt, pontaGancho: () => pontaGancho(new THREE.Vector3()), mantenedor, coordenador, figurasFixas, kgtPose, moverJuntaK: moverJunta, montarTrocas, poseIk, eixoKgt, KVEL, tocar: id => select(id), olho: () => olhoParticipante(), perigo: z => perigoZona(z), obst: () => obstaculos, andarAte: p => andarAte(p), objPonto: (o, p) => { objToque = o; ultimoPonto = p; } };   // só para testes automáticos
+  if (/[?&]teste\b/.test(location.search)) window.__t = { posar: () => posarKgt(), olhar: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(new THREE.Vector3().copy(rig.position).add(camera.position)); yaw = Math.atan2(-d.x, -d.z); pitch = Math.atan2(d.y, Math.hypot(d.x, d.z)); }, select, kgt, KGT_POS, trem, licenca, chamarTrem, kgtNaVia, pedidoCcp: () => pedidoCcp(), autoKgt, PROS, validarPro, startRoteiro, rig, panel, buttons, modo: () => mode, ldl: () => ldl, painel: () => ultimoPainel, scene, partGroups, THREE, kgtAlcance, moverJunta, TROCAS, FIX, kt, trocaSt, pessoaNoRaio, acaoKgt, pontaGancho: () => pontaGancho(new THREE.Vector3()), mantenedor, coordenador, figurasFixas, kgtPose, moverJuntaK: moverJunta, montarTrocas, poseIk, eixoKgt, KVEL, pontoGarra: () => pontoGarra(new THREE.Vector3()), garraYaw: () => garraYaw(), kgtYaw, GARRA_C, tocar: id => select(id), olho: () => olhoParticipante(), perigo: z => perigoZona(z), obst: () => obstaculos, andarAte: p => andarAte(p), objPonto: (o, p) => { objToque = o; ultimoPonto = p; } };   // só para testes automáticos
   requestAnimationFrame(loop);
 })();
 </script>
