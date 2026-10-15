@@ -9,7 +9,8 @@
   "prefixo": "EE",
   "papeis": {
     "coordenador": "Pede a LDL e o comando local ao CCP, confere a garra de bloqueio, conduz o operador do KGT pelo rádio, pede os comandos do teste de concordância e devolve a máquina ao controle central.",
-    "executante": "Gira a chave de comando local e o comutador, aplica o cepo, solta e aplica as fixações da unidade, passa a cinta no gancho do KGT, alinha a unidade, instala o DAM e mede a força."
+    "executante": "Gira a chave de comando local e o comutador, aplica o cepo, solta e aplica as fixações da unidade, alinha a unidade, instala o DAM e mede a força.",
+    "operador": "Opera o KGT da cabine: pega com a garra a unidade inservível e a leva ao palete, e assenta a unidade nova no dormente oco. As outras etapas são feitas pela equipe."
   },
   "falaInicio": "Equipe, troca de unidade da máquina de chave do AMV 03. Procedimentos de segurança 01 e 02 em todos os passos.",
   "falaFim": "Unidade trocada e máquina em controle central.",
@@ -174,16 +175,18 @@
           "componente": "travamento",
           "acao": "retirar",
           "titulo": "Retire a unidade de travamento",
-          "corpo": "O KGT desce o gancho sobre a unidade. Passe a cinta tocando na unidade e vá para a zona segura. O KGT só iça com todos fora do raio de ação.",
-          "explica": "PRO-001122 Anexo 5.4, passo 7: retirar a unidade defeituosa com o KGT ou caminhão com equipamento de guindar."
+          "corpo": "O operador do KGT desce a garra aberta sobre a unidade, fecha a garra e leva a peça inservível para fora da via. Toda a equipe fica na zona segura, fora do raio de ação, até o KGT terminar.",
+          "explica": "PRO-001122 Anexo 5.4, passo 7: retirar a unidade defeituosa com o KGT ou caminhão com equipamento de guindar.",
+          "papel": "operador"
         },
         {
           "tipo": "troca",
           "componente": "travamento",
           "acao": "posicionar",
           "titulo": "Instale a unidade de travamento nova",
-          "corpo": "O KGT desce o gancho sobre a unidade nova no palete. Passe a cinta tocando nela e vá para a zona segura. O KGT a assenta no dormente oco.",
-          "explica": "PRO-001122 Anexo 5.4, passo 8: instalar a nova unidade com o KGT ou caminhão munck."
+          "corpo": "O operador do KGT pega a unidade nova no palete com a garra e a assenta no lugar. Toda a equipe fica na zona segura, fora do raio de ação, até o KGT terminar o posicionamento; depois a equipe aplica as fixações.",
+          "explica": "PRO-001122 Anexo 5.4, passo 8: instalar a nova unidade com o KGT ou caminhão munck.",
+          "papel": "operador"
         },
         {
           "tipo": "decisao",
@@ -491,16 +494,18 @@
           "componente": "motor",
           "acao": "retirar",
           "titulo": "Retire a unidade de motor",
-          "corpo": "O KGT desce o gancho sobre a unidade. Passe a cinta tocando na unidade e vá para a zona segura. O KGT só iça com todos fora do raio de ação.",
-          "explica": "PRO-001122 Anexo 5.4, passo 7: retirar a unidade defeituosa com o KGT ou caminhão com equipamento de guindar."
+          "corpo": "O operador do KGT desce a garra aberta sobre a unidade, fecha a garra e leva a peça inservível para fora da via. Toda a equipe fica na zona segura, fora do raio de ação, até o KGT terminar.",
+          "explica": "PRO-001122 Anexo 5.4, passo 7: retirar a unidade defeituosa com o KGT ou caminhão com equipamento de guindar.",
+          "papel": "operador"
         },
         {
           "tipo": "troca",
           "componente": "motor",
           "acao": "posicionar",
           "titulo": "Instale a unidade de motor nova",
-          "corpo": "O KGT desce o gancho sobre a unidade nova no palete. Passe a cinta tocando nela e vá para a zona segura. O KGT a assenta no dormente oco.",
-          "explica": "PRO-001122 Anexo 5.4, passo 8: instalar a nova unidade com o KGT ou caminhão munck."
+          "corpo": "O operador do KGT pega a unidade nova no palete com a garra e a assenta no lugar. Toda a equipe fica na zona segura, fora do raio de ação, até o KGT terminar o posicionamento; depois a equipe aplica as fixações.",
+          "explica": "PRO-001122 Anexo 5.4, passo 8: instalar a nova unidade com o KGT ou caminhão munck.",
+          "papel": "operador"
         },
         {
           "tipo": "decisao",

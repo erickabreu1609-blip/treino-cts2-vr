@@ -9,7 +9,8 @@
   "prefixo": "VP",
   "papeis": {
     "coordenador": "Abre e devolve a LDL, aprova o plano de rigging, define a zona segura, conduz o operador do KGT, isola a zona crítica e informa o primeiro trem; confere o serviço do executante.",
-    "executante": "Mede a temperatura, aplica o cepo, solta e aplica as fixações da agulha, passa a cinta no gancho do KGT, ajusta o coice, monta a junta e esmerilha."
+    "executante": "Mede a temperatura, aplica o cepo, solta e aplica as fixações da agulha, ajusta o coice, monta a junta e esmerilha.",
+    "operador": "Opera o KGT da cabine: pega com a garra a agulha inservível e a leva para fora da via, e assenta a agulha nova no lugar. As outras etapas são feitas pela equipe."
   },
   "falaInicio": "Equipe, troca da meia chave do AMV 03. Plano de rigging na mão e zona crítica isolada.",
   "falaFim": "Troca concluída dentro do padrão.",
@@ -104,9 +105,9 @@
           "tipo": "troca",
           "componente": "agulha",
           "acao": "descarregar",
-          "papel": "coordenador",
+          "papel": "operador",
           "titulo": "Descarga da agulha nova",
-          "corpo": "O KGT traz a agulha nova na cinta e a deposita ao lado da via. Durante a movimentação, toda a equipe fica na zona segura (cones e faixa verde).",
+          "corpo": "A agulha nova já foi descarregada pelo KGT e está ao lado da via, lado a lado com os outros componentes novos, pronta para ser pega e içada pela garra.",
           "explica": "PRO-020971 Anexo 10, passo 2: descarga do componente com equipamento ferroviário (KGT), para o ativo ficar disponível no local da troca."
         },
         {
@@ -203,16 +204,18 @@
           "componente": "agulha",
           "acao": "retirar",
           "titulo": "Retire a agulha velha com o KGT",
-          "corpo": "O KGT desce o gancho sobre a agulha. Passe a cinta (pinça) tocando na agulha e vá para a zona segura. O KGT só iça com todos fora do raio de ação.",
-          "explica": "PRO-020971 Anexo 10, passo 10: pega com a pinça ou ferramenta de içamento homologada e retirada da agulha para fora da via, em local seguro, sem atingir a máquina de chave, os tirantes e as barras."
+          "corpo": "O operador do KGT desce a garra aberta sobre a agulha, fecha a garra e leva a peça inservível para fora da via. Toda a equipe fica na zona segura, fora do raio de ação, até o KGT terminar.",
+          "explica": "PRO-020971 Anexo 10, passo 10: pega com a pinça ou ferramenta de içamento homologada e retirada da agulha para fora da via, em local seguro, sem atingir a máquina de chave, os tirantes e as barras.",
+          "papel": "operador"
         },
         {
           "tipo": "troca",
           "componente": "agulha",
           "acao": "posicionar",
           "titulo": "Assente a agulha nova",
-          "corpo": "O KGT desce o gancho sobre a agulha nova. Passe a cinta tocando na agulha nova e vá para a zona segura. O KGT a assenta nas placas de apoio.",
-          "explica": "PRO-020971 Anexo 10, passo 11: cinta no ponto indicado, içamento e movimento horizontal com cuidado, deposição bem encaixada nas placas de apoio e depois o KGT se afasta para tirar a cinta."
+          "corpo": "O operador do KGT pega a agulha nova com a garra e a assenta no lugar. Toda a equipe fica na zona segura, fora do raio de ação, até o KGT terminar o posicionamento; depois a equipe aplica as fixações.",
+          "explica": "PRO-020971 Anexo 10, passo 11: cinta no ponto indicado, içamento e movimento horizontal com cuidado, deposição bem encaixada nas placas de apoio e depois o KGT se afasta para tirar a cinta.",
+          "papel": "operador"
         },
         {
           "tipo": "decisao",
